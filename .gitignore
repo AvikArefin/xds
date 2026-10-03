@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+cache/
+export/
+.migrate-backup/
+!packages/protocol/example/**
+.DS_Store
+*.tsbuildinfo

@@ -181,7 +181,7 @@ errors. `tests/fixtures/design-expressions.json` is run through both, so they ca
 
 ### 3.4 Starter designs
 
-`packages/protocol/designs/` holds tested starters: `sweep`, `spotlight`, `aurora`, `grain-solid`,
+`xds/resources/designs/` holds tested starters: `sweep`, `spotlight`, `aurora`, `grain-solid`,
 `split-tone` and `vignette-dark`. The project scaffold stays content-neutral, so copy one in when you
 want it:
 

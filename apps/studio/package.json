@@ -1,0 +1,34 @@
+{
+  "name": "@xds/studio",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.117.0",
+    "@react-three/fiber": "^8.17.10",
+    "@xds/editor-core": "*",
+    "@xds/protocol": "*",
+    "culori": "^4.0.1",
+    "expr-eval": "^2.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.170.0",
+    "three-stdlib": "^2.34.0",
+    "zundo": "^2.2.0",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/culori": "^2.1.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.170.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "vite": "^5.4.10"
+  }
+}

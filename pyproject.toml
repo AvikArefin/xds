@@ -1,0 +1,32 @@
+[project]
+name = "xds"
+version = "2.0.0"
+description = "Local design editor for social-media graphics that agents can drive"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "playwright>=1.48",
+    "pillow>=11",
+    "numpy>=2",
+    "opencv-contrib-python-headless>=4.10",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+xds = "xds.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["xds"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

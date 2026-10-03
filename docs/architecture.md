@@ -34,13 +34,8 @@ xds/
 ├── pyproject.toml                 # uv project: the `xds` Python package
 │
 ├── packages/
-│   ├── protocol/                  # @xds/protocol
-│   │   ├── src/generated/         #   TypeScript types generated from xds/models.py
-│   │   ├── template/              #   the blank project `xds init` copies (content-neutral),
-│   │   │                          #   including AGENTS.md: the in-project guide for AI agents
-│   │   ├── designs/               #   starter ground designs (`xds design add`)
-│   │   ├── screens/               #   starter screen pages + status-bar/home-indicator partials
-│   │   └── example/               #   a fully authored example project (used by tests)
+│   ├── protocol/                  # @xds/protocol: only the TypeScript types generated
+│   │   └── src/generated/         #   from xds/models.py (`xds schema --emit-types`)
 │   └── editor-core/               # @xds/editor-core: pure functions (node edits, box ↔ px,
 │                                  #   pose math, framing math); no React, no Three
 │
@@ -70,13 +65,25 @@ xds/
 │   ├── browser.py                 #   Playwright: render slides, collect measurements
 │   ├── export.py                  #   audit gate → copy renders → export/<stamp>/
 │   ├── migrate/                   #   conform pass + explicit version steps
+│   ├── resources/                 #   files the CLI copies into projects (package data)
+│   │   ├── template/              #     the blank project `xds init` copies (content-neutral),
+│   │   │                          #     including AGENTS.md: the in-project guide for AI agents
+│   │   ├── designs/               #     starter ground designs (`xds design add`)
+│   │   └── screens/               #     starter screen page + status-bar/home-indicator partials
 │   └── audit/                     #   the design-rule engine (see design-rules.md)
 │       ├── engine.py  thresholds.py  contrast.py  saliency.py  annotate.py
 │       └── rules/  collision.py  spacing.py  typography.py  contrast.py
 │                   composition.py  subject.py
 │
 └── tests/                         # pytest (Python) + vitest (TS) + one Playwright smoke test
+    └── fixtures/
+        ├── example/               #   a fully authored example project
+        └── design-expressions.json  # expression cases run by both the TS and Python parsers
 ```
+
+`@xds/protocol` holds nothing but generated types, so it is the one place the TypeScript side
+learns the file format. Starters and the project template belong to the Python package because
+the CLI is what copies them, and they ship with it when `xds` is installed.
 
 The `xds` CLI is the stable automation interface. The HTTP API is an internal detail between
 the editor and the Python process. Editing files directly is the other supported way in.

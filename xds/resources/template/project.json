@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "id": "untitled",
+  "name": "Untitled",
+  "description": "",
+  "format": { "preset": "instagram-portrait", "width": 1080, "height": 1350 },
+  "brand": {
+    "colors": [{ "name": "paper", "hex": "#F2F1EE" }],
+    "typography": {}
+  },
+  "fonts": [],
+  "assets": [],
+  "screens": [],
+  "materials": [],
+  "objects": [],
+  "layerOrder": ["ground", "render", "image", "type"],
+  "slides": [{ "id": "s1", "name": "Slide 1", "background": "paper", "nodes": [] }]
+}
