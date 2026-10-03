@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="{{width}}" height="{{height}}" viewBox="0 0 {{width}} {{height}}">
+  <metadata id="xds-design">
+  {
+    "name": "Grain solid",
+    "params": [
+      { "name": "color", "type": "color", "label": "Color", "default": "#e7e3dc" },
+      { "name": "lift", "type": "number", "label": "Top light", "default": 0.03, "min": 0, "max": 0.1, "step": 0.005 },
+      { "name": "grain", "type": "number", "label": "Grain", "default": 0.055, "min": 0, "max": 0.08, "step": 0.005 }
+    ],
+    "variants": [
+      { "name": "sand", "values": { "color": "#e7e3dc" } },
+      { "name": "sage", "values": { "color": "#cdd6c9" } },
+      { "name": "ink", "values": { "color": "#1e1f23", "lift": 0.04, "grain": 0.06 } }
+    ]
+  }
+  </metadata>
+  <defs>
+    <linearGradient id="grain-solid-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="{{width * 0.2}}" y2="{{height}}">
+      <stop offset="0" stop-color="{{shade(color, lift)}}"/>
+      <stop offset="0.55" stop-color="{{color}}"/>
+      <stop offset="1" stop-color="{{shade(color, -lift * 0.7)}}"/>
+    </linearGradient>
+    <filter id="grain-solid-grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="2" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>
+    </filter>
+  </defs>
+  <rect width="{{width}}" height="{{height}}" fill="url(#grain-solid-fill)"/>
+  <rect width="{{width}}" height="{{height}}" filter="url(#grain-solid-grain)" opacity="{{grain}}"/>
+</svg>

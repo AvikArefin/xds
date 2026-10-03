@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="{{width}}" height="{{height}}" viewBox="0 0 {{width}} {{height}}">
+  <metadata id="xds-design">
+  {
+    "name": "Aurora",
+    "params": [
+      { "name": "base", "type": "color", "label": "Base", "default": "#f4f1ec" },
+      { "name": "accent", "type": "color", "label": "Accent", "default": "#7b61ff" },
+      { "name": "blobs", "type": "number", "label": "Blobs", "default": 3, "min": 2, "max": 5, "step": 1 },
+      { "name": "lightness", "type": "number", "label": "Blob lightness", "default": 0.8, "min": 0.2, "max": 0.95, "step": 0.01 },
+      { "name": "intensity", "type": "number", "label": "Intensity", "default": 0.6, "min": 0, "max": 1, "step": 0.05 },
+      { "name": "spread", "type": "number", "label": "Softness", "default": 0.15, "min": 0.06, "max": 0.3, "step": 0.01 },
+      { "name": "grain", "type": "number", "label": "Grain", "default": 0.04, "min": 0, "max": 0.08, "step": 0.005 }
+    ],
+    "variants": [
+      { "name": "lilac", "values": { "accent": "#7b61ff" } },
+      { "name": "citrus", "values": { "accent": "#ff8a3d", "base": "#f7f2ea" } },
+      { "name": "dusk", "values": { "base": "#15141b", "accent": "#6f5cff", "lightness": 0.42, "intensity": 0.7, "grain": 0.05 } }
+    ]
+  }
+  </metadata>
+  <defs>
+    <filter id="aurora-blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="{{width * spread}}"/>
+    </filter>
+    <radialGradient id="aurora-calm" gradientUnits="userSpaceOnUse" cx="{{subject.cx}}" cy="{{subject.cy}}" r="{{max(subject.w, subject.h) * 0.9}}">
+      <stop offset="0" stop-color="{{base}}" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="{{base}}" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="aurora-grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="5" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>
+    </filter>
+  </defs>
+  <rect width="{{width}}" height="{{height}}" fill="{{base}}"/>
+  <!-- Blobs walk around the edge of the frame (golden-angle steps), in analogous hues of the accent. -->
+  <g filter="url(#aurora-blur)">
+    <circle data-xds-repeat="i" data-xds-count="{{blobs}}"
+            cx="{{width * (0.5 + 0.48 * cos(i * 2.4 + 0.7))}}"
+            cy="{{height * (0.5 + 0.46 * sin(i * 2.4 + 0.7))}}"
+            r="{{width * (0.36 - 0.03 * i)}}"
+            fill="{{tone(hue(accent, i * 36 - 36), lightness + 0.03 * i, 0.13)}}"
+            fill-opacity="{{intensity}}"/>
+  </g>
+  <!-- Keep the area behind the product calm. -->
+  <rect width="{{width}}" height="{{height}}" fill="url(#aurora-calm)"/>
+  <rect width="{{width}}" height="{{height}}" filter="url(#aurora-grain)" opacity="{{grain}}"/>
+</svg>

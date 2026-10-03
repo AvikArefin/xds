@@ -1,3 +1,4 @@
+.ruff_cache/
 node_modules/
 dist/
 .venv/
@@ -10,3 +11,6 @@ export/
 !packages/protocol/example/**
 .DS_Store
 *.tsbuildinfo
+
+# Fontshare fonts are downloaded by the tests (xds fonts fetch), not redistributed
+tests/fixtures/example/fonts/

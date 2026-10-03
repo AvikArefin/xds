@@ -560,6 +560,7 @@ class AuditReport(Model):
     source_hash: str
     format: str
     created_at: Timestamp = Field(default_factory=now)
+    slides: list[str] = Field(default_factory=list)  # the slide ids this report covers
     summary: AuditSummary
     findings: list[Finding]
 

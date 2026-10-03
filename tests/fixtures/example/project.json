@@ -1,0 +1,468 @@
+{
+  "schemaVersion": 2,
+  "id": "example",
+  "name": "Example",
+  "description": "A fully authored example used by the tests.",
+  "createdAt": "2026-10-03T22:34:02Z",
+  "updatedAt": "2026-10-03T22:34:05Z",
+  "format": {
+    "preset": "instagram-portrait",
+    "width": 1080,
+    "height": 1350
+  },
+  "brand": {
+    "colors": [
+      {
+        "name": "paper",
+        "hex": "#F2F1EE"
+      },
+      {
+        "name": "ink",
+        "hex": "#16171A"
+      },
+      {
+        "name": "muted",
+        "hex": "#5B5F66"
+      },
+      {
+        "name": "accent",
+        "hex": "#E4572E"
+      },
+      {
+        "name": "night",
+        "hex": "#1B1D22"
+      },
+      {
+        "name": "snow",
+        "hex": "#F5F5F7"
+      }
+    ],
+    "typography": {
+      "kicker": {
+        "level": "caption",
+        "font": "General Sans",
+        "weight": 500,
+        "color": "accent",
+        "uppercase": true,
+        "letterSpacing": 0.08
+      },
+      "headline": {
+        "level": "headline",
+        "font": "Satoshi",
+        "weight": 700,
+        "color": "ink"
+      },
+      "body": {
+        "level": "body",
+        "font": "General Sans",
+        "weight": 400,
+        "color": "muted"
+      }
+    }
+  },
+  "fonts": [
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-Black.woff2",
+      "weight": 900
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-BlackItalic.woff2",
+      "weight": 900,
+      "italic": true
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-Bold.woff2",
+      "weight": 700
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-BoldItalic.woff2",
+      "weight": 700,
+      "italic": true
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-Italic.woff2",
+      "weight": 400,
+      "italic": true
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-Light.woff2",
+      "weight": 300
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-LightItalic.woff2",
+      "weight": 300,
+      "italic": true
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-Medium.woff2",
+      "weight": 500
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-MediumItalic.woff2",
+      "weight": 500,
+      "italic": true
+    },
+    {
+      "family": "Satoshi",
+      "path": "fonts/Satoshi/Satoshi-Regular.woff2",
+      "weight": 400
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Bold.woff2",
+      "weight": 700
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-BoldItalic.woff2",
+      "weight": 700,
+      "italic": true
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Extralight.woff2",
+      "weight": 200
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-ExtralightItalic.woff2",
+      "weight": 200,
+      "italic": true
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Italic.woff2",
+      "weight": 400,
+      "italic": true
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Light.woff2",
+      "weight": 300
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-LightItalic.woff2",
+      "weight": 300,
+      "italic": true
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Medium.woff2",
+      "weight": 500
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-MediumItalic.woff2",
+      "weight": 500,
+      "italic": true
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Regular.woff2",
+      "weight": 400
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-Semibold.woff2",
+      "weight": 600
+    },
+    {
+      "family": "General Sans",
+      "path": "fonts/GeneralSans/GeneralSans-SemiboldItalic.woff2",
+      "weight": 600,
+      "italic": true
+    }
+  ],
+  "assets": [
+    {
+      "id": "phone",
+      "path": "assets/models/phone.glb",
+      "kind": "model"
+    }
+  ],
+  "screens": [
+    {
+      "id": "app-home",
+      "path": "screens/app-home/index.html",
+      "width": 393.0,
+      "height": 852.0,
+      "scale": 3.0,
+      "safeArea": {
+        "top": 59.0,
+        "right": 0.0,
+        "bottom": 34.0,
+        "left": 0.0
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "matte-stone",
+      "name": "Matte stone",
+      "color": "#D9D5CE",
+      "metalness": 0,
+      "roughness": 0.9
+    }
+  ],
+  "objects": [
+    {
+      "id": "phone",
+      "name": "Phone",
+      "kind": "model",
+      "asset": "phone",
+      "pose": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "id": "podium",
+      "name": "Podium",
+      "kind": "cylinder",
+      "params": {
+        "radiusTop": 0.09,
+        "radiusBottom": 0.09,
+        "height": 0.02
+      },
+      "material": "matte-stone",
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    }
+  ],
+  "layerOrder": [
+    "ground",
+    "render",
+    "image",
+    "type"
+  ],
+  "slides": [
+    {
+      "id": "s1",
+      "name": "Hero",
+      "background": "paper",
+      "nodes": [
+        {
+          "id": "bg1",
+          "name": "Backdrop",
+          "layer": "ground",
+          "box": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          },
+          "data": {
+            "design": "spotlight",
+            "variant": "ivory"
+          }
+        },
+        {
+          "id": "podium-s1",
+          "name": "Podium",
+          "layer": "render",
+          "data": {
+            "object": "podium"
+          }
+        },
+        {
+          "id": "phone-s1",
+          "name": "Phone",
+          "layer": "render",
+          "data": {
+            "object": "phone",
+            "pose": {
+              "position": [
+                0,
+                0.02,
+                0
+              ],
+              "rotation": [
+                0,
+                -15,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "screens": {
+              "Screen": "app-home"
+            }
+          }
+        },
+        {
+          "id": "kicker",
+          "name": "Kicker",
+          "layer": "type",
+          "box": {
+            "x": 5.93,
+            "y": 4.74,
+            "w": 60,
+            "h": 3.5
+          },
+          "data": {
+            "text": "New",
+            "role": "kicker",
+            "group": "intro"
+          }
+        },
+        {
+          "id": "h1",
+          "name": "Headline",
+          "layer": "type",
+          "box": {
+            "x": 5.93,
+            "y": 9.5,
+            "w": 70,
+            "h": 12
+          },
+          "data": {
+            "text": "Your day,\nat a glance",
+            "role": "headline",
+            "group": "intro"
+          }
+        }
+      ],
+      "camera": {
+        "mode": "frame",
+        "x": 50,
+        "y": 62,
+        "height": 55
+      }
+    },
+    {
+      "id": "s2",
+      "name": "Details",
+      "background": "night",
+      "lighting": {
+        "look": "rim",
+        "angle": 210
+      },
+      "nodes": [
+        {
+          "id": "bg2",
+          "name": "Backdrop",
+          "layer": "ground",
+          "box": {
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 100
+          },
+          "data": {
+            "design": "spotlight",
+            "variant": "midnight"
+          }
+        },
+        {
+          "id": "phone-s2",
+          "name": "Phone",
+          "layer": "render",
+          "data": {
+            "object": "phone",
+            "pose": {
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                20,
+                0
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            },
+            "screens": {
+              "Screen": "app-home"
+            }
+          }
+        },
+        {
+          "id": "h2",
+          "name": "Headline",
+          "layer": "type",
+          "box": {
+            "x": 5.93,
+            "y": 4.74,
+            "w": 88.14,
+            "h": 12
+          },
+          "data": {
+            "text": "Built for focus",
+            "role": "headline",
+            "color": "snow",
+            "align": "center"
+          }
+        },
+        {
+          "id": "b2",
+          "name": "Body",
+          "layer": "type",
+          "box": {
+            "x": 15,
+            "y": 84,
+            "w": 70,
+            "h": 10
+          },
+          "data": {
+            "text": "Everything you need, nothing you don't.",
+            "role": "body",
+            "color": "snow",
+            "align": "center"
+          }
+        }
+      ],
+      "camera": {
+        "mode": "frame",
+        "x": 50,
+        "y": 56,
+        "height": 52
+      }
+    }
+  ]
+}

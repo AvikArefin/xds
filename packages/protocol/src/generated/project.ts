@@ -546,6 +546,7 @@ export interface AuditReport {
   sourceHash: string;
   format: string;
   createdAt?: string;
+  slides?: string[];
   summary: AuditSummary;
   findings: Finding[];
 }

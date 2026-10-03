@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  A device screen for XDS. Design at the logical size (393 × 852 for an iPhone), not the texture
+  size. Toolkit: Tailwind CSS v4 classes, Basecoat components (card, btn, badge, …),
+  Lucide icons as <i data-lucide="name"></i>, the project's fonts (font-sans).
+  <xds-include src="NAME"></xds-include> inserts partials/NAME.html at render time.
+  var(--safe-top) / var(--safe-bottom) are the system areas; keep content out of them.
+  Replace this example with real content that tells the slide's story.
+-->
+<html lang="en" data-device="iphone">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Today</title>
+</head>
+<body class="relative h-screen overflow-hidden bg-[#f4f2ee] font-sans text-neutral-900 antialiased">
+  <xds-include src="status-bar"></xds-include>
+
+  <main class="flex h-full flex-col gap-5 px-5"
+        style="padding-top: calc(var(--safe-top) + 12px); padding-bottom: calc(var(--safe-bottom) + 84px)">
+    <header class="flex items-center justify-between">
+      <div>
+        <p class="text-[15px] font-medium text-neutral-500">Thursday, 12 June</p>
+        <h1 class="text-[32px] font-bold leading-tight tracking-tight">Good morning, Maya</h1>
+      </div>
+      <button class="btn-icon-outline size-11 rounded-full bg-white">
+        <i data-lucide="bell" class="size-5"></i>
+      </button>
+    </header>
+
+    <section class="card gap-3 rounded-3xl border-0 bg-neutral-900 px-6 py-6 text-white shadow-none">
+      <div class="flex items-center justify-between">
+        <span class="flex items-center gap-2 text-[15px] font-medium text-white/70">
+          <i data-lucide="footprints" class="size-[18px]"></i> Steps today
+        </span>
+        <span class="badge rounded-full border-0 bg-[#d8ff5e] px-2.5 text-[13px] font-semibold text-neutral-900">78%</span>
+      </div>
+      <p class="text-[56px] font-bold leading-none tracking-tight tabular-nums">7,842</p>
+      <div class="h-2.5 overflow-hidden rounded-full bg-white/15">
+        <div class="h-full w-[78%] rounded-full bg-[#d8ff5e]"></div>
+      </div>
+      <p class="text-[15px] text-white/60">2,158 to go · about 20 minutes of walking</p>
+    </section>
+
+    <section class="grid grid-cols-2 gap-3">
+      <div class="card gap-1 rounded-3xl border-0 bg-white px-5 py-5 shadow-none">
+        <i data-lucide="moon" class="size-6 text-indigo-500"></i>
+        <p class="mt-2 text-[28px] font-bold leading-none tabular-nums">7h 32m</p>
+        <p class="text-[15px] text-neutral-500">Sleep</p>
+      </div>
+      <div class="card gap-1 rounded-3xl border-0 bg-white px-5 py-5 shadow-none">
+        <i data-lucide="flame" class="size-6 text-orange-500"></i>
+        <p class="mt-2 text-[28px] font-bold leading-none tabular-nums">412</p>
+        <p class="text-[15px] text-neutral-500">Active kcal</p>
+      </div>
+    </section>
+
+    <section class="flex items-center gap-4 rounded-3xl bg-white px-5 py-4">
+      <div class="flex size-12 items-center justify-center rounded-2xl bg-[#e9f9b8]">
+        <i data-lucide="activity" class="size-6"></i>
+      </div>
+      <div class="flex-1">
+        <p class="text-[17px] font-semibold">Morning run</p>
+        <p class="text-[15px] text-neutral-500">5.2 km · 28:14 · 5'26"/km</p>
+      </div>
+      <i data-lucide="chevron-right" class="size-5 text-neutral-400"></i>
+    </section>
+
+    <button class="btn-lg mt-auto h-14 w-full gap-2 rounded-full bg-neutral-900 text-[17px] font-semibold text-white">
+      <i data-lucide="play" class="size-5"></i> Start workout
+    </button>
+  </main>
+
+  <nav class="absolute inset-x-0 bottom-0 flex justify-around border-t border-neutral-200 bg-[#f4f2ee]/95 px-6 pt-3"
+       style="padding-bottom: calc(var(--safe-bottom) + 4px)">
+    <span class="flex flex-col items-center gap-1 text-[11px] font-semibold"><i data-lucide="house" class="size-6"></i>Today</span>
+    <span class="flex flex-col items-center gap-1 text-[11px] font-medium text-neutral-400"><i data-lucide="activity" class="size-6"></i>Activity</span>
+    <span class="flex flex-col items-center gap-1 text-[11px] font-medium text-neutral-400"><i data-lucide="calendar" class="size-6"></i>Plan</span>
+    <span class="flex flex-col items-center gap-1 text-[11px] font-medium text-neutral-400"><i data-lucide="user" class="size-6"></i>You</span>
+  </nav>
+
+  <xds-include src="home-indicator"></xds-include>
+</body>
+</html>

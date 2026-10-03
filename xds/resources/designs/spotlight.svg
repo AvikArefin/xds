@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="{{width}}" height="{{height}}" viewBox="0 0 {{width}} {{height}}">
+  <metadata id="xds-design">
+  {
+    "name": "Spotlight",
+    "params": [
+      { "name": "wall", "type": "color", "label": "Wall", "default": "#2b2c30" },
+      { "name": "glow", "type": "number", "label": "Spot brightness", "default": 0.14, "min": 0, "max": 0.35, "step": 0.01 },
+      { "name": "size", "type": "number", "label": "Spot size", "default": 1.4, "min": 0.6, "max": 3, "step": 0.1 },
+      { "name": "floorGlow", "type": "number", "label": "Floor light", "default": 0.08, "min": 0, "max": 0.25, "step": 0.01 },
+      { "name": "vignette", "type": "number", "label": "Vignette", "default": 0.3, "min": 0, "max": 0.7, "step": 0.01 },
+      { "name": "grain", "type": "number", "label": "Grain", "default": 0.05, "min": 0, "max": 0.08, "step": 0.005 }
+    ],
+    "variants": [
+      { "name": "charcoal", "values": { "wall": "#2b2c30" } },
+      { "name": "midnight", "values": { "wall": "#1a2234", "glow": 0.16, "floorGlow": 0.1 } },
+      { "name": "ivory", "values": { "wall": "#e6e1d8", "glow": 0.05, "floorGlow": 0.04, "vignette": 0.12, "grain": 0.04 } }
+    ]
+  }
+  </metadata>
+  <defs>
+    <linearGradient id="spotlight-wall" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="{{height}}">
+      <stop offset="0" stop-color="{{shade(wall, -0.03)}}"/>
+      <stop offset="{{clamp(subject.floor / height, 0.05, 0.95)}}" stop-color="{{wall}}"/>
+      <stop offset="1" stop-color="{{shade(wall, -0.05)}}"/>
+    </linearGradient>
+    <!-- The spot sits a little above the product's center, like a key light on the backdrop. -->
+    <radialGradient id="spotlight-spot" gradientUnits="userSpaceOnUse" cx="{{subject.cx}}" cy="{{subject.cy - subject.h * 0.15}}" r="{{max(subject.w, subject.h) * size * 0.6}}">
+      <stop offset="0" stop-color="{{shade(wall, glow)}}" stop-opacity="1"/>
+      <stop offset="0.35" stop-color="{{shade(wall, glow)}}" stop-opacity="0.7"/>
+      <stop offset="0.7" stop-color="{{shade(wall, glow)}}" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="{{shade(wall, glow)}}" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="spotlight-pool">
+      <stop offset="0" stop-color="{{shade(wall, floorGlow)}}" stop-opacity="1"/>
+      <stop offset="0.6" stop-color="{{shade(wall, floorGlow)}}" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="{{shade(wall, floorGlow)}}" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="spotlight-vignette" gradientUnits="userSpaceOnUse" cx="{{subject.cx}}" cy="{{subject.cy}}" r="{{sqrt(width * width + height * height) * 0.6}}">
+      <stop offset="0.35" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="{{vignette}}"/>
+    </radialGradient>
+    <filter id="spotlight-grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="11" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>
+    </filter>
+  </defs>
+  <rect width="{{width}}" height="{{height}}" fill="url(#spotlight-wall)"/>
+  <rect width="{{width}}" height="{{height}}" fill="url(#spotlight-spot)"/>
+  <ellipse cx="{{subject.cx}}" cy="{{subject.floor}}" rx="{{max(subject.w, width * 0.2) * size * 0.75}}" ry="{{max(subject.w, width * 0.2) * size * 0.14}}" fill="url(#spotlight-pool)"/>
+  <rect width="{{width}}" height="{{height}}" fill="url(#spotlight-vignette)"/>
+  <rect width="{{width}}" height="{{height}}" filter="url(#spotlight-grain)" opacity="{{grain}}"/>
+</svg>

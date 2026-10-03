@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="{{width}}" height="{{height}}" viewBox="0 0 {{width}} {{height}}">
+  <metadata id="xds-design">
+  {
+    "name": "Split tone",
+    "params": [
+      { "name": "top", "type": "color", "label": "Wall", "default": "#e6e1d8" },
+      { "name": "bottom", "type": "color", "label": "Floor", "default": "#cbbfb0" },
+      { "name": "offset", "type": "number", "label": "Line offset", "default": 0, "min": -0.2, "max": 0.2, "step": 0.01 },
+      { "name": "softness", "type": "number", "label": "Edge softness", "default": 0.006, "min": 0, "max": 0.1, "step": 0.002 },
+      { "name": "spot", "type": "number", "label": "Light behind product", "default": 0.03, "min": 0, "max": 0.12, "step": 0.005 },
+      { "name": "grain", "type": "number", "label": "Grain", "default": 0.045, "min": 0, "max": 0.08, "step": 0.005 }
+    ],
+    "variants": [
+      { "name": "stone", "values": { "top": "#e6e1d8", "bottom": "#cbbfb0" } },
+      { "name": "terracotta", "values": { "top": "#efe4d8", "bottom": "#c7836b" } },
+      { "name": "slate", "values": { "top": "#dde1e7", "bottom": "#8f99a7", "spot": 0.04 } }
+    ]
+  }
+  </metadata>
+  <defs>
+    <!-- Wall above the product's floor line, floor below it; the line follows subject.floor. -->
+    <linearGradient id="split-tone-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="{{height}}">
+      <stop offset="0" stop-color="{{shade(top, -0.02)}}"/>
+      <stop offset="{{clamp(subject.floor / height + offset - softness, 0.04, 0.95)}}" stop-color="{{top}}"/>
+      <stop offset="{{clamp(subject.floor / height + offset + softness, 0.05, 0.96)}}" stop-color="{{bottom}}"/>
+      <stop offset="1" stop-color="{{shade(bottom, -0.05)}}"/>
+    </linearGradient>
+    <radialGradient id="split-tone-spot" gradientUnits="userSpaceOnUse" cx="{{subject.cx}}" cy="{{subject.cy}}" r="{{max(subject.w, subject.h) * 0.9}}">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="{{spot * 4}}"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="split-tone-grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>
+    </filter>
+  </defs>
+  <rect width="{{width}}" height="{{height}}" fill="url(#split-tone-fill)"/>
+  <rect width="{{width}}" height="{{height}}" fill="url(#split-tone-spot)"/>
+  <rect width="{{width}}" height="{{height}}" filter="url(#split-tone-grain)" opacity="{{grain}}"/>
+</svg>
