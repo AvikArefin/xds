@@ -1,446 +1,358 @@
-# XDS Architecture
+# XDS architecture
 
-Everything runs on one machine. There is no cloud service, no database, and no LLM call
-inside the product, but projects are meant to be editable and auditable via LLMs. 
-The persistent state is an ordinary directory of editable files
-(`project.xds/`) on disk; the editor is a view over those files.
+XDS is a local design editor for social-media graphics. Each slide stacks four layers: a 2D
+**Ground** (background), a live **3D** scene, 2D **images** and **type**. The result is exported
+as PNG.
+
+Everything runs on one machine: no cloud service, no database, and no LLM calls inside the
+product. The persistent state is an ordinary project directory (`project.xds/`) that people and
+LLM agents both edit. The editor is a view over those files, and the `xds` CLI is how an agent
+renders, audits and exports without it.
+
+Four principles shape every part:
+
+1. **Files are the truth.** One `project.json` plus designs, assets and fonts. Everything else is
+   a disposable cache keyed by a hash of those files.
+2. **The browser is the only rasterizer.** The editor, the headless render, the audit
+   measurements and the export are all the same page in Chromium, so they cannot disagree.
+3. **One schema.** Pydantic models in Python validate files, generate the TypeScript types, and
+   drive migration.
+4. **Readable code over clever code.** Small modules, one job each, standard libraries for
+   standard problems. A person should be able to walk the code from this page.
 
 ---
 
 ## 1. Repository layout
 
-The workspace is an npm + uv monorepo (`@xds/workspace`).
-Two package managers work side by side: **npm** builds the TypeScript
-packages and the React app, **uv** runs the Python services and CLI.
+The workspace is an npm + uv monorepo. **npm** builds the TypeScript packages and the React app;
+**uv** runs the Python package and CLI.
 
 ```text
-xds/                               # repository root (npm + uv monorepo)
-├── README.md                      # user-facing quickstart and CLI reference
+xds/
+├── README.md                      # quickstart and CLI reference
 ├── package.json                   # npm workspaces: apps/*, packages/*
-├── pyproject.toml                 # uv project: xds_cli, services, workers
+├── pyproject.toml                 # uv project: the `xds` Python package
 │
 ├── packages/
-│   ├── protocol/                  # @xds/protocol — generated types, blank init scaffold, example project
-│   └── editor-core/               # @xds/editor-core — pure reducer/transform math
+│   ├── protocol/                  # @xds/protocol
+│   │   ├── src/generated/         #   TypeScript types generated from xds/models.py
+│   │   ├── template/              #   the blank project `xds init` copies (content-neutral),
+│   │   │                          #   including AGENTS.md: the in-project guide for AI agents
+│   │   ├── designs/               #   starter ground designs (`xds design add`)
+│   │   ├── screens/               #   starter screen pages + status-bar/home-indicator partials
+│   │   └── example/               #   a fully authored example project (used by tests)
+│   └── editor-core/               # @xds/editor-core: pure functions (node edits, box ↔ px,
+│                                  #   pose math, framing math); no React, no Three
 │
 ├── apps/
-│   └── studio/                    # @xds/studio — React/Vite/R3F editor
+│   └── studio/                    # @xds/studio: React + Vite + R3F
+│       └── src/
+│           ├── App.tsx            #   editor shell
+│           ├── store/             #   zustand store, one file per slice
+│           ├── api.ts             #   typed fetch client + SSE subscription
+│           ├── stage/             #   the slide: <SlideStage> renders the layers in layerOrder
+│           │   ├── GroundLayer.tsx  ImageLayer.tsx  TypeLayer.tsx
+│           │   └── RenderLayer.tsx  #  the R3F <Canvas>
+│           ├── scene/studio/      #   lighting looks, shadows, subject bounds, auto-framing
+│           ├── design/            #   ground design resolution (expressions, loops, colors)
+│           ├── render/            #   /render route: chrome-less <SlideStage> + measure()
+│           └── components/        #   panels, inspectors, command palette
 │
-├── services/                      # Python backend (stdlib HTTP server)
-│   ├── api/                       # HTTP surface: core.py, server.py, __main__.py (xds-api)
-│   ├── project/project.py         # validation, locks, hashing, guarded save transaction
-│   ├── schema.py                  # single-source rule set for the three JSON documents
-│   ├── pipeline.py                # capture ingestion, review, composite, export
-│   ├── audit.py                   # two-stage structural + rendered-geometry audit
-│   ├── measure.py                 # browser-measured type geometry for the audit
-│   ├── browser.py                 # headless capture worker (drives the Studio in Chrome)
-│   ├── designs.py                 # tolerant parser for authored SVG design manifests
-│   ├── migration.py               # rewrites retired pattern projects into authored designs
-│   ├── renderer.py                # renderer capabilities (three vs blender)
-│   ├── targets.py                 # export-target catalog + derived type sizing
-│   └── blender/                   # optional headless Blender orchestration + validation
+├── xds/                           # Python package
+│   ├── cli.py                     #   `xds` entry point (argparse)
+│   ├── api.py                     #   FastAPI app: routes only, no logic
+│   ├── models.py                  #   Pydantic models = the schema
+│   ├── project.py                 #   load, hash, save (atomic), file watching
+│   ├── designs.py                 #   design manifest parsing + expression checks
+│   ├── formats.py                 #   format profiles: sizes, view widths, safe zones, bands
+│   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, `xds model add`
+│   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
+│   ├── browser.py                 #   Playwright: render slides, collect measurements
+│   ├── export.py                  #   audit gate → copy renders → export/<stamp>/
+│   ├── migrate/                   #   conform pass + explicit version steps
+│   └── audit/                     #   the design-rule engine (see design-rules.md)
+│       ├── engine.py  thresholds.py  contrast.py  saliency.py  annotate.py
+│       └── rules/  collision.py  spacing.py  typography.py  contrast.py
+│                   composition.py  subject.py
 │
-├── workers/
-│   └── blender/render.py          # Blender worker (runs under Blender's Python)
-│
-├── xds_cli/                       # the `xds` command entry point
-└── tests/                         # Python backend tests (schema parity/types, migration, studio, Blender smoke)
+└── tests/                         # pytest (Python) + vitest (TS) + one Playwright smoke test
 ```
 
-The stable automation boundary is the **CLI** (`xds`). The local HTTP API is an
-internal, versioned detail used by the browser. Direct file editing is the other
-supported entry point.
+The `xds` CLI is the stable automation interface. The HTTP API is an internal detail between
+the editor and the Python process. Editing files directly is the other supported way in.
 
 ---
 
-## 2. The three tiers
-
-The system follows a strict three-tier architecture, driven either interactively through the Vite web app or headlessly via the CLI:
+## 2. The tiers
 
 ```mermaid
 flowchart LR
-  %% -----------------------------------------------------------
-  %% Tier 1: Browser Tier
-  %% -----------------------------------------------------------
-  subgraph T1["1. Browser Tier (apps/studio)"]
+  subgraph Browser["Browser (apps/studio)"]
     direction TB
-    subgraph T1_Packages["Packages"]
-      Protocol["@xds/protocol<br/><i>(generated types)</i>"]
-      EditorCore["@xds/editor-core<br/><i>(math & reducers)</i>"]
-      Protocol --> EditorCore
-    end
-
-    Store["store/index.ts + store/useStudio.ts<br/><i>In-memory editor state & pending queue</i>"]
-    EditorCore --> Store
-
-    subgraph T1_Layers["Ordered Composition Layers"]
+    Store["zustand store<br/>(+ undo history)"]
+    subgraph Stage["SlideStage (layers in project.layerOrder)"]
       direction TB
-      Ground["GroundVisual (DOM)"]
-      Image["ImageVisual (DOM)"]
-      Type["TypeVisual (DOM Text)"]
-      R3F["ThreeScene (3D R3F Canvas)"]
+      Ground["GroundLayer<br/>SVG design"]
+      Render["RenderLayer<br/>R3F canvas, transparent"]
+      Image["ImageLayer"]
+      Type["TypeLayer<br/>DOM text"]
     end
-
-    subgraph T1_Capture["Rasterization Engine"]
-      direction TB
-      Overlay["scene/capture/overlay.ts<br/><i>html-to-image (DOM layers)</i>"]
-      Capture["scene/capture/bridge.tsx<br/><i>WebGLRenderTarget (3D)</i>"]
-    end
-
-    Store --> T1_Layers
-    Ground --> Overlay
-    Image --> Overlay
-    Type --> Overlay
-    R3F --> Capture
+    Store --> Stage
+    RenderRoute["/render route<br/>same SlideStage, no chrome<br/>+ window.xds.measure()"]
   end
 
-  %% -----------------------------------------------------------
-  %% Tier 2: Local Service Tier
-  %% -----------------------------------------------------------
-  subgraph T2["2. Local Service Tier (services/)"]
+  subgraph Python["Python (xds/)"]
     direction TB
-    API["HTTP API Server<br/>(server.py + core.py)"]
-
-    subgraph T2_Services["Backend Services"]
-      direction TB
-      PipelineService["Compositor & Pipeline<br/>(pipeline.py)<br/><i>alpha composite · contact sheet · export</i>"]
-      AuditService["Inspection & Audit<br/>(audit.py + measure.py)<br/><i>structural check + geometry audit</i>"]
-      ProjectService["Project & Storage<br/>(project/project.py)<br/><i>locks · atomic save · journal</i>"]
-    end
-
-    API --> PipelineService
-    API --> AuditService
-    API --> ProjectService
+    API["api.py (FastAPI)"]
+    Proj["project.py<br/>load · hash · atomic save · watch"]
+    Models["models.py (Pydantic)"]
+    BrowserPy["browser.py (Playwright)"]
+    Audit["audit/<br/>design rules"]
+    Export["export.py"]
+    API --> Proj
+    Proj --> Models
+    Audit --> BrowserPy
+    Export --> Audit
   end
 
-  %% -----------------------------------------------------------
-  %% Shared Contract & Schema Authority
-  %% -----------------------------------------------------------
-  subgraph SchemaTier["Single Source Rule Set"]
-    direction LR
-    Schema["services/schema.py<br/><i>Single-source schema validator</i>"]
-  end
-
-  %% Schema flows: straight to protocol (codegen) and straight to project validation
-  Schema ==>|"uv run xds schema --emit-types"| Protocol
-  Schema -->|"validates"| ProjectService
-
-  %% -----------------------------------------------------------
-  %% Tier 3: Disk Tier
-  %% -----------------------------------------------------------
-  subgraph T3["3. Disk Tier (project.xds/)"]
+  subgraph Disk["Disk (project.xds/)"]
     direction TB
-    subgraph T3_Artifacts["Derived Artifacts (Disposable)"]
-      direction TB
-      Exp["export/<hash>/<br/><i>final publication PNGs</i>"]
-      Cache["cache/<br/><i>audits · renders · reviews</i>"]
-      RS["review-state.json<br/><i>source-hash audit proof</i>"]
-    end
-
-    Sources["project.json & scene-data.json<br/><i>Editable Sources (Truth)</i>"]
+    Src["project.json · designs/ · assets/ · fonts/"]
+    Cache["cache/&lt;hash&gt;/"]
+    Exp["export/&lt;stamp&gt;/"]
   end
 
-  %% -----------------------------------------------------------
-  %% Orchestrator / CLI
-  %% -----------------------------------------------------------
-  CLI["CLI & Automation<br/>(xds open / audit / export)"]
+  CLI["xds CLI"]
 
-  %% Interactions between Tiers
-  CLI ==>|"boots API & Vite / runs headless"| API
-  CLI -.->|"drives headless capture"| T1_Capture
-
-  Store <==>|"GET /api/project<br/>POST /api/save"| API
-  Overlay -->|"POST /api/render/overlays"| API
-  Capture -->|"POST /api/render/capture"| API
-
-  %% Direct, straight-across connections without crossing
-  PipelineService -->|"certified release"| Exp
-  PipelineService -->|"Ground + 3D + Type blend"| Cache
-  AuditService -->|"record proof & audit cache"| RS
-  ProjectService <==>|"atomic read / write"| Sources
+  Store <-->|"GET / PUT /api/project"| API
+  API -.->|"SSE: file changed"| Store
+  Proj <--> Src
+  BrowserPy -->|"headless Chromium"| RenderRoute
+  Audit --> Cache
+  Export --> Exp
+  CLI --> Proj
+  CLI --> Audit
+  CLI --> Export
+  Models ==>|"xds schema --emit-types"| Store
 ```
 
-### 2.1 Browser tier — `apps/studio`
+### 2.1 Browser: `apps/studio`
 
-A React 18 + Vite + TypeScript single-page app. It owns:
+React 18, Vite, TypeScript, React Three Fiber and drei.
 
-- **Editor state** — `store/types.ts` declares the whole `StudioState` (project, scene, review,
-  pending edits, selection, mode, renderer); `store/index.ts` wires the slices and owns the
-  singleton, and `store/useStudio.ts` exposes it to React through `useSyncExternalStore`.
-- **The authoritative live 3D scene** — `scene/ThreeScene.tsx` mounts a React Three Fiber
-  `<Canvas>` and reconciles `scene-data.json` into real Three.js `Object3D`s, using Drei
-  `TransformControls` and `OrbitControls`. The canvas is alpha-transparent and paints no
-  background of its own; the stage backdrop (`App.tsx` `.stage-paper`) supplies it, since
-  capturing a transparent 3D frame is what lets it composite over the Ground layer.
-- **Studio lighting** — `scene/lighting.ts` holds the five fixed rigs plus the pure knob math
-  (yaw/pitch orbit, intensity, softness); `ScenePanel` drives them. A slide's rig, ambient and
-  exposure are stored in the slide's own `lighting` block in `project.json`, so `scene-data.json`'s
-  lights stay the authored default and a rig choice never rewrites the global scene.
-- **Frame capture** — `scene/capture/bridge.tsx` rasterizes the R3F canvas to a transparent PNG
-  at the publish-target size via a `WebGLRenderTarget`.
-- **Layer order** — `project.layerOrder` is the composition stack (back → front) and the one place
-  it is written down: the canvas stacking, the mode switcher and `pipeline._composite_frame` all
-  read it. Reordering happens in Present mode (`store/actions/layers.ts`).
-- **2D image layer** — an `image` node binds to an asset in `project.assets` (`kind` image/svg) and
-  `ImageVisual` renders it in the DOM, so the browser stays the only rasterizer.
-- **Overlay capture** — `scene/capture/overlay.ts` rasterizes each DOM layer (ground, image and
-  type) with `html-to-image`, always with `skipFonts`. The library's own embedding walks every
-  stylesheet in the document and inlines every format of every face it finds on *each*
-  capture — measured on a real one-slide deck that was ~30 s and an 11 MB SVG per capture,
-  paid even by the font-free ground layer. The Type layer instead receives the scoped CSS
-  from `fonts/embed.ts`, built from the Fontshare stylesheet the project already requests,
-  woff2 sources only. A font that cannot be fetched fails the capture by name; text is
-  never silently rasterized in a fallback face.
-- **Capture phases** — every capture times its own steps (`3D`, `ground`, `type`, `upload`)
-  and publishes them as `captureProgress.detail`, so a slow render names the step it is in
-  instead of showing an anonymous spinner. Headless runs collect the same lines in
-  `window.__xdsCapture.phases`.
-- **API client** — `api.ts` wraps `fetch` calls and types responses using generated
-  protocol types from `packages/protocol`. It performs a version handshake (`REQUIRED_API_VERSION`)
-  and refuses to run against an out-of-date backend. Schema validation is centralized solely
-  in the Python service tier.
+- **State.** One zustand store (`store/`), split into slices (document, selection, view, audit,
+  jobs, disk; see [data models §7](./data-models.md#71-studiostate-appsstudiosrcstore)).
+  Every edit is a store action. The `zundo` middleware gives undo/redo over the document. The
+  document is "dirty" when it differs from the last saved copy.
+- **SlideStage.** One component renders a slide: it maps `project.layerOrder` to stacked layers,
+  so reordering layers is just reordering that array. The editor wraps it with selection handles,
+  guides and gizmos. The `/render` route renders it bare at exact format size. **The editor
+  and the export draw with the same component.**
+- **RenderLayer.** An R3F `<Canvas>` with `alpha: true` that draws no background. It contains the
+  studio rig (`scene/studio/`: environment lighting, contact shadow, auto-framing) and the active
+  slide's render nodes. Models load with drei's `useGLTF` (Draco and Meshopt decoders
+  enabled). See [lighting and backgrounds](./lighting-and-backgrounds.md).
+- **GroundLayer.** Resolves a design SVG (`design/resolve.ts`: `expr-eval` for expressions,
+  `culori` for OKLCH color functions, `subject.*` context from the render layer) and inlines it.
+- **TypeLayer.** Plain DOM text with `@font-face` rules for the project's `fonts/`. Font loading
+  is awaited with `document.fonts.load` before a slide reports ready.
+- **API client.** `api.ts` wraps `fetch` with the generated types, and subscribes to
+  `/api/events` (server-sent events) for file changes. It checks `apiVersion` once on load and
+  refuses to run against a mismatched backend.
 
-`packages/editor-core` supplies pure functions for node edits (`nodes.ts`), 2D/3D transform
-conversion (`transforms.ts`, `scene.ts`), layer ordering (`layers.ts`), document normalization
-(`normalize.ts`), and three-way rebase (`pending.ts`). `packages/protocol` is the single source of the data contract: it contains
-the TypeScript declarations generated from `services/schema.py`, the blank init scaffold
-(`packages/protocol/template/`) that `xds init` copies, and the designed example project
-(`packages/protocol/example/`) the frontend test suite loads. The scaffold stays content-neutral
-so an author or agent never anchors on pre-seeded values.
+`packages/editor-core` holds the pure math (box ↔ px, pose conversion, framing, snapping) so it
+can be unit-tested without a browser.
 
-Ground is the one layered content the editor does not treat as a fixed form: the project's
-`designs/` directory holds authored SVG designs, each an SVG template with its own knob manifest in
-`<metadata id="xds-design">`. A ground node binds to a design by `designId` and supplies its own
-`values`; `GroundVisual.tsx` hands the template to `design/resolve.ts`, which evaluates `{{ … }}`
-placeholders (a param name, or an arithmetic expression over params and enclosing loop variables)
-and expands `data-xds-repeat` directives, then injects the resulting artwork (the browser stays the
-only ground renderer, so headless export is unchanged), and `GroundInspector.tsx` builds its
-controls from the design's declared `params`. Neither the artwork nor its knobs are
-validated — the design file is opaque to the gate, which only checks that the file exists
-(`services/designs.py` parses the manifest tolerantly for the editor and the payload).
+### 2.2 Python: `xds/`
 
-### 2.2 Local service tier — `services/`
+Python 3.12, managed by uv. Dependencies, and what each is for:
 
-Python. Exposed via a dependency-free stdlib HTTP server (`api/server.py`) behind the shared contract (`api/core.py::LocalApi`).
+| Dependency | Used for |
+| --- | --- |
+| `pydantic` | the schema, validation, defaults/aliases for migration, JSON Schema for TS generation |
+| `fastapi` + `uvicorn[standard]` | the local HTTP API; `watchfiles` (bundled) for file-change events |
+| `playwright` | headless Chromium for render, measure, audit and export |
+| `pillow` + `numpy` | reading PNGs, pixel statistics, contact sheets, annotated audit images |
+| `opencv-contrib-python-headless` | spectral-residual saliency for the attention rules (only `audit/saliency.py` imports it) |
 
-Responsibilities:
+Module responsibilities:
 
-- **`schema.py`** — the single description of `project.json`, `scene-data.json` and
-  `review-state.json` (fields, types, references, cross-field checks) plus the walker that
-  validates against it. The gate and the TypeScript declarations are generated from this file;
-  nothing else describes these formats.
-- **`project/project.py`** — validation through `services/schema.py`, project-directory
-  checking, advisory locking, SHA-256 source hashing, the guarded multi-file save
-  transaction, journal recovery, and review-state management.
-- **`pipeline.py`** — accepts captured frames, writes the hash-keyed render manifest,
-  composes Ground → 3D → Type by alpha-blending the browser's PNGs in that fixed order,
-  builds review bundles and contact sheets, and produces the final exact-size PNG export.
-  It includes a dependency-free PNG codec and draws nothing itself: every pixel comes from
-  the browser capture, and a manifest without ground/type overlays is rejected with
-  `OVERLAY_REQUIRED` instead of being approximated.
-- **`audit.py`** — the unified two-stage inspection engine: structural checks through the
-  Python gate, then geometry, legibility and overlap checks that consume browser measurements.
-- **`measure.py`** — stores the editor's laid-out type measurements (per slide, per node,
-  keyed by source hash). The audit reports `GEOMETRY_UNMEASURED` when they are missing instead
-  of approximating text layout in Python.
-- **`browser.py`** — runs the headless capture worker: it starts the local API when needed
-  and drives the Studio's own browser rendering (see `apps/studio/capture/`). It renders
-  nothing itself and never substitutes Blender for a missing browser.
-- **`designs.py`** — parses the `<metadata id="xds-design">` manifest of an authored SVG design
-  for the editor and the API payload; the file stays opaque to the gate.
-- **`migration.py`** — the `xds migrate` rewriter: folds retired `project.json.patterns` ground
-  data into authored `designs/<patternId>.svg` files and `designId` bindings, idempotently and
-  with timestamped backups.
-- **`renderer.py`** — reports capabilities: Three.js runs in the browser (open editor or
-  headless capture worker), Blender is optional, headless, and renders the 3D layer only.
-- **`targets.py`** — the export-target catalog and the per-role type ratios derived from a
-  target's shorter edge.
-- **`blender/`** — the optional orchestrator that launches a Blender executable and
-  validates the restricted recipe dialect. Never invoked unless explicitly selected.
+- **`models.py`** is the single description of `project.json`. Nothing else describes the format.
+- **`project.py`** loads and validates a project, computes the source hash, saves atomically
+  (write a temp file, `fsync`, `os.replace`), refuses a save whose `baseHash` no longer matches the
+  file on disk, and watches the project for external changes.
+- **`browser.py`** starts one headless Chromium per command (Playwright), opens
+  `/render?slide=<id>` at `format` size with `deviceScaleFactor: 1`, waits for
+  `window.xds.ready` (fonts loaded, GLBs loaded, the environment and shadows settled), takes the
+  screenshot and calls `window.xds.measure()`. It writes into `cache/<hash>/`.
+- **`audit/`** runs the design rules on the measurements and pixels
+  ([design rules](./design-rules.md)).
+- **`export.py`** runs the audit, blocks on errors (unless `--force`), and copies the rendered
+  slides into `export/<stamp>/` with an `export.json` record.
+- **`migrate/`** upgrades old project files ([data models §6](./data-models.md#6-migration)).
+- **`models3d.py`** inspects and registers GLB files ([agent guide §3](./agent-guide.md#3-bringing-in-a-3d-model)).
+- **`formats.py`** holds the format catalog and the numbers derived from a format.
 
-### 2.3 Disk tier — the project directory
+FastAPI serves the built studio (`apps/studio/dist`) as static files, so headless commands need
+one Python process and no Vite. `xds open` additionally starts Vite for hot reload during
+development.
+
+### 2.3 Disk: the project directory
 
 ```text
 project.xds/
-├── project.json          # editable source: slides, nodes, brand, canvas, publishTarget
-├── scene-data.json       # editable source: shared 3D catalog, camera, authored default lights
-├── designs/              # editable source: authored SVG background designs (artwork + knobs)
-├── project-scene.py      # OPTIONAL Blender/generic generator source
-├── review-state.json     # source-hash-bound review + audit record
-├── assets/               # hashed, project-contained binary assets
-├── fonts/                # referenced fonts
-├── cache/
-│   ├── previews/         #   disposable preview frames
-│   ├── renders/<hash>/   #   hash-keyed final render manifest + PNGs
-│   ├── audits/<hash>.json#   immutable audit proof per source hash
-│   └── reviews/<hash>/   #   1:1 frames + contact sheet
-└── export/<hash>/        # exact-size PNG deliverables
+├── project.json        # the source: format, brand, objects, slides with their nodes
+├── designs/            # source: SVG ground designs (artwork + knob manifest)
+├── screens/<id>/       # source: HTML UI mockups shown on device screens
+├── assets/             # source: images, SVGs, GLB models
+├── fonts/              # source: font files
+├── sources/            # optional, ignored by the app: .blend files, references, scripts
+├── cache/<hash>/       # derived: slide PNGs, measurements, audit.json, annotated PNGs
+└── export/<stamp>/     # derived: deliverable PNGs + export.json
 ```
 
-**`project.json` and `scene-data.json` are the only editable sources.** PNG is generated
-output. `review-state.json` and everything under `cache/` are derived and disposable.
-A `.blend` file is never required and never source of truth.
+The source hash covers `project.json`, `designs/`, `screens/`, `assets/` and `fonts/`. `cache/` can always be
+deleted, and `export/` holds only finished deliverables.
 
 ---
 
 ## 3. How the pieces connect
 
-### 3.1 Request routing
+### 3.1 HTTP routes
 
-The browser talks to `http://127.0.0.1:8765` (API) and loads the Vite UI from
-`http://127.0.0.1:5173`. `xds open` boots both processes and waits until each is
-reachable before opening a browser tab.
+The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173` and proxies
+`/api` to it.
 
-A headless capture never takes the Studio's API port: `resolve_api_port` reuses `8765`
-only when that API serves **the same project**, and otherwise takes a free port from the
-capture range. The `open` supervisor likewise watches the child processes it started
-instead of polling the port, so a capture passing through can neither be mistaken for the
-session nor end it.
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/api/project` | the project, its designs (parsed manifests + SVG), `hash`, the gate's verdict, `apiVersion` |
+| PUT | `/api/project` | save `{ project, baseHash }`; `409` if the file changed since `baseHash` |
+| GET | `/api/events` | SSE stream: `changed` (with the new hash) when source files change on disk |
+| GET | `/api/files/{path}` | serve a project file (assets, fonts, designs, cache, export); path-contained |
+| GET | `/api/formats` | the format catalog + `guide` numbers for a size |
+| GET | `/api/projects` | list projects in the projects directory (default `~/xd-projects/`) |
+| POST | `/api/projects/open` | switch the active project |
+| POST | `/api/projects/init` | scaffold a new project |
+| POST | `/api/projects/choose` | macOS folder picker (AppleScript) |
+| POST | `/api/audit` | render + audit; streams progress lines over SSE; returns the report |
+| POST | `/api/export` | audit gate + export; returns the files written |
 
-| Method | Route | Handler | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/project` | `LocalApi.get_project` | Current snapshot: project, scene, review, hashes, capabilities |
-| GET | `/api/projects` | `LocalApi.list_projects` | Discover projects in `~/xd-projects/` (or configured directory) |
-| GET | `/api/targets` | `LocalApi.targets` | Export-target catalog |
-| GET | `/api/assets` | `LocalApi.list_assets` | Project asset catalog |
-| POST | `/api/targets/scale` | `LocalApi.target_scale` | Derive the per-role type bands for a target size |
-| GET | `/api/artifact?path=` | `LocalRequestHandler._send_artifact` | Serve a project-contained cache/export file |
-| GET | `/api/asset?path=` | `LocalRequestHandler._send_project_asset` | Serve a project-contained asset binary |
-| POST | `/api/project/open` | `LocalApi.open_project` | Switch active project root to a different project directory |
-| POST | `/api/project/init` | `LocalApi.init_project` | Scaffold a new project via the API |
-| POST | `/api/project/choose` | `LocalApi.choose_project_folder` | Prompt native macOS folder selection dialog via AppleScript |
-| POST | `/api/save` | `LocalApi.save` | Guarded transactional multi-file save |
-| POST | `/api/validate` | `LocalApi.validate` | Alias of audit |
-| POST | `/api/audit` | `LocalApi.audit` | Run + record the unified audit |
-| POST | `/api/preview` | `LocalApi.preview` | Report that the Studio R3F canvas is the preview |
-| POST | `/api/render` | `LocalApi.render` | `three` → capture-required; `blender` → headless run |
-| POST | `/api/render/capture` | `LocalApi.capture_render` | Ingest batch Three.js frames from browser → manifest |
-| POST | `/api/render/overlays` | `LocalApi.capture_overlays` | Ingest batch Ground/Type overlay PNGs from browser |
-| POST | `/api/render/frame` | `LocalApi.save_streamed_frame` | Ingest one streamed browser frame (raw upload; optional endpoint) |
-| POST | `/api/blender/render` | `LocalApi.blender_render` | Explicit headless Blender render |
-| POST | `/api/review` | `LocalApi.review` | Create a review bundle or set a decision |
-| POST | `/api/export` | `LocalApi.export` | Audit gate, render-if-needed, write PNGs |
-
-Errors are normalized to `{ ok: false, error: { code, message, details } }`, with HTTP
-status derived from the exception type (409 conflict, 423 locked, 422 validation).
+Errors are `{ ok: false, error: { code, message, path?, details? } }` with `409` conflict, `422`
+validation, and `404` missing.
 
 ### 3.2 The CLI
 
-`xds_cli/cli.py` maps subcommands to the same services the API uses, so a headless
-agent and the GUI share one implementation:
+`xds/cli.py` calls the same functions as the API, so a headless agent and the editor share one
+implementation. Every command accepts `--json`.
 
 ```text
-xds init PROJECT [--id ID] [--name NAME] [--force] [--json]
-xds migrate [PROJECT] [--all] [--dir DIR] [--dry-run] [--json]
-xds targets [--json]
-xds schema [--emit-types] [--check] [--json]
-xds audit PROJECT [--structural-only] [--json]
-xds validate PROJECT [...]              # alias for audit
-xds preview PROJECT [--json]
-xds render PROJECT [--slide N] [--renderer three|blender] [--blender PATH] [--timeout N] [--save-blend] [--json]
-xds measure PROJECT [--json]
-xds blender-preview PROJECT [--slide N] [--blender PATH] [--timeout N] [--save-blend] [--json]
-xds blender-render PROJECT [--slide N] [--blender PATH] [--timeout N] [--save-blend] [--json]
-xds review PROJECT [--slide N] [--decision pending|approved|rejected] [--notes] [--json]
-xds export PROJECT [--output PATH] [--json]
-xds open [PROJECT] [--port N] [--web-port N] [--no-open] [--json]
+xds init PROJECT [--name NAME] [--format PRESET]
+xds open [PROJECT] [--port N] [--no-open]
+xds check PROJECT                         # schema + references + designs (no browser)
+xds guide PROJECT [--slide ID]            # the design numbers for this format
+xds rules                                 # every audit rule with principle + thresholds
+xds render PROJECT [--slide ID]           # slide PNGs + contact sheet → cache/<hash>/
+xds audit PROJECT [--slide ID]            # render + measure + rules → audit.json + annotated PNGs
+xds export PROJECT [--out DIR] [--force]  # audit gate → export/<stamp>/
+xds migrate [PROJECT | --all] [--dry-run] [--conform]
+xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae
+xds model inspect FILE                    # parts, clips, screen meshes, convention warnings
+xds screen add PROJECT ID [--device PRESET | --width W --height H --scale S]
+xds screen render PROJECT ID              # the screen page → PNG, to check it flat
+xds design add PROJECT STARTER
+xds fonts fetch PROJECT FAMILY
+xds formats
+xds schema --emit-types | --check
+xds clean PROJECT                         # delete cache/
 ```
 
-The CLI, the HTTP API, and any future MCP wrapper all read the **current saved source**;
-none of them owns a private state.
+The CLI, the API and the editor all read the **saved** source. None of them keeps private state.
 
-### 3.3 Frontend module dependency graph
+### 3.3 Frontend module graph
 
 ```mermaid
 flowchart TD
-  main["main.tsx"] --> App["App.tsx"]
-  App --> Stage["Stage (in App.tsx)"]
+  main["main.tsx"] --> Router{"route"}
+  Router -->|"/"| App["App.tsx (editor)"]
+  Router -->|"/render"| RenderPage["render/RenderPage.tsx"]
   App --> Panels["components/panels/*"]
   App --> Inspectors["components/inspectors/*"]
-  Stage --> ThreeScene["scene/ThreeScene.tsx"]
-  Stage --> StageNode["components/canvas/StageNode.tsx"]
-  StageNode --> GroundVisual
-  StageNode --> TypeVisual
-  ThreeScene --> Capture["scene/capture/bridge.tsx"]
-  Capture -->|"CaptureBridge registry"| useStudio["store/useStudio.ts → store/index.ts"]
-  Inspectors --> useStudio
-  ThreeScene --> useStudio
-  useStudio --> api["api.ts"]
-  stage -->|"CaptureBridge registry"| Store
+  App --> EditStage["components/canvas/EditableStage.tsx"]
+  EditStage --> SlideStage["stage/SlideStage.tsx"]
+  RenderPage --> SlideStage
+  RenderPage --> Measure["render/measure.ts"]
+  SlideStage --> GroundLayer["stage/GroundLayer.tsx"] --> Resolve["design/resolve.ts"]
+  SlideStage --> RenderLayer["stage/RenderLayer.tsx"] --> Studio["scene/studio/*"]
+  SlideStage --> ImageLayer["stage/ImageLayer.tsx"]
+  SlideStage --> TypeLayer["stage/TypeLayer.tsx"]
+  Panels --> Store["store/*"]
+  Inspectors --> Store
+  EditStage --> Store
+  RenderLayer --> Store
+  Store --> API["api.ts"]
 ```
 
-All mutations funnel through `studioActions` (exported from `store/useStudio.ts`), which mutate
-the single `store/index.ts` state. Components never write the API directly except through the
-store's actions.
+All mutations go through store actions. Components never call the API directly.
 
 ---
 
-## 4. Rendering pipeline (normal path)
+## 4. Rendering: one path
 
 ```text
-current project.json + scene-data.json + assets
-  → schema/policy validation (services/project)
-  → stable scene ID map
-  → R3F Canvas + recipes + assets (browser)
-  → real Object3D hierarchy, camera, lights, PBR materials
-  → Drei TransformControls + OrbitControls (3D mode)
-  → live preview / read-only Present composite
-  → semantic Object3D → SceneData pending patch
-  → guarded native-file save (Cmd/Ctrl+S)
+saved project.json + designs + screens + assets + fonts
+  → xds/browser.py launches headless Chromium (Playwright)
+  → screens/<id>/index.html → cache/<hash>/screens/<id>.png   (only the screens the slides use)
+  → /render?slide=<id>  at exactly format.width × format.height
+  → SlideStage draws every layer in layerOrder, the same component as the editor
+  → window.xds.ready   (fonts, GLBs, environment, shadows)
+  → page screenshot     → cache/<hash>/slides/<n>-<id>.png     (the final composite)
+  → window.xds.measure()→ cache/<hash>/measure/<id>.json        (geometry for the audit)
+  → layer passes        → per-layer alpha masks + background-only composite (for masking/contrast rules)
 ```
 
-Final frames come from **one explicitly selected renderer**:
-
-- **Three.js (default, in-editor):** the R3F canvas rasterizes each slide to a transparent
-  PNG at the target size; the browser uploads frames to `/api/render/capture`, and Python
-  writes `cache/renders/<source-hash>/manifest.json` (`renderer: "three"`).
-- **Blender (optional, headless):** `workers/blender/render.py` builds a fresh scene from
-  the same recipe data and writes a renderer-neutral manifest (`renderer: "blender"`).
-
-The manifest schema is renderer-neutral (`renderPath` / `metadataPath`), so review, audit,
-and export consume either renderer's output unchanged. The pipeline **never falls back**
-from the selected renderer to the other.
+There is no separate per-layer capture, no compositing in Python, and no font embedding: the
+screenshot *is* the composite, made the same way the person sees it in the editor. Exporting
+copies these PNGs. If one slide fails to become ready within the timeout, the command fails and
+names what it was still waiting for (`fonts: Satoshi 700`, `model: bottle`).
 
 ---
 
-## 5. Authority, isolation, and safety boundaries
+## 5. Safety boundaries
 
-- **Authority.** `scene-data.json`/`project.json` are persistent source. R3F is the
-  authority for the *current, possibly unsaved* runtime scene; it serializes changes back
-  as a semantic patch. Three.js never writes source continuously.
-- **Mode isolation.** A mode is `present` (view-only) or one of the four layer ids — `type`
-  (Text), `image` (2D), `render` (3D), `ground` (Background) — so the modes and the layers are one
-  set of names, not two. Enforced in `store/index.ts` (`guardNode`, `editableLayer`) and in the
-  stage, not merely by hiding controls.
-- **Freshness.** Every render, review, audit, and export records the ordered SHA-256 hashes
-  of the sources it used. A hash mismatch marks a result `stale`, and stale results can
-  never satisfy a gate.
-- **Guarded saves.** `Cmd/Ctrl+S` writes project.json, scene-data.json, and any needed
-  review invalidation as one journaled transaction: validate → lock → re-check hashes →
-  stage → replace → roll back on failure. It writes **all pending changes or none**.
+- **Authority.** `project.json` is the source. The editor's in-memory document becomes source only
+  when saved. A 3D gesture writes a pose patch into the store when it completes, never
+  continuously.
+- **Mode isolation.** A mode is `present` (view-only) or one of the four layer ids, `type`
+  (Text), `image` (2D), `render` (3D) and `ground` (Background), so modes and layers share one set
+  of names. Store actions reject an edit to a node whose layer doesn't match the mode.
+- **Rigid models.** The store has no action that writes `parts`, `animation` or `screens`. These
+  belong to the file and the agent, and editor saves carry them through unchanged.
+- **Freshness.** Every derived artifact lives under its source hash, so a changed source can
+  never be served stale results.
+- **Saves.** One file, written atomically, guarded by `baseHash`. A save either replaces the
+  whole file or leaves it untouched.
+- **Paths.** Every path in `project.json` is project-relative and checked to stay inside the
+  project. `/api/files` serves nothing outside it.
 
 ---
 
-## 6. Optional Blender path
+## 6. 3D models and Blender
 
-Blender is a selectable headless renderer and a custom-geometry/baking/GLB tool — never the
-default, editor, live preview, or a required save dependency.
-
-- `project-scene.py` is optional for the project and Three.js rendering, but is required
-  when invoking the Blender pipeline (`xds blender-preview`, `xds blender-render`, or
-  `xds render --renderer blender`). It is statically inspected and executed only inside
-  an isolated Blender process.
-
-- `services/blender/validation.py` enforces a restricted recipe dialect: a small builtins
-  allowlist, an AST node allowlist, no imports/lambdas/classes, and attribute access
-  limited to `context.project/scene_data/slide/mode`.
-- Ordinary open, watch, preview, save, validate, audit, review, and export **never** invoke
-  Blender or execute `project-scene.py`.
+The app loads glTF binary (`.glb`) files and has **no knowledge of Blender**: no Blender
+renderer, no Blender settings, no generator scripts. `.gltf` and `.dae` files are converted to
+`.glb` once, on import. The editor treats a model as one rigid object. Only an agent, by editing
+the file, can articulate its named parts (`RenderData.parts`, [data models §2.5](./data-models.md#25-node-the-editable-unit)). Blender (or any other tool) is how an agent
+or a person *creates* a model. The [agent guide](./agent-guide.md#3-bringing-in-a-3d-model)
+describes the export conventions and `xds model add`, which checks and registers a GLB.
 
 ---
 
 ## 7. Where to go next
 
-- [Data models](./data-models.md) — every schema, and where each field lives on disk.
-- [Human interaction](./human-interaction.md) — the layout and where a person clicks.
-- [Dataflow](./dataflow.md) — inputs, transformations, and destinations.
+- [Data models](./data-models.md): every schema and where it lives on disk.
+- [Lighting and backgrounds](./lighting-and-backgrounds.md): the studio rig, framing, and
+  product-showcase grounds.
+- [Design rules](./design-rules.md): the numbers, the audit, and every rule.
+- [Agent guide](./agent-guide.md): the file-and-CLI workflow, and bringing in models.
+- [Human interaction](./human-interaction.md): the editor, and where a person clicks.
+- [Dataflow](./dataflow.md): every input, transformation and destination.

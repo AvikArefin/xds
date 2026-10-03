@@ -1,25 +1,16 @@
 # Human interaction
 
-This page describes the Studio editor screen — what is where, and where a person clicks,
-drags, and types. It maps directly to `apps/studio/src/App.tsx` and the components under
-`components/`.
-
-Start the editor with:
+This page describes the Studio editor: what is where on screen, and where a person clicks,
+drags and types. It maps to `apps/studio/src/App.tsx` and `components/`.
 
 ```bash
-uv run xds open                         # opens with the project opener
-# or specify a project directly:
+uv run xds open                          # opens with the project browser
 uv run xds open ~/xd-projects/my-project
 ```
 
-This boots the local API (port `8765`) and the Vite UI (port `5173`), waits until both are
-reachable, then opens a browser tab. Because the API does not auto-reload, restart with
-`xds open` after backend changes; the editor refuses to run against an out-of-date
-API and reports the version mismatch.
-
-`xds open` owns those two processes: the session ends when *they* exit, not when
-something else answers on the port — so a headless `xds render` running beside your
-editor can neither take its API port nor shut it down.
+This starts the API (`8765`) and the Vite dev UI (`5173`) and opens a browser tab. The session
+ends when you stop `xds open`. Headless commands (`xds audit`, `xds export`) run their own
+process and never interfere with an open editor.
 
 ---
 
@@ -35,275 +26,221 @@ flowchart LR
     Insp["<b>Inspector</b><br/>right sidebar"]
   end
   Rail --- Stage --- Side --- Insp
-  Footer["status bar: notices · pending count · validation · canvas size"]
+  Footer["status bar: notices · saved/unsaved · format"]
   Shell --> Footer
 ```
 
-The grid is `SlideRail | canvas-workspace | side panel | Inspector`, with a status bar
-across the bottom containing the project name, the pending-edit count, the canvas size, and
-the latest notice. Validation lives in the left rail (the **Audit** panel), not the status bar.
-
-There is **no separate top navigation bar**. Everything lives in the left rail or the
-canvas toolbar.
-
-### 1.1 Left sidebar — `SlideRail`
-
-Top to bottom:
+### 1.1 Left sidebar: `SlideRail`
 
 | Zone | Contents | Actions |
 | --- | --- | --- |
-| Heading | "Slides", slide count | **`+` Add new slide** button (`addSlide`) |
-| Slide list | index number, name, layer count, delete button per slide | click a row to activate (`setActiveSlide`); trash to delete (disabled when only one slide) |
-| Audit | `ValidationPanel` — status badge, issue list | **Run audit** button |
-| Pending edits | `PendingPanel` — last edits, or "Local state matches the last saved file" | — |
-| Export target | `ExportTargetSelect` — grouped select (Social / Pixels / Paper / Custom) + W×H inputs when Custom | pick a preset, or type a custom size |
-| Final render | renderer `<select>` (**Three.js** / **Blender**) | choose the renderer the export runs |
-| Rail toolbar | Open project, Search, Reload, Export, Save icon buttons | see shortcuts below |
+| Heading | "Slides", count | **`+`** add slide |
+| Slide list | thumbnail, name, finding count badge | click to activate; drag to reorder; trash to delete (not the last slide) |
+| Audit | `AuditPanel`: errors/warnings/info counts and the findings list | **Run audit**; click a finding to select its node and zoom to it |
+| Format | `FormatSelect`: grouped presets (Social / Video / Print / Custom) | pick a preset or type a custom size |
+| Toolbar | Open project, Search, Export, Save | see shortcuts |
 
-### 1.2 Center — the Stage
+### 1.2 Center: the Stage
 
-- **Canvas toolbar** across the top of the stage:
-  - **Mode switcher**: `Present`, then the layers front → back — by default **Text**, **2D**,
-    **3D**, **Background** (the active one is `aria-pressed`). Clicking switches mode, and the
-    switcher follows the project's `layerOrder`.
-  - In **3D** mode only: **Move / Rotate / Scale** buttons, and **World / Local** coordinate
-    space buttons.
-  - In every mode except Present: a **Snap** checkbox.
-- **Zoom control** (float, top-left of the stage): `−` / percentage / `+`.
-- **The canvas** — rendered inside a scrollable, zoomable viewport. Clicking empty canvas
-  clears the selection.
-- In Present and 3D modes the live `ThreeScene` R3F `<Canvas>` is mounted. Present is
-  read-only; 3D is editable.
+- **Canvas toolbar.** The mode switcher (`Present`, then the layers front → back, following
+  `layerOrder`). In 3D mode it also has **Move / Rotate / Scale** and **World / Local**. In every
+  mode except Present it has **Snap** and **Guides**.
+- **Zoom control**: `−` / percentage / `+`.
+- **The canvas**: the same `SlideStage` the export renders, so what you see is what is exported.
+  Clicking empty canvas clears the selection.
+- **Guides** (`G`): the margin, the platform safe zones (hatched), the `u` spacing grid, and the
+  third lines. Snapping uses the margin, the grid, other blocks' edges and centers, and the
+  thirds.
+- **Audit overlay**: after an audit, each finding is drawn on the canvas as an outlined region
+  in its severity color. Hovering shows the message and the fix.
 
-### 1.3 Side panel (right of the canvas)
-
-The middle-right panel changes with mode:
+### 1.3 Side panel
 
 | Mode | Panel | Contents |
 | --- | --- | --- |
-| Present | `PresentPanel` | the layer stack, front → back, with per-layer node counts and **up/down buttons that reorder it** (`moveLayer`); plus the **Exports** list — every finished export shows how many PNGs were written and where, with a numbered download link per slide |
-| 3D | `ScenePanel` | the slide's 3D object list — click to select, eye to hide/show, lock, trash to remove from slide; footer has "+ Assign model from library…" and "+ New 3D shape…" |
-| Text / 2D / Background | `LayerList` | the active layer's nodes — click to select, eye, lock, trash; footer has "+ New type…" / "+ New image…" / "+ New ground…" and duplicate / move-forward / move-backward / delete buttons |
+| Present | `PresentPanel` | the layer stack front → back with up/down buttons that reorder `layerOrder`; the **Exports** list |
+| 3D | `ScenePanel` | the slide's 3D objects (select, hide, lock, remove from slide); **+ Add model…**, **+ Add shape…** |
+| Text / 2D / Background | `LayerList` | the layer's nodes (select, hide, lock, delete, reorder); **+ New text…** / **+ New image…** / **+ New background…** |
 
-### 1.4 Right sidebar — `Inspector`
-
-The inspector's contents depend on mode:
+### 1.4 Right sidebar: `Inspector`
 
 | Mode | Inspector | What you edit |
 | --- | --- | --- |
-| Present | `BrandInspector` | the project-wide **brand system** |
-| 3D | `SceneInspector` | the selected object: linked model, Translate / Rotate / Scale X-Y-Z fields |
-| Text / 2D / Background | `DesignInspector` → `TransformInspector` + `GroundInspector` / `ImageInspector` / `TypeInspector` | the selected node |
+| Present | `BrandInspector` | colors, type roles, fonts, project default lighting |
+| 3D | `SceneInspector` | the selected object's pose; the slide's **Camera** and **Lighting** |
+| Text / 2D / Background | `TransformInspector` + `TypeInspector` / `ImageInspector` / `GroundInspector` | the selected node |
+
+Number fields in the type and transform inspectors show the guide range next to them (for example
+size `70` with `54–97` in muted text) and turn amber outside it.
 
 ### 1.5 `CommandPalette` (⌘K / Ctrl+K)
 
-A modal over a dimmed backdrop. Type to filter; `Enter` runs the first match; `Escape`
-closes. It lists: Open project folder…, New project…, Add new slide, Save all edits, Reload
-project file, Run project audit, Switch to Text / 2D / 3D / Background, and a
-"Go to slide N: <name>" entry per slide.
+Filter and `Enter` to run: Open project…, New project…, Add slide, Save, Run audit, Export, Toggle
+guides, Switch to Text / 2D / 3D / Background, Go to slide N, Apply lighting look…, Add
+background design….
 
 ---
 
-## 2. The modes
+## 2. Modes
 
-A mode is either `present` — the read-only composite — or one of the four layer ids. There is no
-separate mode id: **Text**, **2D**, **3D** and **Background** are labels for the `type`, `image`,
-`render` and `ground` layers. Switching modes is done from the canvas toolbar, the number keys,
-or the command palette.
+A mode is `present` (the read-only composite) or one of the four layer ids. **Text**, **2D**,
+**3D** and **Background** are labels for `type`, `image`, `render` and `ground`.
 
-| Mode | Key | Layer exposed | Side panel | Inspector | Three.js? |
-| --- | --- | --- | --- | --- | --- |
-| **Present** | `1` | all layers (read-only composite) | PresentPanel | BrandInspector | yes, read-only |
-| **Text** | `2` | `type` only | LayerList | TypeInspector | no |
-| **2D** | `3` | `image` only | LayerList | ImageInspector | no |
-| **3D** | `4` | `render` only | ScenePanel | SceneInspector | yes, editable |
-| **Background** | `5` | `ground` only | LayerList | GroundInspector | no |
+| Mode | Key | Editable layer | Side panel | Inspector |
+| --- | --- | --- | --- | --- |
+| **Present** | `1` | none (read-only) | PresentPanel | BrandInspector |
+| **Text** | `2` | `type` | LayerList | TypeInspector |
+| **2D** | `3` | `image` | LayerList | ImageInspector |
+| **3D** | `4` | `render` | ScenePanel | SceneInspector |
+| **Background** | `5` | `ground` | LayerList | GroundInspector |
 
-The composition order can be changed from **Present** mode: its side panel lists the layers
-front → back and its up/down buttons call `moveLayer`, which rewrites `project.layerOrder` and
-regroups `project.nodes` to match. The canvas stack, the mode switcher and the exported PNG all
-follow that one order.
-
-Mode ownership is enforced in state, not just by hiding UI: `store/index.ts` rejects a mutation
-whose node's layer doesn't match the mode (`guardNode`), and switching modes clears
-incompatible selection and gestures.
+All layers are always visible. The mode decides which one you can edit. Store actions reject an
+edit whose node layer doesn't match the mode, so this is enforced, not just hidden.
 
 ---
 
-## 3. Keyboard shortcuts
+## 3. Keyboard and mouse
 
-Registered in `App.tsx` (and `Stage` for nudging). Shortcuts are ignored while typing in an
-input, textarea, select, or contenteditable element.
+Shortcuts are ignored while typing in a field.
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl/Cmd + S` | **Save all pending changes** (`saveAll`) |
-| `Ctrl/Cmd + K` | Toggle the command palette |
-| `1` / `2` / `3` / `4` / `5` | Present / Text / 2D / 3D / Background (fixed per mode; they do not move with the layer order) |
-| `V` | Run project audit |
-| `R` | Reload the project file from disk |
-| `Delete` / `Backspace` | Delete the selected node (or 3D object in 3D mode; respects locks) |
+| `Cmd/Ctrl + S` | Save |
+| `Cmd/Ctrl + Z` / `Shift + Cmd/Ctrl + Z` | Undo / redo |
+| `Cmd/Ctrl + K` | Command palette |
+| `Cmd/Ctrl + O` | Open project |
+| `1`–`5` | Present / Text / 2D / 3D / Background |
+| `A` | Run audit |
+| `G` | Toggle guides |
+| `Delete` / `Backspace` | Delete the selection (respects locks) |
+| `Shift + click` | Add to / remove from the selection |
+| `Cmd/Ctrl + A` | Select all nodes in the current layer |
+| `Cmd/Ctrl + D` | Duplicate the selection |
 | `Escape` | Close palette, clear selection |
-| `←` / `→` | Nudge selected 3D object on X (3D mode) |
-| `↑` / `↓` | Nudge selected 3D object on Y (3D mode) |
-| `PageUp` / `PageDown` | Nudge selected 3D object on Z (3D mode) |
+| arrows | Nudge: 2D by 1 px (`Shift`: `u`); 3D by 1 cm (`Shift`: 10 cm) |
 
-Nudge step: `0.05 m` by default, `0.25 m` when **Snap** is on, `0.5 m` with `Shift`.
+In the 3D viewport:
 
-In the 3D viewport: **left-drag** orbits the camera (when not transforming), **scroll**
-zooms, and a selected object shows Drei `TransformControls` whose mode follows the
-Move/Rotate/Scale buttons. Orbit is locked while a transform drag is in progress.
+| Gesture | Effect |
+| --- | --- |
+| left-drag | orbit (camera `yaw` / `pitch`) |
+| right-drag | pan (camera `x` / `y`: where the product sits on the canvas) |
+| scroll | zoom (camera `height`: how big the product is) |
+| **`L` + drag** | swing the light: horizontal = `angle`, vertical = `elevation` |
+| drag a gizmo | move / rotate / scale the selected object on this slide |
+
+Clicking any part of a model selects the **whole model**. The editor never moves a model's
+individual parts. Articulation (`parts`, `animation`) and device screens are set in the file by
+an agent, and the editor displays them and keeps them unchanged when you save.
+
+### 3.1 Selection
+
+- **Multi-select** works within the current mode's layer: `Shift + click`, drag a marquee from
+  empty canvas, or `Cmd/Ctrl + A`. In 3D mode, `Shift + click` selects several objects, and the gizmo
+  moves them together around their shared center.
+- With several 2D nodes selected, the inspector shows the fields they share (mixed values show
+  as `—`), and the toolbar adds **Align** (left, center, right, top, middle, bottom) and
+  **Distribute** (equal gaps, or gaps snapped to the spacing unit `u`).
+- **Selection persists.** Selection is stored as node ids, and editing never changes an id, so
+  the edited node stays selected after a drag, an inspector change, undo/redo, save, or a reload
+  from disk. It clears only when the node no longer exists, on `Escape`, on a click on empty
+  canvas, or when you switch to a mode whose layer the node isn't in.
+- **Undo/redo** (`Cmd/Ctrl + Z`, `Shift + Cmd/Ctrl + Z`) steps through every completed edit (one
+  step per drag or field change) and restores the selection that went with it.
 
 ---
 
-## 4. Task walkthroughs — where to click
+## 4. Walkthroughs
 
 ### Create a project
 
-From a terminal: `uv run xds init ~/xd-projects/my-project --name "My Project"`. This
-scaffolds the directory with a single blank slide, an empty 3D scene, and a one-token brand —
-content is authored on top, so the scaffold never seeds a design. A fully authored reference
-project lives in `packages/protocol/example/`.
+In the editor: `Cmd/Ctrl + O` → **New project** tab (or the palette's *New project…*). Enter a
+name, a folder (default `~/xd-projects/<name>`) and a format, then **Create**. The new project
+opens right away.
+
+From a terminal: `uv run xds init ~/xd-projects/launch --name "Launch" --format instagram-portrait`.
+
+The scaffold has one blank slide, an empty scene, a one-color brand, and an `AGENTS.md` that tells
+an AI agent how to work in the project. Nothing is pre-designed.
 
 ### Open a project
 
-`uv run xds open ~/xd-projects/my-project`. The editor loads `GET /api/project`; if the
-API is unreachable it shows an `ErrorState` with a **Retry** action — it never loads a fake
-project.
+`Cmd/Ctrl + O`, the toolbar folder icon, or the palette. The browser lists projects in
+`~/xd-projects/` with an **Active** badge. **Browse…** opens the macOS folder picker. If you
+have unsaved edits, it warns before switching.
 
-### Add a slide
+### Add text
 
-Click the **`+`** button in the SlideRail header, or run "Add new slide" from the palette.
-A new slide (with a default Ground node and Type headline) becomes active immediately.
+1. Press `2` (Text). Declare a role first in **Present → Brand → Typography** if none exist; pick
+   its **level** (display, headline, …) and the size defaults from the guide.
+2. **+ New text…** → choose a role. The block is placed inside the margin.
+3. Drag it on the canvas, or type values in the inspector. Edges snap to the margin, the grid and
+   other blocks.
 
-### Add a 2D node (Ground or Type)
+### Add a background
 
-1. Switch to **Background**, **2D** or **Text** (keyboard `5` / `3` / `2`).
-2. In the side panel footer, open **"+ New ground…"** (pick one of the project's SVG designs in
-   `designs/`) or **"+ New type…"** (the roles the brand has declared in **Brand Typography**;
-   declare a role there first if the list is empty). The node is created and selected.
+1. Press `5` (Background) → **+ New background…** → pick a project design, or **From starters…**
+   (sweep, spotlight, aurora, …), which copies the file into `designs/`.
+2. The `GroundInspector` shows one control per design param (number scrubber, brand-color
+   swatch, select, checkbox, text) and the design's variants.
 
-### Edit a selected node
+### Add a 3D model
 
-- Drag it on the canvas, or type exact values in the inspector (`TransformInspector` for
-  x/y/width/height/rotation/opacity/visible).
-- **Type nodes** (`TypeInspector`): edit Text Content, Preset role, Font Family, Font Size,
-  Bold/Italic, the **9-position alignment matrix**, and the brand color swatch.
-- **Ground nodes** (`GroundInspector`): the **Form** dropdown (the design's declared variants) and
-  one control per design parameter — a scrubbable number field for a number, a brand-token swatch
-  for a color, a dropdown for a select, a checkbox for a boolean, a textarea for text. The controls
-  are generated from the design file's own manifest, so a new design needs no UI change.
+1. Press `4` (3D) → **+ Add model…** → choose a `.glb`, `.gltf` or `.dae` file (or drop it on the
+   canvas). This runs the same conversion and check as `xds model add` and shows any convention
+   warnings (units, origin, size).
+2. The model appears framed and lit with no further steps.
+3. Place it on the canvas with **right-drag** (position) and **scroll** (size), or type
+   `x`, `y`, `height` under **Camera**. **Left-drag** changes the viewing angle.
+4. Use the gizmo or the pose fields to move or rotate the object itself, e.g. to tilt a bottle.
+   These changes apply to this slide only.
+5. If the model has articulated parts or a device screen, the inspector lists them read-only (for
+   example *Lid: rotated −15°*, *Screen: app-home*), with **Open screen file** to view the HTML.
 
-### Add and manipulate a 3D object
+### Light the product
 
-1. Switch to **3D** (key `4`).
-2. In `ScenePanel`, use **"+ New 3D shape…"** (box, sphere, cylinder, torus, plane) to add a
-   shape — this creates both a scene object and a slide render node. Or **"+ Assign model
-   from library…"** to instance an existing object on this slide.
-3. Click an object in the list or directly in the viewport (raycast selection) to select it.
-4. Choose **Move / Rotate / Scale**, then drag the gizmo in the viewport — or type exact
-   values in `SceneInspector` (Translate/Rotate/Scale, X/Y/Z), or nudge with the arrow keys.
-5. Toggle **World / Local** space for nested or rotated objects. Use the eye icon to hide,
-   the lock icon to guard from edits, and trash to remove the model **from this slide only**
-   (the shared catalog object and other slides are untouched).
+You usually don't need to do anything. To change it, open **Lighting** in the 3D inspector:
 
-### Light the 3D layer
+- **Look**: four thumbnails (Softbox, Contrast, Rim, Bright), rendered with your model.
+- **Angle / Elevation**: a dial and a slider, or `L` + drag in the viewport.
+- **Shadow**: Contact · Soft · None.
+- **Brightness**: one slider, ±1 stop.
+- **Tint**: optional brand color for reflections.
 
-In **3D** mode, `ScenePanel`'s footer holds the studio lighting controls. Every one is scoped
-to the active slide:
+The settings apply to this slide. **Use for all slides** writes them to the project default.
 
-- **Rig** — pick a preset (Studio 3-point, Softbox product, Dramatic rim, Outdoor sun, Flat
-  ambient). A rig replaces the whole light set and carries its own ambient level.
-- **Intensity** — multiplies the rig's lights.
-- **Yaw / Pitch** — orbit the rig around the subject and tilt it above/below the horizon.
-- **Softness** — scales the emitter size; larger sources give softer light and shadow edges.
-- **Ambient** — ambient/hemisphere fill, independent of the rig's intensity.
-- **Exposure** — tone-mapping exposure for the whole 3D layer.
+### Edit the brand
 
-Lighting never writes the global scene: a slide's rig, ambient and exposure are stored in the
-slide's own `lighting` block. Switching slides swaps the rig with it, and a slide that was never
-given a rig falls back to the project's authored lights. Because the rig belongs to the slide, it
-survives editing or removing that slide's 3D objects.
+In Present mode the inspector shows `BrandInspector`: **Colors** (swatches, add, delete),
+**Typography** (roles with level, font, weight, size, color), **Fonts** (files in `fonts/`;
+**Fetch from Fontshare…** downloads one) and **Default lighting**.
 
-Camera moves commit deliberately: dragging the viewport to orbit/pan/zoom does not rewrite an
-authored camera, while a committed move records the camera view on that slide only.
+### Choose the format
 
-### Edit the brand system
-
-In **Present** mode, the inspector is `BrandInspector`:
-
-- **Brand Typography** — the roles the brand declares. Click a role pill to select it, click the
-  trash button to remove it (only while no type node uses it), or **+ New type…** to create one from the
-  catalogue or a name of your own. Pick a role, then set Font Family (Fontshare catalog),
-  Size (px), **B** / *I*, and the color token. A role with no size shows the export target's
-  derived default.
-- **Brand Colors** — click a circular swatch to open the native hex picker, add a token
-  (name + color + **Add**), or delete one.
-- **Canvas Background** — choose which brand token is the canvas background.
-
-Because these are project-wide, changes propagate live to all slides.
-
-### Choose the export target
-
-In the left rail's **Export target** selector, pick a grouped preset (Social / Pixels /
-Paper) or **Custom…** and type exact dimensions. Choosing a target sets `publishTarget` and
-re-derives the per-role bands from the target's shorter edge. It rewrites no authored size:
-a role without a pinned `fontSize` simply reads the new derived default, so every role rescales
-together.
+Pick a preset in the rail's **Format** selector, or **Custom…**. Boxes are percentages, so the
+layout reflows. Type sizes without a pinned `size` follow the new bands. Run the audit afterwards,
+because a format change often creates new findings (for example, story safe zones).
 
 ### Run the audit
 
-Click **Run audit** in the rail's Audit panel, press `V`, or run "Run project audit" from
-the palette. Failures appear as a clickable list with exact codes and paths.
-
-### Render final frames
-
-Pick the renderer (**Three.js** or **Blender**) in the rail's Final render control. Rendering
-is a step of **Export PNG**, not a button of its own: the browser captures Three.js frames,
-while Blender runs headlessly inside the API, and either way the ground and type layers come
-from this browser because only it can draw them. One export therefore renders once — the
-render happens after the export's gates (see below). You must **save first** — the editor
-warns "Save before rendering final frames" otherwise, because a render must match the saved
-source hash. When the browser does the rendering, each slide is rasterized layer by layer and
-the running **Exports** row names the slide and times each step as it lands (`Capturing slides
-2/5 · 3D 1.1s · ground 0.4s · type 0.6s`). A font that never arrives, or a 3D model that never
-finishes loading, fails the render with a named error instead of waiting forever or writing an
-empty layer. Headless equivalents: `xds render --renderer three` and
-`xds render --renderer blender`.
-
-### Measure the type (for the audit)
-
-`xds measure PROJECT` renders nothing: it lays the slides out in headless Chrome and
-records each type node's box, rendered line boxes, line count and effective font size. The
-audit uses those numbers for overflow and overlap checks and reports `GEOMETRY_UNMEASURED`
-until they exist — it never estimates text layout itself. Capturing a render or overlays
-records the same measurements.
+Press `A`, click **Run audit**, or use the palette. Unsaved edits are saved first (the audit reads
+the file). The progress line names each slide and step. Findings appear in the rail and as an
+overlay on the canvas. Click one to select its node. To accept a finding as deliberate, choose
+**Mark as intentional…** on it and give a reason. This writes an exception into the source
+([design rules §7](./design-rules.md#7-deliberate-exceptions)).
 
 ### Export PNG
 
-Open the rail toolbar's **Export** menu and choose **PNG**. Export gates first, then renders,
-then writes exact-size PNGs: the audit is the gate, so it runs before any capture or render
-and a blocked export fails at once with the reasons listed in the Audit panel — a Blender
-export never starts Blender for an export that cannot pass. The project's `export/` directory
-is part of the validated layout: delete it and the audit says `MISSING_DIRECTORY: export`
-until it exists again. It requires a clean save (no pending
-edits) and blocks on audit **errors** (warnings do not block). When it finishes, the job
-appears in the Present panel's **Exports** list with the output folder and a download link
-for every slide; a failed step leaves the job marked **failed** with the reason
-instead of silently doing nothing.
+Toolbar **Export**. You must save first. Export runs the audit (reusing it when current) and
+stops on open errors, listing them. **Export anyway** forces it and records that in
+`export.json`. Finished exports appear in the Present panel with a download link per slide.
 
-### Save, reload, and open project
+### Save and external changes
 
-- **Open project** — the rail toolbar folder icon, `Ctrl/Cmd + O`, or Command Palette (`Ctrl/Cmd + K` → *"Open project folder…"*) opens the project browser dialog.
-  - Defaults to **`~/xd-projects/`**, displaying all discovered projects with their slide counts, folder paths, and an **Active** badge on the currently loaded project.
-  - Click any project to open it directly, or filter by name/path using the search input.
-  - To open any other folder on your machine, click **Browse…** to open the native macOS folder selection dialog, or enter the path and click **Open**.
-  - If you have unsaved edits in the active project, the dialog warns that opening another project will discard uncommitted changes.
-- **Save** — the rail toolbar save icon, or `Ctrl/Cmd + S`. Writes all pending native
-  changes in one guarded transaction, or none on failure.
-- **Reload** — the reload icon or `R`. If you have pending edits, you're asked to confirm;
-  non-conflicting external changes rebase, and overlapping changes surface as conflicts to
-  resolve.
+`Cmd/Ctrl + S` saves the whole project in one atomic write. When an agent (or anything else)
+changes the project files, the editor reloads them immediately: the file on disk is the truth.
+Unsaved edits in the editor are replaced, and a notice says so. Selection stays on anything that
+still exists.
 
 ---
 
@@ -311,14 +248,12 @@ instead of silently doing nothing.
 
 | Surface | Where | Shows |
 | --- | --- | --- |
-| Notices | bottom status bar | latest info/success/warning/error with an optional detail and a dismiss `×` |
-| Pending count | bottom status bar | number of unsaved edits |
-| Validation | left rail (**Audit** panel) | "Passed" / "Attention" / "Not run" badge and the issue list |
-| Audit panel | left rail | pass/attention badge and the issue list |
-| Pending panel | left rail | the most recent pending edits with their paths |
-| Conflict state | via notices | prompts to keep the local or server value before saving |
-| Exports row | Present panel | a running capture names the slide and each finished step's time; a finished export lists its files |
+| Notices | status bar | latest info/success/warning/error, dismissible |
+| Saved state | status bar | "Saved" or "Unsaved changes" |
+| Audit panel | left rail | counts and the findings list |
+| Audit overlay | canvas | finding regions with message and fix on hover |
+| Slide badges | slide list | per-slide open error/warning counts |
+| Guide ranges | inspectors | the recommended range next to size and spacing fields |
+| Exports | Present panel | progress per slide and step; finished files with links |
 
-Unsaved work also triggers the browser's `beforeunload` guard. Closing with pending changes
-in a native flow offers **Save and close**, **Discard and close**, or **Cancel**; a failed
-save never closes the editor.
+Closing the tab with unsaved edits triggers the browser's `beforeunload` prompt.

@@ -1,16 +1,18 @@
-# XDS All Data models & Diagram
+# XDS data models
 
-**The rules live in exactly one place:** `services/schema.py`. It describes `project.json`,
-`scene-data.json` and `review-state.json` as data, and two consumers read that description:
+**The rules live in exactly one place:** the Pydantic models in `xds/models.py`. Three
+consumers read them:
 
-1. the Python gate (`services/project/project.py`) that validates files on disk, and
-2. the type generator (`uv run xds schema --emit-types`) that writes
-   `packages/protocol/src/generated/project-types.ts`.
+1. the **gate** (`xds/project.py`), which validates `project.json` on every load, save, audit and
+   export;
+2. the **type generator** (`uv run xds schema --emit-types`), which turns the models' JSON Schema
+   into `packages/protocol/src/generated/project.ts` with `json-schema-to-typescript`;
+3. the **migrator** (`xds/migrate/`), which uses each field's declared `default` and `aliases`
+   to bring an old file up to date automatically (see §6).
 
-The editor holds no rules of its own: it consumes the generated types and the gate's verdict
-from the API. There is no zod schema and nothing is mirrored field-by-field;
-`uv run xds schema --check` (and `tests/test_schema_types.py`) prove the checked-in types
-still match the rule set.
+The editor holds no rules of its own: it uses the generated types and shows the gate's verdict.
+`uv run xds schema --check` (and `tests/test_schema_types.py`) fails when the checked-in types
+no longer match the models.
 
 ---
 
@@ -18,576 +20,496 @@ still match the rule set.
 
 ```mermaid
 flowchart TB
-  subgraph Sources["Editable source — on disk"]
-    PJ["project.json<br/><b>ProjectDocument</b>"]
-    SD["scene-data.json<br/><b>SceneData</b>"]
-    PS["project-scene.py<br/><i>optional generator</i>"]
+  subgraph Source["Editable source (on disk)"]
+    PJ["project.json<br/><b>Project</b>"]
+    DS["designs/*.svg<br/><b>Design</b>"]
+    AS["assets/ · fonts/<br/>images, GLB models, font files"]
   end
 
-  subgraph Derived["Derived state — on disk"]
-    RS["review-state.json<br/><b>ReviewState</b>"]
-    RM["cache/renders/&lt;hash&gt;/manifest.json<br/><b>Render manifest</b>"]
-    AU["cache/audits/&lt;hash&gt;.json<br/><b>Audit record</b>"]
-    RV["cache/reviews/&lt;hash&gt;/<br/>1:1 frames + contact sheet"]
-    EX["export/&lt;hash&gt;/*.png<br/><b>Deliverables</b>"]
-    OV["cache/renders/&lt;hash&gt;/overlays/<br/>ground/type PNGs"]
-    LK[".project.lock · .project-save-journal.json"]
+  subgraph Derived["Derived (on disk, disposable)"]
+    RN["cache/&lt;hash&gt;/slides/*.png<br/>rendered slides + contact sheet"]
+    AU["cache/&lt;hash&gt;/audit.json<br/>+ *.annotated.png"]
+    EX["export/&lt;stamp&gt;/*.png<br/>deliverables + export.json"]
   end
 
-  subgraph Memory["In-memory only"]
-    ST["StudioState<br/>(store/types.ts)"]
-    R3F["Live Three.js Object3D graph"]
-    PD["PendingState<br/>(pending edits)"]
+  subgraph Memory["In memory (editor only)"]
+    ST["StudioState (zustand)"]
+    R3F["Live Three.js graph"]
   end
 
-  PJ -->|"read/validate"| ST
-  SD -->|"read/validate"| ST
+  PJ & DS & AS -->|"GET /api/project"| ST
   ST -->|"reconcile"| R3F
-  R3F -->|"gesture → semantic patch"| PD
-  PD -->|"Cmd/Ctrl+S"| PJ
-  PD -->|"Cmd/Ctrl+S"| SD
-  ST -->|"capture frames"| RM
-  ST -->|"capture overlays"| OV
-  RM -->|"audit"| AU
-  RM -->|"review"| RV
-  RM -->|"export"| EX
-  AU --> RS
-  RV --> RS
-  PJ -->|"hash"| RS
-  PS -.->|"blender-render only"| RM
+  R3F -->|"gesture → pose patch"| ST
+  ST -->|"PUT /api/project (Cmd/Ctrl+S)"| PJ
+  PJ & DS & AS -->|"headless render (Playwright)"| RN
+  RN -->|"measure + rules"| AU
+  RN -->|"export"| EX
 ```
 
-Legend: solid arrows are the normal path; the dashed arrow is the explicitly-optional
-Blender generator path.
+**Key idea:** `project.json`, `designs/`, `screens/`, `assets/` and `fonts/` are source. Everything
+else is a cache keyed by the **source hash**, a SHA-256 over all of those files, and can be deleted at
+any time.
 
-**Key idea:** two files are *source* (`project.json`, `scene-data.json`). Everything else is
-either a byte-for-byte derived cache or a small bookkeeping record keyed by a **source hash**.
-`project-scene.py` is optional source that ordinary operations only inspect; it is required
-when running the headless Blender renderer (`--renderer blender`).
+A project directory may also contain a `sources/` folder (`.blend` files, original `.dae`/`.gltf`
+exports, reference images). The app ignores it: it is not validated, not hashed and never read.
 
 ---
 
-## 2. `project.json` — `ProjectDocument`
+## 2. `project.json`: `Project`
 
-`schemaVersion` is the literal `"1.0"`. The object is validated with `.strict()`
-(unknown fields are rejected).
+Unknown fields are rejected (`extra="forbid"`). The migrator, not the gate, handles fields that
+were dropped or renamed (see §6).
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `schemaVersion` | `"1.0"` | literal |
-| `id` | `string` | non-empty project id |
+| `schemaVersion` | `2` | integer; bumped by every migration step |
+| `id` | `string` | non-empty, `[a-z0-9-]+` |
 | `name` | `string` | non-empty |
-| `description` | `string` | may be empty |
-| `createdAt` / `updatedAt` | ISO 8601 string | datetime |
-| `canvas` | `Canvas` | the *design* space |
-| `publishTarget` | `PublishTarget` | the *deliverable* |
-| `brand` | `Brand` | color palette + per-role typography |
-| `layout` | `LayoutTokens` | `outerInset`, `contentInset`, `gutter`, `baseline`, `minimumGap`, `safeArea` |
-| `layerOrder` | `Layer[]` | optional; the composition stack (back → front), a permutation of the four layers |
-| `slides` | `Slide[]` | min 1, unique ids and orders |
-| `nodes` | `ProjectNode[]` | all layers, all slides |
-| `assets` | `Asset[]` | project-contained binaries |
-| `fonts` | `FontFile[]` | referenced font files |
-| `scene` | `SceneLink` | points at `scene-data.json` |
+| `description` | `string` | default `""` |
+| `createdAt` / `updatedAt` | ISO 8601 | `updatedAt` is set by save |
+| `format` | `Format` | the deliverable size; the only canvas there is |
+| `brand` | `Brand` | color tokens + type roles |
+| `fonts` | `FontFile[]` | font files under `fonts/` |
+| `assets` | `Asset[]` | images and GLB models under `assets/` |
+| `screens` | `Screen[]` | UI mockups shown on device screens (§2.10) |
+| `materials` | `Material[]` | for primitive 3D shapes only |
+| `objects` | `SceneObject[]` | the shared 3D catalog |
+| `layerOrder` | `Layer[]` | the composition stack, back → front, a permutation of the four layers; default `["ground","render","image","type"]` |
+| `lighting` | `Lighting?` | project default; each slide may override fields |
+| `rules` | `RuleOverrides?` | per-project changes to audit thresholds (see [design rules](./design-rules.md)) |
+| `slides` | `Slide[]` | min 1; **array order is slide order** |
 
-### 2.1 `Canvas`
+Removed in v2: `canvas` (merged into `format`), `publishTarget` (now `format`), `layout` tokens
+(now derived from `format`, see [design rules §1](./design-rules.md#1-numbers-derived-from-the-format)),
+`scene` link, and the separate `scene-data.json` (its `objects` and `materials` now live here, and
+lights and camera became `lighting` and `Slide.camera`).
 
-```ts
-{ width: number; height: number; unit: "px"; background: string }
-```
-
-`background` is a non-empty string; by convention it is a **brand color token name** (e.g.
-`"paper"`) rather than a hex value. The schema only requires the string, so the token lookup is a
-convention the editor and audit follow, not a gate check.
-
-### 2.2 `PublishTarget`
-
-```ts
-{ name: string; width: number; height: number; format: "png"; colorSpace: "srgb" }
-```
-
-`canvas` is the internal design space; `publishTarget` is what export must match exactly.
-Export scales the design space to the target; a mismatch is a validation concern.
-
-### 2.3 `Brand`
+### 2.1 `Format`
 
 ```ts
 {
-  name: string;
-  colors: { hex: string; name: string }[];        // min 1, unique names
-  typographyStyles: Record<string, {               // keyed by role; membership is authored
-    fontFamily?: string;
-    fontSize?: number;                             // optional: derived from the export band when absent
-    bold?: boolean;
-    italic?: boolean;
-    colorToken?: string;
-  }>;
+  preset?: string;   // a key of the format catalog (xds/formats.py), e.g. "instagram-portrait"
+  width: number;     // px, integer
+  height: number;    // px, integer
 }
 ```
 
-The map is **authored, not seeded**: a role exists exactly when the brand declares it, and every
-type node's `role` must name a declared key. An entry may carry only the properties the brand
-overrides; its size derives from the export target band (`services/targets.py`) when `fontSize`
-is absent. The brand inspector is where roles are created.
-Legacy `fontFallbacks`, `fontFamily`, `spacing`, `voice`, and `typeScale` are retired.
+A preset brings the platform's **safe zones** (where the app's UI covers the image, e.g. story
+captions) and its **view width** (how wide the image appears on a phone screen). The audit
+needs both (see [design rules](./design-rules.md)). A custom size with no preset uses the
+`generic-screen` profile.
+
+### 2.2 `Brand`
+
+```ts
+{
+  colors: { name: string; hex: string }[];          // min 1, unique names, "#rrggbb"
+  typography: Record<string, TypeRole>;              // keyed by role name; authored, not seeded
+}
+
+TypeRole = {
+  level: "display" | "headline" | "subhead" | "body" | "caption";  // which size band it uses
+  font: string;            // a family in `fonts`
+  weight?: number;         // 100..900, default 400
+  italic?: boolean;
+  size?: number;           // px; when absent, the band default for `level` at this format
+  color?: string;          // brand color token
+  lineHeight?: number;     // unitless; when absent, the level's default
+  letterSpacing?: number;  // em
+  uppercase?: boolean;
+}
+```
+
+`level` is what the audit reasons about. Role names (`"kicker"`, `"price"`, `"cta"`) are free
+for the author, but each role says which hierarchy level it belongs to. Every type node's `role`
+must name a declared role.
+
+### 2.3 `FontFile` and `Asset`
+
+```ts
+FontFile = { family: string; path: string; weight: number; italic?: boolean };   // path under fonts/
+Asset    = { id: string; path: string; kind: "image" | "svg" | "model" };       // path under assets/
+```
+
+Paths are project-relative, must not contain `..`, and must exist. A `model` asset is always a
+binary glTF 2.0 file (`.glb`), the one 3D format the app loads. `xds model add` accepts `.glb`,
+`.gltf` (with its `.bin` and textures) and `.dae` (Collada), and converts the last two to `.glb` on
+import (see [agent guide §3.3](./agent-guide.md#33-wiring-it-into-the-project)). The original file is
+kept in `sources/` for reference. Fonts are files on disk rather than a network stylesheet, so a headless
+render is deterministic and works offline. `xds fonts fetch PROJECT FAMILY` downloads a
+Fontshare family into `fonts/` and registers it.
 
 ### 2.4 `Slide`
 
 ```ts
 {
-  id: string; order: number;         // int, unique, >= 0
-  name: string; 
-  interface: string[];
-  lighting?: SlideLighting;          // the slide's own rig (see 2.4.1)
-}
-```
-
-#### 2.4.1 `SlideLighting`
-
-A slide's complete, self-contained lighting choice. `baseline` is the authored rig the pure
-knobs scale and `lights` is the effective rig after they are applied; both are stored so a
-save/reload keeps the knobs reversible. `presetId` is present only when a fixed rig is active.
-
-```ts
-{
-  presetId?: string;                 // → apps/studio/src/scene/lighting.ts LIGHTING_PRESETS
-  intensity: number;                 // rig intensity multiplier
-  direction: number;                 // yaw orbit around the Y axis (degrees)
-  pitch: number;                     // tilt above/below the horizon (degrees)
-  softness: number;                  // emitter-size multiplier
-  environmentIntensity: number;      // ambient/hemisphere strength
-  exposure: number;                  // tone-mapping exposure
-  baseline?: LightRecipe[];          // the rig the knobs scale
-  lights: LightRecipe[];             // the effective rig (baseline + knobs)
-}
-```
-
-### 2.5 `ProjectNode` — the editable unit
-
-Every node belongs to one slide and one layer. `layer` drives which `data` shape is legal, and
-within `nodes` each slide's entries must appear in ascending `layerOrder` order (the field listed
-under `ProjectDocument`), or the audit reports `ILLEGAL_LAYER_ORDER`.
-
-```ts
-{
-  id: string;                // unique across the project
-  slideId: string;           // must exist
-  layer: "ground" | "image" | "render" | "type";
-  kind: string;              // must equal data.kind
+  id: string;                        // unique
   name: string;
-  transform: NodeTransform;  // 2D placement
-  data: GroundNodeData | RenderNodeData | ImageNodeData | TypeNodeData;
+  background: string;                // brand color token; the flat fill under every layer
+  lighting?: Partial<Lighting>;      // overrides project.lighting field by field
+  camera?: Camera;                   // absent → auto-framed (see lighting doc)
+  nodes: Node[];                     // this slide's content, all layers
+  exceptions?: Exception[];          // waived slide-level (composition) rules, see design-rules §7
 }
 ```
 
-`NodeTransform` (2D, canvas-percentage coordinates):
+Nodes are **nested under their slide**. Within one layer, array order is z-order (later is in
+front); layers stack by `project.layerOrder`. No ordering rule spans layers, so appending a node
+anywhere in `nodes` is always valid.
+
+### 2.5 `Node`: the editable unit
+
+A node is a discriminated union on `layer`.
 
 ```ts
-{
-  x: number; y: number;                 // finite, percent origin (top-left, y down)
-  width: number; height: number;        // positive
-  rotation: number;                     // degrees
-  opacity: number;                      // 0..1
-  visible: boolean;
-}
-```
+// Shared by the three 2D layers
+Box = {
+  x: number; y: number;      // percent of format, origin top-left, y down
+  w: number; h: number;      // percent, > 0
+  rotation?: number;         // degrees, default 0
+  opacity?: number;          // 0..1, default 1
+};
 
-**Ground node data** (`layer: "ground"`) — a binding to an authored SVG design:
+Exception = { rule: string; reason: string };   // see design-rules §7; reason must be non-empty
 
-```ts
-{
-  kind: "design";
-  designId: string;                    // → designs/<designId>.svg
-  variant?: string;                    // the applied variant name, if any
-  values?: Record<string, string | number | boolean>;  // parameter overrides
-}
-```
+GroundNode = { id; name; layer: "ground"; box: Box; hidden?: boolean; exceptions?: Exception[];
+               data: { design: string; variant?: string; values?: Record<string, string|number|boolean> } };
 
-**Design** (`designs/<designId>.svg`) — one self-contained SVG file holding both the artwork and
-its knob manifest, in a `<metadata id="xds-design">` element:
+ImageNode  = { id; name; layer: "image";  box: Box; hidden?: boolean; exceptions?: Exception[];
+               data: { asset: string; fit?: "cover" | "contain" | "fill" } };
 
-```ts
-interface DesignSpec {                 // parsed tolerantly by services/designs.py
-  name?: string;
-  params: {                            // one control per entry; the inspector builds it from `type`
-    name: string;
-    type: "number" | "color" | "select" | "boolean" | "text";
-    label?: string;
-    default?: string | number | boolean;
-    min?: number; max?: number; step?: number;
-    options?: string[];                // for "select"
-  }[];
-  variants?: { name: string; values: Record<string, string | number | boolean> }[];
-  svg: string;                         // the raw artwork, with {{name}} placeholders
-}
-```
+TypeNode   = { id; name; layer: "type";   box: Box; hidden?: boolean; exceptions?: Exception[];
+               data: TypeData };
 
-A placeholder in the artwork may be a bare param name — resolved for its type (a `color` to its
-brand hex, a `boolean` to `1`/`0, text verbatim) — **or an arithmetic expression** over the params
-and any enclosing loop variable, and any element may carry `data-xds-repeat`/`data-xds-count` to be
-cloned per iteration. That is what lets a knob reshape the structure (`density`, `count`,
-`frequency`) rather than only recolor it; `apps/studio/src/design/resolve.ts` evaluates it in the
-browser, identically to the headless capture. The
-file is **opaque to the gate**: `services/designs.py` reads the manifest for the editor, but
-neither the artwork nor its knobs are validated. A ground node is valid as long as its file
-exists; naming a missing one is `UNKNOWN_DESIGN`. `designs/` is part of the project layout and
-its files are folded into the source hash. The browser is the only renderer for this layer.
+RenderNode = { id; name; layer: "render"; hidden?: boolean; exceptions?: Exception[];
+               data: RenderData };
 
-**Render node data** (`layer: "render"`) — a slide-scoped instance of a scene object:
+RenderData = {
+  object: string;                           // → SceneObject.id
+  pose?: Pose;                              // whole-object placement on this slide
+  parts?: Record<string, PartPose>;         // articulation, keyed by glTF node name (agent-only, see below)
+  animation?: { clip: string; time: number };   // freeze a glTF animation clip at `time` seconds
+  screens?: Record<string, string>;         // screen mesh name → Screen.id (§2.10)
+};
 
-```ts
-{
-  kind: "scene-object";
-  objectId: string;                     // → SceneData.objects[].id
-  role: "background" | "environment" | "support" | "subject" | "accent";
-  anchorId?: string;
-  transform?: SceneTransform;           // per-slide object placement override
-  hidden?: boolean;                     // per-slide visibility
-  cameraTransform?: SceneTransform;     // per-slide camera view override
-  cameraTarget?: [number, number, number]; // per-slide camera look-at target
-}
-```
-
-A render node is where a slide overrides **one scene object** — its placement, visibility and
-the camera view. The object itself (`parameters`, `materialId`, topology) is shared through
-`SceneData.objects`; the render node's `transform`/`hidden` are per slide, so moving or hiding an
-object on one slide leaves it in place on every other slide. Editing an object only ever writes
-this node, never the shared catalogue entry.
-
-Lighting is **not** stored here: it belongs to the slide, in its own `lighting` block (see
-2.4.1). `SceneData.lights` and `SceneData.renderSettings` are authored defaults, frozen at
-author time; a slide with no `lighting` block is rendered with them.
-
-**Image node data** (`layer: "image"`) — a 2D image bound to a project asset:
-
-```ts
-{
-  kind: "image";
-  assetId: string;                      // → ProjectDocument.assets[].id, kind "image" | "svg"
-  fit?: "cover" | "contain" | "fill";   // CSS object-fit; defaults to "cover"
-}
-```
-
-The browser renders the asset (`ImageVisual`) and the node's `transform` places the box in
-canvas percent. An `assetId` that names no asset, or one whose kind is not image/svg, fails with
-`UNKNOWN_ASSET`.
-
-**Type node data** (`layer: "type"`):
-
-```ts
-{
-  kind: "text" | "decoration";
-  text: string;
-  role: string;                         // must name a declared key in brand.typographyStyles
-  horizontalAlign: "left" | "center" | "right";
-  verticalAlign: "top" | "middle" | "bottom";
-  colorToken?: string;
-  spacingToken?: string;
-  targetObjectId?: string;              // optional 3D anchor target
-  targetAnchorId?: string;
-  offsetX: number; offsetY: number;
-  bold?: boolean; italic?: boolean;
-  fontSize?: number;                    // per-instance override
-  fontFamily?: string;
-}
-```
-
-**Effective font-size resolution** (identical in editor and audit):
-`data.fontSize` → `brand.typographyStyles[role].fontSize` → the export target's derived band
-default (`services/targets.py`). The band always exists (an unknown role falls back to `body`),
-so a type node's size is never missing and the audit never reports one absent.
-
-### 2.6 `Asset` and `FontFile`
-
-```ts
-Asset    = { id; path; kind: "image"|"svg"|"model"|"video"; role };   // path project-relative
-FontFile = { id; path; family; weight: 100..900 };
-```
-
-### 2.7 `SceneLink`
-
-```ts
-{ sceneData: "scene-data.json"; activeSlideId: string }
-```
-
----
-
-## 3. `scene-data.json` — `SceneData`
-
-Stores the **shared 3D object catalog** that slide render nodes instantiate. R3F consumes
-it directly.
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `schemaVersion` | `"1.0"` | literal |
-| `sceneId`, `name` | `string` | |
-| `units` | `"metric"` | literal |
-| `rotationUnit?` | `"degrees"` | default degrees |
-| `rotationOrder?` | `"XYZ"`…`"ZYX"` | default `XYZ` |
-| `objects` | `ObjectRecipe[]` | acyclic `parentId`, unique ids |
-| `materials` | `Material[]` | unique ids |
-| `camera` | `Camera` | exactly one main camera |
-| `lights` | `Light[]` | min 1, unique ids; the authored default, not any slide's rig |
-| `renderSettings` | `RenderSettings` \| legacy | THREE renderer settings; authored ambient/exposure default |
-
-### 3.1 `SceneTransform` — the 3D transform
-
-```ts
-{
-  location: [number, number, number];
-  rotation: [number, number, number];   // Euler degrees, XYZ order
-  scale: [number, number, number];      // each non-zero
-}
-```
-
-NaN/infinity and zero scale are rejected. This is the shared vocabulary between
-`scene-data.json`, slide overrides, `editor-core` conversion functions, and the Blender
-worker.
-
-### 3.2 `ObjectRecipe`
-
-```ts
-{
-  id: string; name: string;
-  kind: "box" | "sphere" | "cylinder" | "torus" | "plane" | "image";
-  parameters: Record<string, string | number | boolean>;
-  transform: SceneTransform;
-  materialId?: string;
-  parentId: string | null;              // acyclic
-  assetId?: string;
-  hidden: boolean;
-  renderable: boolean;
-}
-```
-
-### 3.3 `Material`, `Camera`, `Light`
-
-```ts
-Material = { id; name; color: { r; g; b; a } /* 0..1 */; metallic: 0..1; roughness: 0..1 };
-
-Camera = {
-  id; name; type: "perspective" | "orthographic";
-  transform: SceneTransform;
-  lens; sensorWidth; clipStart; clipEnd;              // clipEnd > clipStart
-  target: { objectId?; location: [x, y, z] };
-};                                                    // name must be "Main camera"
-
-Light = {
-  id; name; type: "area" | "point" | "sun";
-  transform: SceneTransform;
-  color: "#rrggbb"; intensity: >= 0;
-  size: > 0;                            // emitter size; a softness knob scales this
-  target: { objectId?; location: [x, y, z] };
+PartPose = {
+  rotate?: [x, y, z];      // degrees, added to the part's rest rotation, about its own pivot
+  move?: [x, y, z];        // meters, added to the part's rest position, in its parent's space
+  hidden?: boolean;
 };
 ```
 
-The five lighting rigs the editor applies are fixed presets in
-`apps/studio/src/scene/lighting.ts`: each fully replaces the light set and carries its own
-`environmentIntensity`, so a rig is one deterministic, reversible choice. Choosing one writes it
-to the **slide's** `lighting` block (2.4.1), never to `SceneData.lights`.
+A render node has **no 2D box**: the 3D layer always covers the whole slide, and the object's
+screen position comes from its pose and the camera.
 
-### 3.4 `RenderSettings`
+**Ground data** binds to an authored SVG design, `designs/<design>.svg` (see §4). A missing file
+is `UNKNOWN_DESIGN`.
+
+**Image data**: `asset` must name an asset of kind `image` or `svg` (`UNKNOWN_ASSET`).
+
+**Type data**:
+
+```ts
+TypeData = {
+  text: string;                                   // "\n" forces a line break
+  role: string;                                   // → brand.typography key
+  align?: "left" | "center" | "right";            // default "left"
+  valign?: "top" | "middle" | "bottom";           // default "top"
+  // per-instance overrides of the role; each is optional
+  color?: string; size?: number; weight?: number; italic?: boolean;
+  lineHeight?: number; letterSpacing?: number; uppercase?: boolean;
+  group?: string;          // blocks that belong together (e.g. headline + subhead); the spacing rules use it
+  decorative?: boolean;    // graphic lettering: exempt from size/legibility/reading rules, not from collisions
+};
+```
+
+**Effective type style** (the editor and the audit use the same order, and the audit reads it from
+the browser rather than recomputing it): node override → `brand.typography[role]` → the
+level's band default for this format (`xds/formats.py`).
+
+**Render data**: `object` names a `SceneObject`; `pose` overrides the catalog pose on this slide
+only. To hide an object on one slide, set `hidden` on its render node. To leave it out of a
+slide, have no render node for it there.
+
+**Parts are agent-only.** A multi-part model (a robot arm, a laptop lid, a watch crown) has named
+nodes in its glTF hierarchy. `parts` rotates or offsets them *relative to their rest pose*, so
+`{ "Lid": { "rotate": [-110, 0, 0] } }` reads as "open the lid 110°". The editor treats every model
+as **one rigid object**: clicking any part selects the whole object, the gizmo moves, rotates and
+scales the whole object only, and no control in the editor edits `parts` or `animation`. Saving
+from the editor writes back the agent's `parts` exactly as loaded. The articulation is visible in
+the editor but can only be changed by editing the file.
+
+The gate checks that every `parts` key names a node in the GLB (`UNKNOWN_PART`), and that each
+`animation.clip` exists and its `time` is within the clip's duration (`UNKNOWN_CLIP`). If the
+model declares joint limits (glTF `extras.xds.limits` on a node, which Blender exports from custom
+properties), it also checks them (`PART_OUT_OF_RANGE`). `xds model inspect` lists the parts, their
+limits and the clips, so an agent knows what can move.
+
+### 2.6 `Pose`
+
+```ts
+{ position: [x, y, z]; rotation: [x, y, z]; scale: [x, y, z] }   // meters, Euler degrees XYZ, non-zero scale
+```
+
+This is the one 3D transform vocabulary. Y is up, the floor is `y = 0`, and +Z faces the
+default camera.
+
+### 2.7 `SceneObject` and `Material`
+
+```ts
+SceneObject = {
+  id: string; name: string;
+  kind: "model" | "box" | "sphere" | "cylinder" | "torus" | "plane";
+  asset?: string;                                  // required for "model": → Asset kind "model"
+  params?: Record<string, number>;                 // primitive dimensions (e.g. radius, height)
+  material?: string;                               // primitives only; a model brings its own
+  pose: Pose;                                      // the default placement
+};
+
+Material = { id: string; name: string; color: string /* "#rrggbb" */; metalness: number; roughness: number };  // 0..1
+```
+
+Models are expected to follow the [model conventions](./agent-guide.md#3-bringing-in-a-3d-model):
+meters, Y-up, origin at the bottom center. The app never rescales a model. Lighting and the
+auto-camera adapt to its bounds instead.
+
+### 2.8 `Lighting`
 
 ```ts
 {
-  renderer: "THREE";
-  antialias: boolean;
-  toneMapping: "NoToneMapping" | "LinearToneMapping" | "ReinhardToneMapping"
-             | "CineonToneMapping" | "ACESFilmicToneMapping" | "AgXToneMapping"
-             | "NeutralToneMapping";
-  toneMappingExposure: number;                          // > 0
-  shadows: "none" | "basic" | "soft" | "variance";
-  environment: { type: "color"|"cubeTexture"|"equirectangular"|"scene";
-                 value: string | null; intensity: >= 0 };
-  outputColorSpace: "srgb" | "linear-srgb";
-  resolution: { width: number; height: number };
+  look: "softbox" | "contrast" | "rim" | "bright";   // default "softbox"
+  angle: number;        // 0..360, key light yaw around the subject; default 35
+  elevation: number;    // 0..80 degrees above the horizon; default 30
+  shadow: "contact" | "soft" | "none";               // default "contact"
+  brightness: number;   // -1..+1 stops; default 0
+  tint?: string;        // brand color token for colored reflections; default neutral
 }
 ```
 
-A legacy Blender-shaped settings object (`engine`, `samples`, `world`, `colorManagement`, …)
-is still accepted by the union for backward compatibility, but new projects always write the
-`renderer: "THREE"` form.
+The complete description of a slide's light is these six fields. There are no light lists to edit
+and no stored derived rig. [Lighting and backgrounds](./lighting-and-backgrounds.md) explains how
+the rig is built from them.
+
+### 2.9 `Camera`
+
+```ts
+Camera =
+  | { mode: "frame";              // default: place the subject, let the camera follow
+      x: number; y: number;       // subject center, percent of canvas; default 50, 55
+      height: number;             // subject height, percent of canvas height; default 55
+      yaw?: number; pitch?: number;  // view direction in degrees; default 25, 12
+      fov?: number }              // vertical degrees; default 30
+  | { mode: "free"; position: [x, y, z]; target: [x, y, z]; fov: number };
+```
+
+The camera is per slide. When absent, the slide uses `frame` with every default, which centers
+the product in the frame. See [lighting and backgrounds §2](./lighting-and-backgrounds.md#2-framing-the-auto-camera).
+
+### 2.10 `Screen`: UI shown on a device
+
+```ts
+Screen = {
+  id: string;
+  path: string;              // "screens/<id>/index.html": a self-contained HTML page
+  width: number;             // logical CSS px, e.g. 393 for an iPhone 15/16 Pro
+  height: number;            // e.g. 852
+  scale?: number;            // device pixel ratio for the texture; default 3 (phones) / 2 (laptops)
+  safeArea?: { top: number; right: number; bottom: number; left: number };  // CSS px, exposed as --safe-*
+}
+```
+
+A screen is a UI mockup that is applied as a texture to a device model's screen mesh. The page is
+rendered to PNG by the same headless browser at `width × height × scale`. In 3D it is drawn
+**unlit and not tone-mapped** (`MeshBasicMaterial`, `toneMapped: false`), so UI colors stay exactly
+as designed while the device body is lit by the studio rig. The device's own glass mesh, if any,
+stays on top to give real reflections.
+
+A render node connects them: `"screens": { "Screen": "app-home" }` puts screen `app-home` on the
+model's mesh named `Screen`. One model can have several screens (`"Screen"`, `"CoverScreen"`), and
+two slides can show different screens on the same device. See the
+[agent guide §4](./agent-guide.md#4-device-screens) for building one.
 
 ---
 
-## 4. `review-state.json` — `ReviewState`
+## 3. Type relationships
 
-Bookkeeping that binds review decisions and the audit result to a specific source hash.
+```mermaid
+erDiagram
+  PROJECT ||--|| FORMAT : has
+  PROJECT ||--|| BRAND : has
+  PROJECT ||--o{ FONT_FILE : references
+  PROJECT ||--o{ ASSET : references
+  PROJECT ||--o{ MATERIAL : contains
+  PROJECT ||--o{ SCENE_OBJECT : "3D catalog"
+  PROJECT ||--o| LIGHTING : "default"
+  PROJECT ||--|{ SLIDE : "ordered"
+
+  BRAND ||--|{ COLOR_TOKEN : contains
+  BRAND ||--o{ TYPE_ROLE : contains
+  TYPE_ROLE }o--|| FONT_FILE : "font"
+
+  SLIDE ||--o| LIGHTING : "override"
+  SLIDE ||--o| CAMERA : "override"
+  SLIDE ||--o{ NODE : "nodes[]"
+
+  NODE ||--o| GROUND_DATA : "layer=ground"
+  NODE ||--o| IMAGE_DATA : "layer=image"
+  NODE ||--o| TYPE_DATA : "layer=type"
+  NODE ||--o| RENDER_DATA : "layer=render"
+  NODE ||--o{ EXCEPTION : "waived rules"
+
+  GROUND_DATA }o--|| DESIGN_FILE : "design"
+  IMAGE_DATA }o--|| ASSET : "asset (image|svg)"
+  TYPE_DATA }o--|| TYPE_ROLE : "role"
+  RENDER_DATA }o--|| SCENE_OBJECT : "object"
+  RENDER_DATA ||--o| POSE : "per-slide pose"
+
+  RENDER_DATA ||--o{ PART_POSE : "parts (agent-only)"
+  RENDER_DATA }o--o{ SCREEN : "screens"
+  PROJECT ||--o{ SCREEN : contains
+  SCENE_OBJECT ||--|| POSE : "default pose"
+  SCENE_OBJECT }o--o| ASSET : "asset (model)"
+  SCENE_OBJECT }o--o| MATERIAL : "material"
+
+  DESIGN_FILE {
+    string id "designs/<id>.svg"
+  }
+```
+
+---
+
+## 4. Designs: `designs/<id>.svg`
+
+A design is one SVG file that holds both the artwork and its knob manifest, in a
+`<metadata id="xds-design">` element containing JSON:
 
 ```ts
-{
-  schemaVersion: "1.0";
-  projectId: string;                    // must match project.json.id
-  sourceHash: string;                   // 64-hex combined source digest
-  reviews: { slideId; status: "pending" | "approved" | "rejected";
-             reviewedAt?: ISO8601; notes: string }[];
-  lastAudit: { status: "pass" | "block"; at: ISO8601;
-               detailsPath: string; sourceHash: string } | null;
-  reviewBundle?: { createdAt; sourceHash; manifestPath;
-                   contactSheetPath; slides: { slideId; path }[] };
-  exportReady: boolean;
+DesignManifest = {
+  name?: string;
+  params: {
+    name: string;
+    type: "number" | "color" | "select" | "boolean" | "text";
+    label?: string;
+    default: string | number | boolean;
+    min?: number; max?: number; step?: number;   // number
+    options?: string[];                          // select
+  }[];
+  variants?: { name: string; values: Record<string, string | number | boolean> }[];
 }
 ```
 
-Because `sourceHash` is embedded, any edit to project.json or scene-data.json invalidates
-the review state: it can no longer certify a different source for export.
+The artwork uses `{{ … }}` placeholders and `data-xds-repeat` / `data-xds-count` loops. The
+expression language and the context variables (`width`, `height`, `subject.*`, color
+functions) are described in [lighting and backgrounds §3](./lighting-and-backgrounds.md#3-backgrounds-ground-designs).
+
+Designs are **checked, not opaque**. `xds/designs.py` parses the manifest with Pydantic, and
+the gate reports `DESIGN_INVALID` (bad manifest JSON), `DESIGN_UNKNOWN_PARAM` (a placeholder or a
+node's `values` key names no param), `DESIGN_BAD_EXPRESSION` (a placeholder that does not parse)
+and `DESIGN_VALUE_TYPE` (a value of the wrong type or out of range). The browser still evaluates
+the expressions. The gate only checks that they parse and reference known names, so mistakes
+surface at `xds check` and not as a broken render.
 
 ---
 
 ## 5. Derived artifacts
 
-### 5.1 Render manifest — `cache/renders/<source-hash>/manifest.json`
+All derived files live under `cache/<hash>/`, where `<hash>` is the current source hash. Changing
+any source file changes the hash, so stale results are never read. They are simply in a different
+folder.
+
+| Path | Written by | Contents |
+| --- | --- | --- |
+| `cache/<hash>/slides/<n>-<slideId>.png` | `xds render` / audit / export | the final composite at `format` size |
+| `cache/<hash>/screens/<screenId>.png` | render page | a screen rendered at `width × height × scale`, used as a texture |
+| `cache/<hash>/contact-sheet.png` | `xds render` | all slides on one sheet (for a quick look by a person or a multimodal agent) |
+| `cache/<hash>/measure/<slideId>.json` | render page | the geometry the audit reads (see §5.1) |
+| `cache/<hash>/audit.json` | `xds audit` | `AuditReport` (see [design rules §6](./design-rules.md#6-the-report)) |
+| `cache/<hash>/annotated/<n>-<slideId>.png` | `xds audit` | the slide with every diagnostic drawn on it |
+| `export/<YYYYMMDD-HHMMSS>/<n>-<slideId>.png` | `xds export` | the deliverables |
+| `export/<stamp>/export.json` | `xds export` | `{ sourceHash, format, files[], audit: {errors, warnings}, forced }` |
+
+`xds clean PROJECT` deletes `cache/`.
+
+### 5.1 `SlideMeasure`: what the render page reports
 
 ```ts
 {
-  schemaVersion: "1.0";
-  status: "complete";
-  mode: "final";
-  renderer: "three" | "blender";
-  sourceHash: string;
-  sourceHashes: Record<string, string>;         // per-file digests
-  createdAt: ISO8601;
-  projectId: string;
-  cacheDirectory: string;
-  slides: {
-    slideId: string; slideNumber: number;
-    renderPath: string;                          // transparent PNG (3D only)
-    metadataPath: string;
-    width: number; height: number;
-    overlayPaths?: Record<string, string>;       // browser layers, keyed by layer id
+  slideId: string; width: number; height: number;
+  nodes: {
+    id: string; layer: Layer;
+    box: Rect;                                    // px, after rotation (axis-aligned bounds)
+    // type nodes
+    lines?: { text: string; rect: Rect; baseline: number }[];   // the ink lines, from Range.getClientRects
+    style?: { font: string; size: number; weight: number; lineHeight: number;
+              letterSpacing: number; color: string; uppercase: boolean };
+    overflow?: boolean;                           // text did not fit its box
   }[];
+  subject: { bounds: Rect; coverage: number } | null;   // 3D silhouette, from the 3D layer's alpha
+  layers: Record<Layer, string>;                  // per-layer alpha masks, PNG paths, for masking checks
+  backgroundOnly: string;                         // composite without the type layer, for contrast sampling
 }
+Rect = { x: number; y: number; w: number; h: number };
 ```
 
-Renderer-neutral: review and export read `renderPath`/`metadataPath` the same way whether
-the frames came from the R3F canvas or Blender. The browser layers' PNGs live in a hash-keyed
-overlay cache (`.../overlays/<slide>.<layer>.png`) so they survive a Blender re-render that
-rewrites the manifest.
-
-### 5.2 Audit record — `cache/audits/<source-hash>.json`
-
-An immutable snapshot of one audit run (`summary` + full `diagnostics`).
-
-### 5.3 Review bundle — `cache/reviews/<source-hash>/`
-
-`full-size/<slide>.png` 1:1 frames plus `contact-sheet.png`.
-
-### 5.4 Export — `export/<source-hash>/<slide>.png`
-
-Exact `publishTarget` dimensions, composited Ground → 3D → Type.
+The browser lays out the text, so the browser measures it. The audit never estimates text
+geometry in Python.
 
 ---
 
-## 6. In-memory models (not persisted)
+## 6. Migration
 
-### 6.1 `StudioState` (`apps/studio/src/store/types.ts`)
+`schemaVersion` is an integer. `xds migrate` upgrades a project in two passes:
 
-The whole editor state (the interface lives in `store/types.ts`; `store/index.ts` wires the
-slices): `project`, `scene`, `review`, `api`, `phase`, `mode`, `transformMode`,
-`transformSpace`, `activeSlideId`, `selectedNodeId`, `selectedObjectId`, `pending`,
-`baseProject`/`baseScene`/`baseHashes`, `lockedNodeIds`, `lockedObjectIds`, `conflictPaths`,
-`validation`, `notices`, `renderer`, `rendering`, `targets`, `zoom`, `snap`,
-`commandPaletteOpen`, `designs`, `layerSolo`, `inspectorTab`, `exports`, `captureProgress`,
-`targetBands`, `openProjectDialogOpen`, `openProjectDialogTab`, `slideCameras`, `slideLighting`,
-and the lighting knobs (`lightingPresetId`, `lightingIntensity`, `lightingDirection`,
-`lightingPitch`, `lightingSoftness`, `lightingEnvironmentIntensity`, `lightingExposure`,
-`lightingBaseline`).
+1. **Explicit steps** (`xds/migrate/steps/m0002_*.py`, …): one small pure function per version,
+   `def upgrade(doc: dict, report: Report) -> dict`, for structural changes that no default can
+   express. **v1 → v2** is one such step. It nests `nodes` under their slides (ordered by the old
+   `order`), merges `scene-data.json` into `objects`/`materials`, folds per-render-node camera
+   fields into `Slide.camera`, maps the old lighting block to the nearest `look`, turns
+   `publishTarget` into `format`, and converts `Material.color` from RGBA floats to hex.
+2. **Conform pass** (`xds/migrate/conform.py`), which runs after every migration and also on its own
+   (`xds migrate --conform`). It walks the document against the current models and, to the best
+   of its ability:
+   - **renames** a field when the old name is listed in that field's `aliases`
+     (`Field(validation_alias=AliasChoices("box", "transform"))`);
+   - **fills** a missing required field from its declared `default` or `default_factory`;
+   - **drops** unknown fields, recording each one with its value;
+   - **reports** anything it cannot resolve (a missing required field with no default, a value of
+     the wrong type) as `MIGRATION_UNRESOLVED` with the JSON path, and leaves the file unwritten.
 
-`baseProject`/`baseScene`/`baseHashes` are the **last-saved** snapshot, used as the base for
-three-way rebase when files change on disk.
+Renaming or adding a field therefore usually needs **no migration code**. Add an alias or a
+default to the model, and the conform pass applies it.
 
-### 6.2 `PendingState` (`packages/editor-core/src/pending.ts`)
+Every run writes a backup (`.migrate-backup/<stamp>/`) and a report listing renamed, defaulted,
+dropped and unresolved paths. `--dry-run` prints the report and a unified diff without writing.
+`--all` migrates every project under the projects directory.
 
-```ts
-PendingChange = {
-  id: string;                                 // `${domain}:${path}:${at}`
-  domain: "project" | "scene";
-  path: string;                               // e.g. "nodes.<id>.transform"
-  summary: string;                            // human-readable
-  at: ISO8601;
-};
-PendingState = { project: PendingChange[]; scene: PendingChange[] };
-```
+---
 
-Also defined here: `RebaseConflict`, `RebaseResult`, and the leaf-level three-way
-`rebaseValue`/`rebaseProject`/`rebaseScene` used when external edits arrive.
+## 7. In-memory models (not persisted)
 
-### 6.3 Live Three.js graph
+### 7.1 `StudioState` (`apps/studio/src/store/`)
 
-Real `Object3D`s reconciled from `SceneData`. The mapping contract is:
+A zustand store with the `zundo` middleware for undo and redo, split into slices:
+
+| Slice | Holds |
+| --- | --- |
+| `document` | `project`, `designs`, `baseHash` (hash of the last loaded/saved file), `dirty` |
+| `selection` | `mode`, `activeSlideId`, `selectedIds: string[]` (multi-select, within one layer), `transformMode`, `transformSpace` |
+| `view` | `zoom`, `snap`, `showGuides`, `layerSolo`, `inspectorTab`, `commandPaletteOpen` |
+| `audit` | the latest `AuditReport`, `auditing` |
+| `jobs` | running/finished exports with their progress lines |
+
+Undo history covers `document.project` only. `dirty` is `project !== savedProject`. There is no
+per-path pending-edit ledger and no three-way rebase (see [dataflow §2](./dataflow.md#2-input-an-agent-editing-files)): the file on disk is the
+truth, and an outside change simply reloads.
+
+### 7.2 Live Three.js graph
+
+Real `Object3D`s reconciled from `objects` and the active slide's render nodes. The mapping is:
 
 ```text
-SceneData object ID  ↔  Three Object3D runtime key  ↔  the active slide's render node
+SceneObject.id  ↔  Object3D.userData.objectId  ↔  the active slide's RenderNode (data.object)
 ```
 
-Transforms are stored in local parent space; rotation is Euler degrees `XYZ`; position is
-`location`; scale is non-zero. Only fields owned by a completed gesture are patched, and
-selection/hover/helper geometry is never serialized.
-
----
-
-## 7. Type relationships at a glance
-
-```mermaid
-erDiagram
-  PROJECT_DOCUMENT ||--o{ SLIDE : contains
-  PROJECT_DOCUMENT ||--o{ PROJECT_NODE : contains
-  PROJECT_DOCUMENT ||--|| BRAND : has
-  PROJECT_DOCUMENT ||--|| CANVAS : has
-  PROJECT_DOCUMENT ||--|| PUBLISH_TARGET : has
-  PROJECT_DOCUMENT ||--|| SCENE_LINK : links
-  PROJECT_DOCUMENT ||--o{ ASSET : references
-  PROJECT_DOCUMENT ||--o{ FONT : references
-
-  SLIDE ||--o{ PROJECT_NODE : "owns (by slideId)"
-  SLIDE ||--o| SLIDE_LIGHTING : "own rig"
-
-  PROJECT_NODE ||--|| NODE_TRANSFORM : "2D placement"
-  PROJECT_NODE ||--o| GROUND_DATA : "layer=ground"
-  PROJECT_NODE ||--o| RENDER_DATA : "layer=render"
-  PROJECT_NODE ||--o| TYPE_DATA : "layer=type"
-
-  GROUND_DATA }o--|| DESIGN_FILE : "designId"
-  DESIGN_FILE {
-    string id "designs/<id>.svg (on disk, opaque to the gate)"
-  }
-
-  RENDER_DATA }o--|| OBJECT_RECIPE : "objectId"
-  RENDER_DATA ||--o| SCENE_TRANSFORM : "slide override"
-
-  PROJECT_DOCUMENT ||--|| SCENE_DATA : "scene.sceneData"
-
-  SCENE_DATA ||--o{ OBJECT_RECIPE : contains
-  SCENE_DATA ||--o{ MATERIAL : contains
-  SCENE_DATA ||--|| CAMERA : has
-  SCENE_DATA ||--o{ LIGHT : contains
-  SCENE_DATA ||--|| RENDER_SETTINGS : has
-
-  OBJECT_RECIPE }o--o| OBJECT_RECIPE : "parentId"
-  OBJECT_RECIPE }o--o| MATERIAL : "materialId"
-  OBJECT_RECIPE }o--o| ASSET : "assetId"
-  OBJECT_RECIPE ||--|| SCENE_TRANSFORM : has
-```
-
----
-
-## 8. Validation layers
-
-There is one rule set (`services/schema.py`) and one gate:
-
-1. **Python** (`services/project/project.py`) — the only validator. It runs on disk for every
-   load, save, audit, review, and export, and additionally checks the directory layout
-   (`assets/`, `fonts/`, `designs/`, `cache/`, `export/`), file existence for referenced
-   assets/fonts and ground designs, path containment (no `..`, no absolute paths), and the AST
-   safety policy for `project-scene.py`.
-   `tests/test_schema_parity.py` pins its exact verdicts (code, message and path).
-2. **TypeScript** (`packages/protocol`) — declarations generated from that rule set. The editor
-   shows the gate's verdict instead of re-deriving one; its `api.ts` consumes the API payload
-   directly.
-
-The structural stage of the audit reuses the Python gate; the rendered stage
-(`services/audit.py`) adds geometry, overflow, legibility, overlap, and layer-order diagnostics
-such as `NODE_OVERFLOW`, `TEXT_BOX_OVERFLOW`, `TEXT_OVERLAP`, `TEXT_TOO_SMALL`,
-`TEXT_LOW_LEGIBILITY`, `TEXT_TOO_LARGE`, and `ILLEGAL_LAYER_ORDER`. Text geometry is
-**measured in the browser** (see `services/measure.py`): a slide that was never measured
-reports `GEOMETRY_UNMEASURED` rather than being estimated.
+A completed gesture writes only the active slide's `RenderNode.data.pose`. Selection, hover and
+helper geometry are never serialized.
