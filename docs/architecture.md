@@ -243,6 +243,14 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | POST | `/api/projects/choose` | macOS folder picker (AppleScript) |
 | POST | `/api/audit` | render + audit; streams progress lines over SSE; returns the report |
 | POST | `/api/export` | audit gate + export; returns the files written |
+| GET | `/api/exports` | finished exports with their `export.json` records and file links |
+| GET | `/api/screens/{id}.png` | a device screen rendered to PNG (cached under `cache/<hash>/screens/`) |
+| GET | `/api/starters` · POST `/api/designs/add` | starter designs, and copying one into `designs/` |
+| POST | `/api/models/import` | multipart upload; runs `xds model add` |
+| POST | `/api/fonts/fetch` | runs `xds fonts fetch` |
+
+Commands that change `project.json` on the server (`designs/add`, `models/import`, `fonts/fetch`)
+need a saved document. The editor saves first, and the resulting file change reloads it.
 
 Errors are `{ ok: false, error: { code, message, path?, details? } }` with `409` conflict, `422`
 validation, and `404` missing.
@@ -316,6 +324,19 @@ saved project.json + designs + screens + assets + fonts
   → window.xds.measure()→ cache/<hash>/measure/<id>.json        (geometry for the audit)
   → layer passes        → per-layer alpha masks + background-only composite (for masking/contrast rules)
 ```
+
+The render page exposes `window.xds` (`apps/studio/src/render/`), which `browser.py` drives:
+
+| Member | Meaning |
+| --- | --- |
+| `ready` | true once fonts, GLBs, screen textures, the environment, shadows, framing and the ground (resolved with `subject.*`) are done, plus two more frames |
+| `error` | a fatal error (unknown slide, invalid project); the command fails immediately |
+| `waiting()` | what is still pending, e.g. `["fonts: Satoshi 700", "model: bottle"]` |
+| `measure()` | the `SlideMeasure` ([data models §5.1](./data-models.md#51-slidemeasure-what-the-render-page-reports)) |
+| `showLayers(layers, { background, shadows })` | show only these layers (and optionally the flat background fill and the 3D shadows); resolves once drawn |
+
+Each layer mask is a screenshot of that layer alone, without background or shadows, so the
+render layer's mask is the product's silhouette.
 
 There is no separate per-layer capture, no compositing in Python, and no font embedding: the
 screenshot *is* the composite, made the same way the person sees it in the editor. Exporting

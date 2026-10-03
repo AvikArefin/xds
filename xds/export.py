@@ -45,8 +45,6 @@ def audit(path: str | Path, *, slide_ids: list[str] | None = None,
     browser.render(loaded.root, slide_ids=slide_ids, progress=progress)
     progress("rules")
     report = engine.run(project, cache, loaded.hash, slide_ids=slide_ids, progress=progress)
-    progress(f"done: {report.summary.errors} errors, {report.summary.warnings} warnings, "
-             f"{report.summary.infos} info, {report.summary.waived} waived")
     return report
 
 

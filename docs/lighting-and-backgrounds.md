@@ -179,6 +179,21 @@ HSL. `apps/studio/src/design/resolve.ts` evaluates the expressions with `expr-ev
 gate parses the same grammar with a restricted `ast` walk to catch unknown names and syntax
 errors. `tests/fixtures/design-expressions.json` is run through both, so they cannot disagree.
 
+The grammar is deliberately small: decimal numbers, `'…'`/`"…"` strings, dotted names,
+`+ - * / %`, unary minus, parentheses, one (non-chained) comparison, and calls to the functions
+above. `and`/`or`/`not`, `^`, `**`, `?:`, indexing, exponent and hex numbers are rejected. `%` and
+`round` behave as in JavaScript.
+
+**Color params** take a `#rrggbb` hex or a brand token name; a token is replaced by its hex
+before evaluation. Color functions return lowercase `#rrggbb` (or `#rrggbbaa` when alpha < 1);
+`mix` interpolates in OKLab, and out-of-gamut results are brought into sRGB by reducing chroma.
+
+**Loops.** `data-xds-repeat="i"` with `data-xds-count="{{expr}}"` repeats an element `count`
+times. Inside it, `i` runs from 0 to count − 1 and `n` is the count. The count is evaluated in the
+outer scope, floored and clamped to 0–500; nested loops need distinct names, and `n` always
+refers to the innermost loop. Both attributes are removed from the output. Each ground node's
+SVG ids (gradients, filters) are prefixed per instance, so two grounds never share a gradient.
+
 ### 3.4 Starter designs
 
 `xds/resources/designs/` holds tested starters: `sweep`, `spotlight`, `aurora`, `grain-solid`,

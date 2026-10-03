@@ -423,6 +423,8 @@ folder.
 | `cache/<hash>/screens/<screenId>.png` | render page | a screen rendered at `width × height × scale`, used as a texture |
 | `cache/<hash>/contact-sheet.png` | `xds render` | all slides on one sheet (for a quick look by a person or a multimodal agent) |
 | `cache/<hash>/measure/<slideId>.json` | render page | the geometry the audit reads (see §5.1) |
+| `cache/<hash>/masks/<slideId>-<layer>.png` | render page | each layer's alpha, drawn alone without shadows |
+| `cache/<hash>/background/<slideId>.png` | render page | every layer except type, for contrast sampling |
 | `cache/<hash>/audit.json` | `xds audit` | `AuditReport` (see [design rules §6](./design-rules.md#6-the-report)) |
 | `cache/<hash>/annotated/<n>-<slideId>.png` | `xds audit` | the slide with every diagnostic drawn on it |
 | `export/<YYYYMMDD-HHMMSS>/<n>-<slideId>.png` | `xds export` | the deliverables |

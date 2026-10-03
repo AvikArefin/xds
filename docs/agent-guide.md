@@ -214,7 +214,15 @@ provided by the workspace and compiled by `xds` at render time:
 | Project `fonts/` | the brand fonts, so the UI matches the slide's type |
 
 The page receives CSS variables `--safe-top/right/bottom/left` from the screen's `safeArea`, and
-`data-device="iphone"` on `<html>`.
+`data-device="iphone"` on `<html>`. `--font-sans` is the project's body-role font. Partials are
+included with `<xds-include src="status-bar"></xds-include>`, which is replaced with
+`screens/<id>/partials/status-bar.html` (falling back to the starter's copy). `/fonts/...` and
+relative URLs resolve inside the project; any other network request is blocked, so a screen
+renders the same offline.
+
+A mesh counts as a screen when its name, before any `.suffix`, ends in "screen" (`Screen`,
+`Screen.001`, `CoverScreen`). It needs UVs (`TEXCOORD_0`); `xds model inspect` warns
+`MODEL_SCREEN_NO_UV` when they are missing.
 
 ### 4.4 Rules for convincing UI
 

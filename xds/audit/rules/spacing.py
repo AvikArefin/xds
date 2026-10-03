@@ -37,7 +37,8 @@ def groups(s: MeasuredSlide) -> list[tuple[str, list[Block]]]:
     """Declared groups (TypeData.group), then ungrouped text blocks clustered by vertical gap.
 
     A stack of ungrouped blocks splits into clusters wherever a gap is more than 1.5× the
-    smallest gap in the stack.
+    smallest gap in the stack, or more than 6u: blocks that far apart are separate elements,
+    not a group with a loose gap.
     """
     if "groups" in s.memo:
         return s.memo["groups"]
@@ -54,7 +55,7 @@ def groups(s: MeasuredSlide) -> list[tuple[str, list[Block]]]:
         clusters: list[list[Block]] = []
         index: dict[str, int] = {}
         for a, b, gap in pairs:
-            if gap > 1.5 * smallest:
+            if gap > 1.5 * smallest or gap > 6 * s.guide.u:
                 continue
             ia, ib = index.get(a.id), index.get(b.id)
             if ia is None and ib is None:

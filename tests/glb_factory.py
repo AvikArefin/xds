@@ -49,7 +49,7 @@ class _Builder:
         return len(self.doc["bufferViews"]) - 1
 
     def accessor(self, values: list[float], kind: str, minmax: bool = False) -> int:
-        size = {"SCALAR": 1, "VEC3": 3}[kind]
+        size = {"SCALAR": 1, "VEC2": 2, "VEC3": 3}[kind]
         view = self._view(struct.pack(f"<{len(values)}f", *values))
         acc: dict[str, Any] = {"bufferView": view, "componentType": 5126,
                                "count": len(values) // size, "type": kind}
@@ -59,11 +59,13 @@ class _Builder:
         self.doc["accessors"].append(acc)
         return len(self.doc["accessors"]) - 1
 
-    def mesh(self, name: str, pos: list[float], idx: list[int]) -> int:
-        p = self.accessor(pos, "VEC3", minmax=True)
+    def mesh(self, name: str, pos: list[float], idx: list[int], uv: list[float] | None = None) -> int:
+        attributes = {"POSITION": self.accessor(pos, "VEC3", minmax=True)}
+        if uv is not None:
+            attributes["TEXCOORD_0"] = self.accessor(uv, "VEC2")
         i = self._indices(idx)
         self.doc["meshes"].append({"name": name, "primitives": [
-            {"attributes": {"POSITION": p}, "indices": i}]})
+            {"attributes": attributes, "indices": i}]})
         return len(self.doc["meshes"]) - 1
 
     def _indices(self, idx: list[int]) -> int:
@@ -111,7 +113,8 @@ def make_glb(path: Path | None = None, *, size: tuple[float, float, float] = (0.
     roots = [b.node(**body)]
     if screen:
         w, h = screen
-        scr_mesh = b.mesh("ScreenMesh", *_plane(w, h, 0.0, 0.0))
+        # glTF UVs have their origin at the top-left: the plane's bottom-left corner is (0, 1).
+        scr_mesh = b.mesh("ScreenMesh", *_plane(w, h, 0.0, 0.0), uv=[0, 1, 1, 1, 1, 0, 0, 0])
         roots.append(b.node(name="Screen", mesh=scr_mesh, translation=[offset[0], offset[1] + 0.01,
                                                                        offset[2] + sz / 2 + 0.001]))
     b.doc["scenes"][0]["nodes"] = roots

@@ -269,8 +269,10 @@ def inspect_json(doc: dict[str, Any], *, file_size: int = 0) -> dict[str, Any]:
             if "mesh" in node and is_screen_name(name) and not mesh_bounds.empty:
                 w, h = screen_aspect(mesh_bounds.size)
                 if w > 0 and h > 0:
+                    has_uv = all("TEXCOORD_0" in prim.get("attributes", {})
+                                 for prim in meshes[node["mesh"]].get("primitives", []))
                     screens.append({"name": name, "aspect": round(w / h, 4),
-                                    "size": [round(w, 6), round(h, 6)],
+                                    "size": [round(w, 6), round(h, 6)], "uv": has_uv,
                                     "recommended": recommend_screen(w / h)})
         for c in node.get("children", []):
             visit(c, world, name or parent, depth + 1)
@@ -326,7 +328,13 @@ def _warnings(r: dict[str, Any], b: Bounds, bad_required: list[str],
             out.append(_warn("MODEL_OFF_CENTER", f"The footprint center is at x = {cx:.4g}, "
                              f"z = {cz:.4g} m, not at the origin. Center the origin under the "
                              "model.", centerX=round(cx, 6), centerZ=round(cz, 6)))
-    if r["bytes"] > MAX_BYTES or r["triangles"] > MAX_TRIANGLES:
+    heavy = r["bytes"] > MAX_BYTES or r["triangles"] > MAX_TRIANGLES
+    for scr in r["screens"]:
+        if not scr.get("uv", True):
+            out.append(_warn("MODEL_SCREEN_NO_UV", f"Screen mesh '{scr['name']}' has no UVs "
+                             "(TEXCOORD_0), so a screen texture can't be mapped onto it; "
+                             "unwrap it to fill 0–1 and re-export."))
+    if heavy:
         out.append(_warn("MODEL_HEAVY", f"{r['bytes'] / 1e6:.1f} MB, {r['triangles']:,} triangles; "
                          "keep models ≤ 20 MB and ≤ 500k triangles (decimate, compress textures, "
                          "or use `gltf-transform optimize`).", bytes=r["bytes"],

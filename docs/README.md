@@ -19,7 +19,7 @@ design-rule audit.
   walkthroughs.
 - **[Dataflow](./dataflow.md)**: every input, transformation and destination.
 
-The user-facing quickstart and CLI reference is the repository's root `README.md` (still to be written).
+The user-facing quickstart and CLI reference is the repository's root [`README.md`](../README.md).
 
 ## Changes from v1
 

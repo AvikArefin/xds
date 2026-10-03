@@ -249,7 +249,8 @@ be waived.
 }
 ```
 
-Keys are the names `xds rules --json` reports. Unknown keys are a structural error, so a
+Keys are the names `xds rules --json` reports (`thresholdKeys`). Ranges are `[lo, hi]` and
+warn/error tiers are `[warn, error]`; per-level keys look like `body.size` or `headline.maxLines`. Unknown keys are a structural error, so a
 typo can't silently do nothing.
 
 ---
