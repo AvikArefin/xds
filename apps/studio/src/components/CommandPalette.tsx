@@ -24,6 +24,7 @@ function baseCommands(): Command[] {
     { id: "audit", label: "Run audit", hint: "A", run: () => void st.runAudit() },
     { id: "export", label: "Export", run: () => void st.exportPng() },
     { id: "guides", label: "Toggle guides", hint: "G", run: () => st.toggleGuides() },
+    { id: "audit-regions", label: "Toggle audit regions", hint: "⇧A", run: () => st.toggleAudit() },
     { id: "mode-present", label: "Switch to Present", hint: "1", run: () => st.setMode("present") },
     { id: "mode-type", label: "Switch to Text", hint: "2", run: () => st.setMode("type") },
     { id: "mode-image", label: "Switch to 2D", hint: "3", run: () => st.setMode("image") },

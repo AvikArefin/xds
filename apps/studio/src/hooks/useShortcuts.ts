@@ -103,6 +103,9 @@ export function useShortcuts() {
       if (key === "a" && !e.shiftKey) {
         e.preventDefault();
         void st.runAudit();
+      } else if (key === "a") {
+        e.preventDefault();
+        st.toggleAudit();
       } else if (key === "g") {
         e.preventDefault();
         st.toggleGuides();

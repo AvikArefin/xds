@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Finding } from "@xds/protocol";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
+import { IconButton } from "./ui";
 
 const SEV_ICON = { error: "error", warn: "warn", info: "info" } as const;
 
@@ -43,6 +44,8 @@ export function AuditPanel() {
   const readOnly = useStudio((s) => s.readOnly);
   const check = useStudio((s) => s.check);
   const activeSlideId = useStudio((s) => s.activeSlideId);
+  const showAudit = useStudio((s) => s.showAudit);
+  const toggleAudit = useStudio((s) => s.toggleAudit);
   const [scope, setScope] = useState<"slide" | "all">("all");
   const [showWaived, setShowWaived] = useState(false);
 
@@ -95,6 +98,13 @@ export function AuditPanel() {
                 Waived {sum?.waived}
               </button>
             )}
+            <IconButton
+              icon={showAudit ? "eye" : "eyeOff"}
+              title={`${showAudit ? "Hide" : "Show"} findings on the canvas (Shift+A). View only, not saved`}
+              active={showAudit}
+              onClick={toggleAudit}
+              className="audit-canvas-toggle"
+            />
           </div>
           {stale && <div className="muted small pad">Edited since this audit. Run it again to update.</div>}
           <ul className="findings">

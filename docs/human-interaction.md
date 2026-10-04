@@ -27,7 +27,7 @@ editor.
 
 | Area | Contents |
 | --- | --- |
-| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings); **Format** (preset or custom size); toolbar: Open, Search, Export PNG, Undo, Redo, Save |
+| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Export PNG, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields. |
@@ -61,7 +61,7 @@ Shortcuts are ignored while typing in a field.
 | `Cmd/Ctrl + S` · `Z` · `Shift + Z` | save · undo · redo |
 | `Cmd/Ctrl + K` · `O` | command palette · open project |
 | `1`–`5` | switch mode |
-| `A` · `G` | run audit · toggle guides |
+| `A` · `Shift + A` · `G` | run audit · toggle audit regions · toggle guides |
 | `Delete` / `Backspace` | delete the selection (respects locks) |
 | `Shift + click` · marquee · `Cmd/Ctrl + A` | add to the selection · select by area · select all in the layer |
 | `Cmd/Ctrl + D` | duplicate |

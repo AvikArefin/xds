@@ -124,7 +124,7 @@ One component for every pick-one-of-many, including brand colors (`ColorTokenSel
 
 - **Edits are undoable, one step per gesture.** A drag (scrub, gizmo, canvas move) is one undo
   step: wrap it in `beginGesture()` / `endGesture()`. A typed value is one step on commit.
-- **View settings are not saved.** Zoom, guides, snap, hidden layers and locks live in the store,
+- **View settings are not saved.** Zoom, guides, audit regions, snap, hidden layers and locks live in the store,
   outside undo, and never reach `project.json`. Say so in the control's `title`.
 - **Read-only** (a project with structural errors) disables every editing control: pass
   `disabled={readOnly}`.

@@ -46,6 +46,7 @@ export function EditableStage() {
   const zoomSetting = useStudio((s) => s.zoom);
   const fitZoom = useStudio((s) => s.fitZoom);
   const showGuides = useStudio((s) => s.showGuides);
+  const showAudit = useStudio((s) => s.showAudit);
   const report = useStudio((s) => s.report);
   const highlight = useStudio((s) => s.hoverFinding);
   const focusRect = useStudio((s) => s.focusRect);
@@ -214,7 +215,7 @@ export function EditableStage() {
   };
 
   // --- audit regions for this slide ---------------------------------------------------------
-  const findings = (report?.findings ?? []).filter((f) => f.slideId === slideId && f.status !== "waived" && f.region);
+  const findings = showAudit ? (report?.findings ?? []).filter((f) => f.slideId === slideId && f.status !== "waived" && f.region) : [];
   const onFrameMove = (e: React.PointerEvent) => {
     if (camDrag.current || !findings.length) return;
     const r = frameRef.current!.getBoundingClientRect();

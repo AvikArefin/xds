@@ -103,6 +103,8 @@ export interface StudioState {
   fitZoom: number;
   snap: boolean;
   showGuides: boolean;
+  /** Audit regions outlined on the canvas. A view setting: never saved, not in undo. */
+  showAudit: boolean;
   /** Layers hidden on the canvas while editing. A view setting: never saved, not in undo. */
   hiddenLayers: Layer[];
   inspectorTab: string;
@@ -152,6 +154,7 @@ export interface StudioActions {
   setFitZoom(z: number): void;
   toggleSnap(): void;
   toggleGuides(): void;
+  toggleAudit(): void;
   toggleLayer(layer: Layer): void;
   setPalette(open: boolean): void;
   setProjectBrowser(tab: StudioState["projectBrowser"]): void;
@@ -229,6 +232,7 @@ const initial: StudioState = {
   fitZoom: 0.5,
   snap: true,
   showGuides: false,
+  showAudit: true,
   hiddenLayers: [],
   inspectorTab: "",
   commandPaletteOpen: false,
@@ -541,6 +545,7 @@ export const useStudio = create<Studio>()(
         setFitZoom: (fitZoom) => set({ fitZoom }),
         toggleSnap: () => set((s) => ({ snap: !s.snap })),
         toggleGuides: () => set((s) => ({ showGuides: !s.showGuides })),
+        toggleAudit: () => set((s) => ({ showAudit: !s.showAudit })),
         toggleLayer: (layer) =>
           set((s) => ({
             hiddenLayers: s.hiddenLayers.includes(layer) ? s.hiddenLayers.filter((l) => l !== layer) : [...s.hiddenLayers, layer],
@@ -898,7 +903,7 @@ export const useStudio = create<Studio>()(
           const slideId = f.slideId ?? s.activeSlideId;
           const slide = getSlide(s.project, slideId);
           const node = nodesOf(slide).find((n) => f.nodes?.includes(n.id));
-          const patch: Partial<StudioState> = { activeSlideId: slideId };
+          const patch: Partial<StudioState> = { activeSlideId: slideId, showAudit: true };
           if (node) {
             patch.mode = node.layer;
             patch.selectedIds = [node.id];
