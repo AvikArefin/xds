@@ -1,5 +1,5 @@
 .ruff_cache/
-node_modules/
+**/node_modules/
 dist/
 .venv/
 __pycache__/
