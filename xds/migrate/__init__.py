@@ -100,6 +100,8 @@ def run(root: Path, *, dry_run: bool = False, conform_only: bool = False) -> dic
                 (bdir / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(target, bdir / rel)
             write_atomic(target, text)
+        if report.steps:
+            _refresh_agents_md(root, bdir, report)
         backup, written = (bdir / PROJECT_FILE).relative_to(root).as_posix(), True
         _fetch_fonts(root, report)
     return {"root": str(root), "ok": not report.unresolved, "fromVersion": from_version,
@@ -109,18 +111,36 @@ def run(root: Path, *, dry_run: bool = False, conform_only: bool = False) -> dic
 
 
 def _with_side_files(root: Path, doc: dict[str, Any]) -> dict[str, Any]:
-    """v1 kept the 3D scene in scene-data.json and the step may rewrite designs: hand both to the
-    (pure) steps inside the document. Later versions keep everything in project.json."""
+    """Hand the (pure) steps the side files they read, inside the document: the designs (any
+    step may read or rewrite them) and, for v1, scene-data.json, where v1 kept the 3D scene."""
     version = doc.get("schemaVersion", 1)
-    if version not in (1, "1", "1.0"):
+    if version == SCHEMA_VERSION:
         return doc
-    scene_file = root / "scene-data.json"
-    try:
-        scene = json.loads(scene_file.read_text(encoding="utf-8")) if scene_file.is_file() else None
-    except ValueError:
-        scene = None
     designs = {p.stem: p.read_text(encoding="utf-8") for p in sorted((root / "designs").glob("*.svg"))}
-    return {**doc, "__sceneData": scene, "__designs": designs}
+    extra: dict[str, Any] = {"__designs": designs}
+    if version in (1, "1", "1.0"):
+        scene_file = root / "scene-data.json"
+        try:
+            extra["__sceneData"] = (json.loads(scene_file.read_text(encoding="utf-8"))
+                                    if scene_file.is_file() else None)
+        except ValueError:
+            extra["__sceneData"] = None
+    return {**doc, **extra}
+
+
+def _refresh_agents_md(root: Path, bdir: Path, report: Report) -> None:
+    """A schema change makes the project's AGENTS.md describe the old format: keep the old one
+    in the backup and write the current template (the only guide a project's agent reads)."""
+    from ..project import RESOURCES, write_atomic
+
+    current = (RESOURCES / "template" / "AGENTS.md").read_text(encoding="utf-8")
+    target = root / "AGENTS.md"
+    if target.is_file():
+        if target.read_text(encoding="utf-8") == current:
+            return
+        shutil.copy2(target, bdir / "AGENTS.md")
+    write_atomic(target, current)
+    report.notes.append("AGENTS.md updated to this version's guide (the old one is in the backup)")
 
 
 def _fetch_fonts(root: Path, report: Report) -> None:

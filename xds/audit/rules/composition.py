@@ -256,3 +256,25 @@ def too_many_elements(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         measured={"blocks": count}, expected={"blocksMax": t["blocks"]},
         fix=f"Remove or merge {count - t['blocks']:.0f} blocks (set hidden, or combine text into one node)",
     )
+
+
+@rule("UNCOVERED_CANVAS", family=FAMILY, severity="error")
+def uncovered_canvas(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
+    """Every pixel of the slide is painted on purpose: a full-canvas background sits at the back.
+
+    There is no page color under the layers, so a slide whose ground layer doesn't cover the
+    whole canvas (visible, unrotated, opaque, box 0–100 %) exports with holes.
+    """
+    from ...migrate.steps.m0003_ground_paints_canvas import covers_canvas
+
+    nodes = [n.model_dump(mode="json", by_alias=True) for n in s.slide.nodes]
+    if any(covers_canvas(n) for n in nodes):
+        return
+    grounds = [n["id"] for n in nodes if n["layer"] == "ground"]
+    yield Hit(
+        message="Nothing paints the whole canvas: parts of this slide would be empty.",
+        fix="Add a full-canvas background at the back of the ground layer, e.g. design 'solid' "
+            "(`xds design add . solid`) with box {x: 0, y: 0, w: 100, h: 100}, or make an existing "
+            "background cover the canvas.",
+        nodes=grounds,
+    )

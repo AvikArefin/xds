@@ -62,7 +62,7 @@ were dropped or renamed (see §6).
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `schemaVersion` | `2` | integer; bumped by every migration step |
+| `schemaVersion` | `3` | integer; bumped by every migration step |
 | `id` | `string` | non-empty, `[a-z0-9-]+` |
 | `name` | `string` | non-empty |
 | `description` | `string` | default `""` |
@@ -153,13 +153,19 @@ project's fonts into its own `fonts/` folder when it has to travel without xds. 
 {
   id: string;                        // unique
   name: string;
-  background: string;                // brand color token; the flat fill under every layer
   lighting?: Partial<Lighting>;      // overrides project.lighting field by field
   camera?: Camera;                   // absent → auto-framed (see lighting doc)
   nodes: Node[];                     // this slide's content, all layers
   exceptions?: Exception[];          // waived slide-level (composition) rules, see design-rules §7
 }
 ```
+
+There is **no page color** (removed in v3). The ground layer paints the canvas: a slide's first
+full-canvas ground node (box 0/0/100/100, unrotated, opaque, not hidden) is its background, and a
+plain color is the `solid` design. New slides start with a copy of the previous slide's
+background, and the audit reports `UNCOVERED_CANVAS` (error) for a slide without one. Two answers
+to "what is behind everything" used to disagree silently: a full-canvas design hid the page color
+that the editor still showed as the slide's "Background".
 
 Nodes are **nested under their slide**. Within one layer, array order is z-order (later is in
 front); layers stack by `project.layerOrder`. No ordering rule spans layers, so appending a node
@@ -483,7 +489,11 @@ geometry in Python.
    SVG too, backed up), and converts `Material.color` from RGBA floats to hex. After writing, the
    runner fetches the fonts the roles name into the font library (v1 loaded them from Fontshare at
    render time), and moves the v1-only files (`scene-data.json`, `review-state.json`,
-   `project-scene.py`, and v1's `AGENTS.md`) into the backup folder, writing the v2 `AGENTS.md`.
+   `project-scene.py`, and v1's `AGENTS.md`) into the backup folder, writing the current `AGENTS.md`.
+   **v2 → v3** (`m0003_ground_paints_canvas.py`) removes `Slide.background`: a slide whose ground
+   already covers the canvas drops it (it was never visible); any other slide gets a `solid`
+   ground node in that color at the back (and `designs/solid.svg` if the project has none), so
+   it looks exactly as before.
 2. **Conform pass** (`xds/migrate/conform.py`), which runs after every migration and also on its own
    (`xds migrate --conform`). It walks the document against the current models and, to the best
    of its ability:
@@ -496,6 +506,9 @@ geometry in Python.
 
 Renaming or adding a field therefore usually needs **no migration code**. Add an alias or a
 default to the model, and the conform pass applies it.
+
+A run that applies a version step also replaces the project's `AGENTS.md` with the current
+template (the old one goes into the backup), since it is the only guide a project's agent reads.
 
 Every run writes a backup (`.migrate-backup/<stamp>/`) and a report listing renamed, defaulted,
 dropped and unresolved paths. `--dry-run` prints the report and a unified diff without writing.

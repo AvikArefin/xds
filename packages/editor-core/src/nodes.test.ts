@@ -3,6 +3,8 @@ import type { Project, RenderNode, TypeNode } from "@xds/protocol";
 import {
   addNode,
   addSlide,
+  coversCanvas,
+  slideBackground,
   deleteSlide,
   duplicateNodes,
   findNode,
@@ -20,7 +22,7 @@ const guide = { width: 1080, height: 1350, u: 8, margins: { top: 64, right: 64, 
 
 function project(): Project {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "p",
     name: "P",
     format: { preset: "instagram-portrait", width: 1080, height: 1350 },
@@ -29,7 +31,6 @@ function project(): Project {
     slides: [
       {
         id: "s1",
-        background: "paper",
         nodes: [
           { id: "bg", layer: "ground", box: { x: 0, y: 0, w: 100, h: 100 }, data: { design: "sweep" } },
           { id: "title", layer: "type", box: { x: 10, y: 10, w: 50, h: 10 }, data: { text: "Hi", role: "headline" } },
@@ -42,7 +43,7 @@ function project(): Project {
           { id: "cta", layer: "type", box: { x: 10, y: 80, w: 30, h: 5 }, data: { text: "Buy", role: "body" } },
         ],
       },
-      { id: "s2", background: "paper", nodes: [] },
+      { id: "s2", nodes: [] },
     ],
   };
 }
@@ -169,6 +170,17 @@ describe("slides and removal", () => {
     expect(moveSlide(a.project, "s3", 0).slides.map((s) => s.id)).toEqual(["s3", "s1", "s2"]);
     const one = deleteSlide(deleteSlide(project(), "s2"), "s1");
     expect(one.slides.map((s) => s.id)).toEqual(["s1"]);
+  });
+
+  it("a new slide copies the full-canvas background of the slide it follows", () => {
+    const a = addSlide(project(), "s1");
+    const added = a.project.slides.find((s) => s.id === a.id)!;
+    expect(added.nodes).toEqual([
+      { id: "s3-background", layer: "ground", name: "Background", box: { x: 0, y: 0, w: 100, h: 100 }, data: { design: "sweep" } },
+    ]);
+    expect(slideBackground(added)?.data.design).toBe("sweep");
+    expect(addSlide(project(), "s2").project.slides[2].nodes).toEqual([]); // s2 has none to copy
+    expect(coversCanvas({ id: "g", layer: "ground", box: { x: 0, y: 0, w: 100, h: 90 }, data: { design: "x" } })).toBe(false);
   });
 
   it("removes nodes", () => {

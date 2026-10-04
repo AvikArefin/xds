@@ -115,12 +115,16 @@ A role is a named text style. Name roles for what they do (`kicker`, `headline`,
 
 ```jsonc
 { "id": "s1", "name": "Hero",
-  "background": "paper",          // brand color token: the flat fill under every layer
   "lighting": { "angle": 210 },   // optional, overrides project.lighting field by field
   "camera": { "mode": "frame", "x": 50, "y": 58, "height": 50 },   // optional (§5.4)
   "nodes": [ … ],
   "exceptions": [] }
 ```
+
+There is **no page color**. Every slide's first ground node is a full-canvas background
+(`box` 0/0/100/100, unrotated, opaque) that paints every pixel; for a plain color that's the
+`solid` design: `"data": { "design": "solid", "values": { "color": "paper" } }`. The audit reports
+`UNCOVERED_CANVAS` for a slide without one.
 
 ### 4.4 Nodes
 
@@ -312,10 +316,12 @@ The page gets the CSS variables `--safe-top/right/bottom/left` and `data-device`
 
 ## 7. Backgrounds (ground designs)
 
-Start from a starter and set its knobs on the ground node:
+The back ground node paints the whole canvas (§4.3). To change a slide's background, change that
+node's `design` and `values` rather than adding a second full-canvas node on top. Start from a
+starter and set its knobs on the ground node:
 
 ```bash
-xds design add . sweep      # also: spotlight, aurora, grain-solid, split-tone, vignette-dark
+xds design add . sweep      # also: solid, spotlight, aurora, grain-solid, split-tone, vignette-dark
 ```
 
 A design is one SVG file. Its knobs are JSON in `<metadata id="xds-design">`, and the artwork

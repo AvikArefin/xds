@@ -16,7 +16,7 @@ import { ImageLayer } from "./ImageLayer";
 import { Readiness, ReadinessProvider, useFailure } from "./readiness";
 import { RenderLayer } from "./RenderLayer";
 import { ProjectFonts, TypeLayer } from "./TypeLayer";
-import { tokenHex } from "./typeStyle";
+import { slideBaseColor } from "./typeStyle";
 
 export interface StageStatus {
   /** Nothing pending and no error. */
@@ -106,7 +106,7 @@ export function SlideStage(props: SlideStageProps) {
 
   const onSubject = useCallback((s: SubjectLayout | null) => setSubject(s), []);
 
-  const bg = slide ? tokenHex(project, slide.background) : null;
+  const bg = slide ? slideBaseColor(project, slide) : null;  // for the default text color only
 
   // status reporting
   const onStatus = props.onStatus;
@@ -153,7 +153,7 @@ export function SlideStage(props: SlideStageProps) {
           style={{
             position: "absolute",
             inset: 0,
-            background: bg ?? "transparent",
+            background: "transparent", // the ground layer paints the canvas; no page color
             visibility: props.showBackground === false ? "hidden" : "visible",
             opacity: props.showBackground === false ? 0 : 1,
           }}

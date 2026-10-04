@@ -313,7 +313,6 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
 
     for si, slide in enumerate(p.slides):
         sp = f"slides[{si}]"
-        color(slide.background, f"{sp}.background", slide_id=slide.id)
         if slide.lighting:
             color(slide.lighting.tint, f"{sp}.lighting.tint", slide_id=slide.id)
         exceptions(slide.exceptions, f"{sp}.exceptions", slide_id=slide.id)
@@ -424,6 +423,9 @@ def init(path: str | Path, *, name: str | None = None, preset: str = "instagram-
             shutil.copy2(src, dst)
     for d in ("designs", "screens", "assets", "sources"):  # fonts come from the xds font library
         (root / d).mkdir(exist_ok=True)
+    solid = root / "designs" / "solid.svg"  # the template's slide background
+    if not solid.exists():
+        shutil.copyfile(RESOURCES / "designs" / "solid.svg", solid)
 
     doc = json.loads((template / PROJECT_FILE).read_text())
     slug = re.sub(r"[^a-z0-9]+", "-", (name or root.name).lower()).strip("-") or "project"

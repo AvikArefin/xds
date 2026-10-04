@@ -106,7 +106,7 @@ class Case:
     # --- output -----------------------------------------------------------------------------
     def project(self, *, rules: dict[str, Any] | None = None,
                 slide_exceptions: list[dict[str, str]] | None = None) -> Project:
-        slide: dict[str, Any] = {"id": "s1", "name": "One", "background": "paper", "nodes": self.nodes}
+        slide: dict[str, Any] = {"id": "s1", "name": "One", "nodes": self.nodes}
         if slide_exceptions:
             slide["exceptions"] = slide_exceptions
         if getattr(self, "camera", None):

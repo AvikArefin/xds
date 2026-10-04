@@ -52,7 +52,7 @@ function OpenTab() {
             <button type="button" className="pb-item" onClick={() => void openPath(p.path)}>
               <span className="pb-name">{p.name}</span>
               {p.active && <span className="badge active">Active</span>}
-              {p.schemaVersion !== 2 && <span className="badge sev-warn">v{p.schemaVersion ?? "?"} · needs migrate</span>}
+              {p.schemaVersion !== 3 && <span className="badge sev-warn">v{p.schemaVersion ?? "?"} · needs migrate</span>}
               <span className="muted mono small">{p.path}</span>
             </button>
           </li>

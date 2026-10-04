@@ -110,7 +110,7 @@ def test_add_registers_and_replace_keeps_poses(blank, tmp_path):
     models3d.add(blank, src, id="bottle", slide="s1", replace=True)
     p = proj.load(blank).project
     assert p.object("bottle").pose.position == (0.1, 0, 0)
-    assert len(p.slides[0].nodes) == 1 and len(p.assets) == 1
+    assert [n.layer for n in p.slides[0].nodes] == ["ground", "render"] and len(p.assets) == 1
 
 
 def test_add_converts_gltf_and_keeps_source(blank, tmp_path):
@@ -146,12 +146,12 @@ def _with_node(root, tmp_path, data, **glb_kw):
     src = tmp_path / "dev.glb"
     make_glb(src, **glb_kw)
     models3d.add(root, src, id="dev", slide="s1")
-    edit(root, lambda d: d["slides"][0]["nodes"][0]["data"].update(data))
+    edit(root, lambda d: d["slides"][0]["nodes"][-1]["data"].update(data))
     return {(f.rule, f.path) for f in proj.load(root).findings}
 
 
 def test_check_parts_clips_and_limits(blank, tmp_path):
-    np_ = "slides[0].nodes[0].data"
+    np_ = "slides[0].nodes[1].data"  # nodes[0] is the template's background
     found = _with_node(blank, tmp_path, {
         "parts": {"Lid": {"rotate": [-120, 0, 0]}, "Nope": {"hidden": True}},
         "animation": {"clip": "Open", "time": 3}}, animation=1.0, limits={"rotateX": [-110, 0]})
@@ -159,7 +159,7 @@ def test_check_parts_clips_and_limits(blank, tmp_path):
     assert ("UNKNOWN_PART", f"{np_}.parts.Nope") in found
     assert ("UNKNOWN_CLIP", f"{np_}.animation.time") in found
 
-    edit(blank, lambda d: d["slides"][0]["nodes"][0]["data"].update(
+    edit(blank, lambda d: d["slides"][0]["nodes"][1]["data"].update(
         parts={"Lid": {"rotate": [-90, 0, 0]}}, animation={"clip": "Close", "time": 0}))
     found = {(f.rule, f.path) for f in proj.load(blank).findings}
     assert found == {("UNKNOWN_CLIP", f"{np_}.animation.clip")}

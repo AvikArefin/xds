@@ -12,7 +12,7 @@ export interface XdsSchema {
  * via the `definition` "Project".
  */
 export interface Project {
-  schemaVersion?: 2;
+  schemaVersion?: 3;
   id: string;
   name: string;
   description?: string;
@@ -205,7 +205,6 @@ export interface RuleOverrides {
 export interface Slide {
   id: string;
   name?: string;
-  background: string;
   lighting?: LightingOverride;
   camera?: FrameCamera | FreeCamera;
   nodes?: (GroundNode | ImageNode | TypeNode | RenderNode)[];

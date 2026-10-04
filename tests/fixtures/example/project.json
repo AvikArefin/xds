@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "example",
   "name": "Example",
   "description": "A fully authored example used by the tests.",
@@ -277,7 +277,6 @@
     {
       "id": "s1",
       "name": "Hero",
-      "background": "paper",
       "camera": {
         "mode": "frame",
         "x": 50.0,
@@ -383,7 +382,6 @@
     {
       "id": "s2",
       "name": "Details",
-      "background": "night",
       "lighting": {
         "look": "rim",
         "angle": 210.0

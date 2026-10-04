@@ -6,6 +6,7 @@
 import { memo, useState } from "react";
 import type { Asset, Node, Project, Slide, TypeNode } from "@xds/protocol";
 import { fileUrl } from "../api";
+import { slideBaseColor } from "../stage/typeStyle";
 import { colorHex, effectiveCamera, layerOrder } from "../store";
 
 export const SlideThumb = memo(function SlideThumb({
@@ -42,7 +43,7 @@ export const SlideThumb = memo(function SlideThumb({
   const assets = new Map<string, Asset>((project.assets ?? []).map((a) => [a.id, a]));
 
   return (
-    <div className="thumb" style={{ width, height, background: colorHex(project, slide.background) ?? "#222" }}>
+    <div className="thumb" style={{ width, height, background: slideBaseColor(project, slide) ?? "#222" }}>
       {sorted.map((n) => {
         if (n.layer === "render") {
           if (cam.mode !== "frame") return <div key={n.id} className="thumb-subject" style={{ left: "40%", top: "35%", width: "20%", height: "35%" }} />;

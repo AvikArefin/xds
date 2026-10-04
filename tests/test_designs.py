@@ -57,9 +57,9 @@ def test_starters_pass_the_checker(name):
         assert "{{" not in out and 'viewBox="0 0 1080 1350"' in out
 
 
-def test_six_starters():
+def test_seven_starters():
     assert designs.starters() == sorted(
-        ["sweep", "spotlight", "aurora", "grain-solid", "split-tone", "vignette-dark"])
+        ["solid", "sweep", "spotlight", "aurora", "grain-solid", "split-tone", "vignette-dark"])
 
 
 def test_repeat_expands_with_loop_variables():
@@ -116,10 +116,10 @@ def test_gate_checks_nodes_against_the_manifest(blank):
     edit(blank, lambda d: _ground(d, variant="graphite", values={"grain": 0.05, "wall": "paper"}))
     assert proj.load(blank).ok
 
-    edit(blank, lambda d: d["slides"][0]["nodes"][0]["data"].update(
+    edit(blank, lambda d: d["slides"][0]["nodes"][1]["data"].update(
         variant="neon", values={"grain": 0.5, "wall": "brandless", "depth": 1}))
     found = {(f.rule, f.path) for f in proj.load(blank).findings}
-    np_ = "slides[0].nodes[0].data"
+    np_ = "slides[0].nodes[1].data"  # nodes[0] is the template's background
     assert ("DESIGN_UNKNOWN_PARAM", f"{np_}.variant") in found
     assert ("DESIGN_VALUE_TYPE", f"{np_}.values.grain") in found
     assert ("DESIGN_VALUE_TYPE", f"{np_}.values.wall") in found

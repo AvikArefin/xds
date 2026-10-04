@@ -24,7 +24,7 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 Layer = Literal["ground", "render", "image", "type"]
 LAYERS: tuple[Layer, ...] = ("ground", "render", "image", "type")
@@ -344,7 +344,7 @@ Node = Annotated[Union[GroundNode, ImageNode, TypeNode, RenderNode], Field(discr
 class Slide(Model):
     id: Id
     name: str = ""
-    background: str = Field(min_length=1)
+    # No page color: the ground layer paints the whole canvas (a `solid` design for a plain color).
     lighting: LightingOverride | None = None
     camera: Camera | None = None
     nodes: list[Node] = Field(default_factory=list)
@@ -362,7 +362,7 @@ DEFAULT_LAYER_ORDER: list[Layer] = ["ground", "render", "image", "type"]
 
 
 class Project(Model):
-    schema_version: Literal[2] = SCHEMA_VERSION
+    schema_version: Literal[3] = SCHEMA_VERSION
     id: Annotated[str, Field(min_length=1, pattern=r"^[a-z0-9-]+$")]
     name: str = Field(min_length=1)
     description: str = ""

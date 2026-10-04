@@ -31,7 +31,7 @@ def test_conform_renames_fills_and_drops(blank):
     assert rep["ok"] and rep["written"]
     assert {"from": "layer_order", "to": "layerOrder"} in rep["renamed"]
     assert {"path": "legacy", "value": {"a": 1}} in rep["dropped"]
-    assert {"path": "slides[0].nodes[0].box.skew", "value": 3} in rep["dropped"]
+    assert {"path": "slides[0].nodes[1].box.skew", "value": 3} in rep["dropped"]
     assert {"path": "slides[0].camera.mode", "value": "frame"} in rep["defaulted"]
     assert "-  \"legacy\"" in rep["diff"] or "legacy" in rep["diff"]
     backup = blank / rep["backup"]
@@ -51,12 +51,12 @@ def test_dry_run_writes_nothing(blank):
 
 
 def test_unresolved_is_not_written(blank):
-    edit(blank, lambda d: (d.pop("name"), d["slides"][0].update(background=42)))
+    edit(blank, lambda d: (d.pop("name"), d["slides"][0].update(name=42)))
     before = (blank / "project.json").read_text()
     rep = migrate.run(blank)
     assert not rep["ok"] and not rep["written"]
     paths = {u["path"] for u in rep["unresolved"]}
-    assert "name" in paths and "slides[0].background" in paths
+    assert "name" in paths and "slides[0].name" in paths
     assert all(u["rule"] == "MIGRATION_UNRESOLVED" for u in rep["unresolved"])
     assert (blank / "project.json").read_text() == before
 
@@ -65,7 +65,7 @@ def test_unknown_version_is_unresolved(blank):
     edit(blank, lambda d: d.update(schemaVersion="beta"))
     rep = migrate.run(blank)
     assert not rep["ok"] and "not a positive integer" in rep["unresolved"][0]["message"]
-    assert set(registry()) == {2}
+    assert set(registry()) == {2, 3}
     rep = migrate.run(blank, conform_only=True)
     assert not rep["ok"]
 
@@ -76,11 +76,12 @@ def test_steps_are_applied_in_order(blank, monkeypatch):
         doc["name"] = doc.pop("title")
         return doc
 
-    monkeypatch.setattr(migrate, "registry", lambda: {2: ("m0002_test", step)})
+    monkeypatch.setattr(migrate, "registry",
+                        lambda: {2: ("m0002_test", step), 3: ("m0003_test", lambda d, r: d)})
     edit(blank, lambda d: (d.update(schemaVersion=1, title=d.pop("name"))))
     rep = migrate.run(blank)
-    assert rep["ok"] and rep["steps"] == ["m0002_test"] and rep["fromVersion"] == 1
-    assert json.loads((blank / "project.json").read_text())["schemaVersion"] == 2
+    assert rep["ok"] and rep["steps"] == ["m0002_test", "m0003_test"] and rep["fromVersion"] == 1
+    assert json.loads((blank / "project.json").read_text())["schemaVersion"] == 3
 
 
 def test_alias_choices_rename():

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "untitled",
   "name": "Untitled",
   "description": "",
@@ -14,5 +14,17 @@
   "materials": [],
   "objects": [],
   "layerOrder": ["ground", "render", "image", "type"],
-  "slides": [{ "id": "s1", "name": "Slide 1", "background": "paper", "nodes": [] }]
+  "slides": [
+    {
+      "id": "s1",
+      "name": "Slide 1",
+      "nodes": [
+        {
+          "id": "s1-background", "name": "Background", "layer": "ground",
+          "box": { "x": 0, "y": 0, "w": 100, "h": 100 },
+          "data": { "design": "solid", "values": { "color": "paper" } }
+        }
+      ]
+    }
+  ]
 }

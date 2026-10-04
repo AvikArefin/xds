@@ -1,4 +1,5 @@
-import type { Lighting, Project, TypeRole } from "@xds/protocol";
+import { allNodeIds, freshId, slideBackground } from "@xds/editor-core";
+import type { GroundNode, Lighting, Project, Slide, TypeRole } from "@xds/protocol";
 import { LEVELS, LIGHTING_DEFAULTS, getSlide, useStudio, type Level } from "../../store";
 import { fetchFont } from "../commands";
 import { ColorTokenSelect, IconButton, NumberField, Row, Section, Select, TextField } from "../ui";
@@ -9,36 +10,93 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 function colorUsage(p: Project, name: string): number {
   let n = 0;
   const s = JSON.stringify({ slides: p.slides, typography: p.brand.typography, lighting: p.lighting });
-  const re = new RegExp(`"(background|color|tint)":"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`, "g");
+  const re = new RegExp(`"(color|tint)":"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`, "g");
   n += (s.match(re) ?? []).length;
   return n;
+}
+
+/**
+ * The slide's background is its full-canvas ground node (there is no page color): pick its
+ * design here, set a solid color inline, or jump to the node for the design's other knobs.
+ */
+function SlideBackground({ project, slide, readOnly }: { project: Project; slide: Slide; readOnly: boolean }) {
+  const designs = useStudio((s) => s.designs);
+  const { editProject, setMode, select } = useStudio.getState();
+  const back = slideBackground(slide);
+  const design = back?.data.design;
+  const setBack = (fn: (node: GroundNode | undefined) => GroundNode) =>
+    editProject((p) => ({
+      ...p,
+      slides: p.slides.map((s) => {
+        if (s.id !== slide.id) return s;
+        const cur = slideBackground(s);
+        const next = fn(cur);
+        const nodes = cur ? (s.nodes ?? []).map((n) => (n.id === cur.id ? next : n)) : [next, ...(s.nodes ?? [])];
+        return { ...s, nodes };
+      }) as Project["slides"],
+    }));
+  const pickDesign = (d: string) =>
+    setBack((cur) =>
+      cur
+        ? { ...cur, data: { design: d } }
+        : {
+            id: freshId(`${slide.id}-background`, allNodeIds(project)),
+            name: "Background",
+            layer: "ground",
+            box: { x: 0, y: 0, w: 100, h: 100 },
+            data: { design: d },
+          },
+    );
+  return (
+    <>
+      <Row label="Background" hint={back ? undefined : "Nothing paints the whole canvas"}>
+        <div className="inline">
+          <Select
+            value={design}
+            options={Object.keys(designs)}
+            placeholder="None"
+            disabled={readOnly}
+            onChange={(d) => d && pickDesign(d)}
+          />
+          {back && (
+            <IconButton
+              icon="layers"
+              title="Edit the background's knobs"
+              size={12}
+              onClick={() => {
+                setMode("ground");
+                select([back.id]);
+              }}
+            />
+          )}
+        </div>
+      </Row>
+      {back && design === "solid" && (
+        <Row label="Color">
+          <ColorTokenSelect
+            project={project}
+            value={typeof back.data.values?.color === "string" ? back.data.values.color : undefined}
+            disabled={readOnly}
+            onChange={(v) => v && setBack((cur) => ({ ...cur!, data: { ...cur!.data, values: { ...cur!.data.values, color: v } } }))}
+          />
+        </Row>
+      )}
+    </>
+  );
 }
 
 export function SlideSection() {
   const project = useStudio((s) => s.project)!;
   const slide = useStudio((s) => getSlide(s.project, s.activeSlideId));
   const readOnly = useStudio((s) => s.readOnly);
-  const { editProject, renameSlide } = useStudio.getState();
+  const { renameSlide } = useStudio.getState();
   if (!slide) return null;
   return (
     <Section title="Slide">
       <Row label="Name">
         <TextField value={slide.name ?? ""} disabled={readOnly} onChange={(v) => renameSlide(slide.id, v)} />
       </Row>
-      <Row label="Background">
-        <ColorTokenSelect
-          project={project}
-          value={slide.background}
-          disabled={readOnly}
-          onChange={(v) =>
-            v &&
-            editProject((p) => ({
-              ...p,
-              slides: p.slides.map((s) => (s.id === slide.id ? { ...s, background: v } : s)) as Project["slides"],
-            }))
-          }
-        />
-      </Row>
+      <SlideBackground project={project} slide={slide} readOnly={readOnly} />
     </Section>
   );
 }

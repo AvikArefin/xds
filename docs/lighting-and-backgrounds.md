@@ -196,9 +196,10 @@ SVG ids (gradients, filters) are prefixed per instance, so two grounds never sha
 
 ### 3.4 Starter designs
 
-`xds/resources/designs/` holds tested starters: `sweep`, `spotlight`, `aurora`, `grain-solid`,
-`split-tone` and `vignette-dark`. The project scaffold stays content-neutral, so copy one in when you
-want it:
+`xds/resources/designs/` holds tested starters: `solid`, `sweep`, `spotlight`, `aurora`,
+`grain-solid`, `split-tone` and `vignette-dark`. A new project gets `solid` (its first slide's
+background, since the ground layer paints the whole canvas and there is no page color); copy the
+others in when you want them:
 
 ```bash
 uv run xds design add ~/xd-projects/launch sweep

@@ -5,6 +5,7 @@
  */
 import type {
   Box,
+  GroundNode,
   Layer,
   Node,
   Pose,
@@ -305,13 +306,33 @@ export function setRenderPose(project: Project, slideId: string, nodeId: string,
 
 // --- slides --------------------------------------------------------------------------------
 
+/**
+ * A ground node that paints the whole canvas: visible, unrotated, opaque, box 0–100 %. There is
+ * no page color under the layers, so every slide needs one at the back (`UNCOVERED_CANVAS`).
+ */
+export function coversCanvas(n: Node): n is GroundNode {
+  if (n.layer !== "ground" || n.hidden) return false;
+  const b = n.box;
+  const e = 1e-6;
+  return b.x <= e && b.y <= e && b.x + b.w >= 100 - e && b.y + b.h >= 100 - e && (b.rotation ?? 0) % 360 === 0 && (b.opacity ?? 1) >= 1;
+}
+
+/** The slide's back full-canvas background node, if any. */
+export function slideBackground(slide: Slide): GroundNode | undefined {
+  return (slide.nodes ?? []).find(coversCanvas);
+}
+
 export function addSlide(project: Project, afterId?: string): { project: Project; id: string } {
   const taken = new Set(project.slides.map((s) => s.id));
   let n = project.slides.length + 1;
   let id = `s${n}`;
   while (taken.has(id)) id = `s${++n}`;
   const ref = project.slides.find((s) => s.id === afterId) ?? project.slides[project.slides.length - 1];
-  const slide: Slide = { id, name: `Slide ${project.slides.length + 1}`, background: ref.background, nodes: [] };
+  // The new slide starts with the same full-canvas background as the one it follows.
+  const nodeIds = allNodeIds(project);
+  const back = ref ? slideBackground(ref) : undefined;
+  const nodes: Node[] = back ? [{ ...back, id: freshId(`${id}-background`, nodeIds), name: back.name || "Background" }] : [];
+  const slide: Slide = { id, name: `Slide ${project.slides.length + 1}`, nodes };
   const at = afterId ? project.slides.findIndex((s) => s.id === afterId) + 1 : project.slides.length;
   const slides = [...project.slides];
   slides.splice(at <= 0 ? slides.length : at, 0, slide);

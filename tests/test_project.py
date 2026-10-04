@@ -17,7 +17,8 @@ def test_init_is_valid_and_content_neutral(blank):
     loaded = proj.load(blank)
     assert loaded.ok, loaded.findings
     p = loaded.project
-    assert len(p.slides) == 1 and p.slides[0].nodes == []
+    assert len(p.slides) == 1 and [n.data.design for n in p.slides[0].nodes] == ["solid"]
+    assert (blank / "designs" / "solid.svg").exists()
     assert p.objects == [] and p.brand.typography == {}
     assert (blank / "AGENTS.md").exists()
 
@@ -48,7 +49,7 @@ def test_old_schema_version_needs_migration(blank):
 def test_reference_checks(blank):
     def add(d):
         d["brand"]["typography"]["headline"] = {"level": "headline", "font": "Nope"}
-        d["slides"][0]["background"] = "missing"
+        d["brand"]["colors"][0]["name"] = "paper2"   # the template's background now names no token
         d["slides"][0]["nodes"] = [
             {"id": "t", "name": "T", "layer": "type", "box": {"x": 0, "y": 0, "w": 10, "h": 10},
              "data": {"text": "Hi", "role": "kicker", "color": "red"}},

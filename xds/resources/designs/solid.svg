@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="{{width}}" height="{{height}}" viewBox="0 0 {{width}} {{height}}">
+  <metadata id="xds-design">
+  {
+    "name": "Solid",
+    "params": [
+      { "name": "color", "type": "color", "label": "Color", "default": "#ffffff" }
+    ],
+    "variants": [
+      { "name": "white", "values": { "color": "#ffffff" } },
+      { "name": "black", "values": { "color": "#111111" } }
+    ]
+  }
+  </metadata>
+  <rect width="{{width}}" height="{{height}}" fill="{{color}}"/>
+</svg>

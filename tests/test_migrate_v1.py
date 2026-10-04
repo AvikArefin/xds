@@ -101,8 +101,9 @@ def v1(tmp_path, monkeypatch, fetched):
 
 def test_v1_migrates_to_a_valid_project(v1, fetched):
     rep = migrate.run(v1)
-    assert rep["ok"] and rep["written"] and rep["steps"] == ["m0002_v1_to_v2"]
-    assert rep["fromVersion"] == "1.0" and rep["toVersion"] == 2
+    assert rep["ok"] and rep["written"]
+    assert rep["steps"] == ["m0002_v1_to_v2", "m0003_ground_paints_canvas"]
+    assert rep["fromVersion"] == "1.0" and rep["toVersion"] == 3
     assert sorted(fetched) == ["Clash Display", "Satoshi"]
     assert json.loads((v1 / rep["backup"]).read_text())["schemaVersion"] == "1.0"
     loaded = proj.load(v1)
@@ -110,7 +111,11 @@ def test_v1_migrates_to_a_valid_project(v1, fetched):
     p = loaded.project
     assert p.id == "old-project" and p.format.preset == "instagram-portrait"
     assert [s.id for s in p.slides] == ["s1", "s2"]  # ordered by v1 `order`
-    assert p.slides[0].background == "night"
+    # s1's full-canvas design already hid the page color; s2 gets a solid ground in it
+    assert [n.layer for n in p.slides[0].nodes][0] == "ground"
+    back = p.slides[1].nodes[0]
+    assert (back.data.design, back.data.values) == ("solid", {"color": "night"})
+    assert (v1 / "designs" / "solid.svg").exists()
 
 
 def test_v1_typography_keeps_the_v1_look(v1):
@@ -151,7 +156,7 @@ def test_v1_nodes_scene_camera_and_light(v1):
     assert objs["drone"].kind == "model" and objs["drone"].asset == "drone-glb"
     assert objs["cube"].kind == "box" and objs["cube"].pose.position == (1, -1, 0)
     assert objs["cube"].material == "red" and p.materials[0].color == "#ff0000"
-    img = p.slides[1].nodes[0]
+    img = p.slides[1].nodes[1]  # nodes[0] is the solid background m0003 added
     assert img.data.asset == "photo" and img.data.fit == "contain"
     assert "designs/haze.svg" in rep["files"]
 
@@ -177,7 +182,7 @@ def test_v1_dry_run_touches_nothing(v1, fetched):
 def test_v1_leftovers_move_into_the_backup(v1):
     rep = migrate.run(v1)
     bdir = (v1 / rep["backup"]).parent
-    for f in ("scene-data.json", "review-state.json", "AGENTS.md"):
+    for f in ("scene-data.json", "review-state.json"):
         assert (bdir / f).is_file() and f in rep["retired"]
     assert not (v1 / "scene-data.json").exists() and not (v1 / "review-state.json").exists()
     assert (bdir / "AGENTS.md").read_text() == "# v1 instructions"

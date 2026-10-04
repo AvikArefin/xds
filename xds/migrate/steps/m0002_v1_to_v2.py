@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import math
 import re
-from pathlib import Path
 from typing import Any
 
 # v1 type bands: ratio of the short edge (services/targets.py).
@@ -68,11 +67,8 @@ def upgrade(doc: dict[str, Any], report: Any) -> dict[str, Any]:
     designs = doc.pop("__designs", None) or {}
     report.files = getattr(report, "files", {})
     report.fonts = getattr(report, "fonts", [])
-    # v1 format files v2 never reads, and v1's AGENTS.md, which would steer an agent wrong: they
-    # move into the backup; the project gets the v2 AGENTS.md.
-    report.retire = [*V1_FILES, "AGENTS.md"]
-    report.files["AGENTS.md"] = (Path(__file__).parents[2] / "resources" / "template" / "AGENTS.md"
-                                 ).read_text(encoding="utf-8")
+    # v1 format files v2 never reads move into the backup (the runner also refreshes AGENTS.md).
+    report.retire = list(V1_FILES)
 
     canvas = doc.get("canvas") or {}
     target = doc.get("publishTarget") or {}
@@ -219,6 +215,9 @@ def upgrade(doc: dict[str, Any], report: Any) -> dict[str, Any]:
         slide["nodes"] = nodes
         slides.append(slide)
     out["slides"] = slides
+    # the next step (m0003) reads the designs too, including any this step rewrote
+    out["__designs"] = {**designs, **{k[len("designs/"):-len(".svg")]: v for k, v in report.files.items()
+                                      if k.startswith("designs/") and k.endswith(".svg")}}
 
     dropped = [k for k in ("canvas", "layout", "scene", "publishTarget") if k in doc]
     if dropped:

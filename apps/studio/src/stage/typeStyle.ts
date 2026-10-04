@@ -5,7 +5,8 @@
  * letterSpacing 0; color: node/role color → the brand color named "ink" → the brand color with
  * the best contrast against the slide background.
  */
-import type { Project, TypeData, TypeRole } from "@xds/protocol";
+import { slideBackground } from "@xds/editor-core";
+import type { Project, Slide, TypeData, TypeRole } from "@xds/protocol";
 import { contrastRatio } from "../design/color";
 import type { Guide, GuideBand, Level } from "../types";
 
@@ -45,6 +46,17 @@ export function tokenHex(project: Project, token: string | undefined | null): st
   const c = project.brand?.colors?.find((t) => t.name === token);
   if (c) return c.hex.toLowerCase();
   return HEX.test(token) ? token.toLowerCase() : null;
+}
+
+/**
+ * The slide's base color, when its full-canvas background is the plain `solid` design; null for
+ * any other design (the real pixels are only known after rendering).
+ */
+export function slideBaseColor(project: Project, slide: Slide): string | null {
+  const back = slideBackground(slide);
+  if (!back || back.data.design !== "solid") return null;
+  const color = back.data.values?.color;
+  return typeof color === "string" ? tokenHex(project, color) : null;
 }
 
 export function defaultTextColor(project: Project, background: string | null): string {
