@@ -33,7 +33,10 @@ uv run xds export . --json
 
 ## 3D models
 
-- Add with `uv run xds model add . path/to/file.{glb,gltf,dae} --id ID --slide SLIDE`.
+- Devices ship with xds: `uv run xds model library` (iPhone 17 Pro, MacBook Pro 14″). Use one by
+  reference: `uv run xds model add . --library iphone-17-pro --slide SLIDE [--screen SCREEN]`.
+  Never copy library models into the project.
+- Add your own with `uv run xds model add . path/to/file.{glb,gltf,dae} --id ID --slide SLIDE`.
 - Conventions: meters, Y-up, origin at bottom center, front faces +Z, Principled BSDF materials,
   textures packed. Moving parts: separate named objects with their origin on the joint.
 - Lighting and framing are automatic. Place the product on the slide with the slide camera:
@@ -45,8 +48,10 @@ uv run xds export . --json
 
 ## Device screens (phone / laptop UI)
 
-1. `uv run xds screen add . app-home --device iphone` → edit `screens/app-home/index.html`.
-2. Put it on the device: `"screens": { "Screen": "app-home" }` in the render node's `data`.
+1. `uv run xds screen add . app-home --device iphone-17-pro` (laptop: `--device macbook`) → edit
+   `screens/app-home/index.html`.
+2. Put it on the device: `uv run xds model add . --library iphone-17-pro --slide SLIDE --screen app-home`,
+   or set `"screens": { "Screen": "app-home" }` in an existing render node's `data`.
 3. Toolkit: **Tailwind CSS v4** classes, **Basecoat UI** components (shadcn-style, plain HTML),
    **Lucide** icons as `<i data-lucide="name"></i>`, the project's brand fonts. No build step.
 4. Design at the logical size (e.g. 393 × 852). Respect `var(--safe-top)` / `var(--safe-bottom)`.

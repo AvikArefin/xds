@@ -78,6 +78,14 @@ def resolve_inside(root: Path, rel: str) -> Path:
     return target
 
 
+def resolve_asset(root: Path, rel: str) -> Path:
+    """Resolve an asset path: `xds:` paths name a file in the xds library (see library.py),
+    anything else is project-relative."""
+    from . import library
+
+    return library.resolve(rel) if library.is_library_path(rel) else resolve_inside(root, rel)
+
+
 # --- hashing ---------------------------------------------------------------------------------
 
 def source_files(root: Path) -> list[Path]:
@@ -227,15 +235,17 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
                           f"Use one of: {', '.join(sorted(colors))}.", **kw))
 
     def file(rel: str, path: str, under: str | None = None) -> Path | None:
+        library = under == "assets" and rel.startswith("xds:")
         try:
-            target = resolve_inside(root, rel)
+            target = resolve_asset(root, rel) if under == "assets" else resolve_inside(root, rel)
         except XdsError as e:
             out.append(_f("PATH_ESCAPE", path, e.message))
             return None
-        if under and not rel.replace("\\", "/").startswith(under + "/"):
+        if under and not library and not rel.replace("\\", "/").startswith(under + "/"):
             out.append(_f("PATH_LOCATION", path, f"'{rel}' must be under {under}/."))
         if not target.exists():
-            out.append(_f("MISSING_FILE", path, f"'{rel}' does not exist."))
+            out.append(_f("MISSING_FILE", path, f"'{rel}' does not exist."
+                          + (" Run `xds model library` for the models xds ships." if library else "")))
             return None
         return target
 

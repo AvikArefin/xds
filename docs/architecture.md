@@ -61,6 +61,8 @@ xds/
 │   ├── designs.py                 #   design manifest parsing + expression checks
 │   ├── formats.py                 #   format profiles: sizes, view widths, safe zones, bands
 │   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, `xds model add`
+│   ├── library.py                 #   the shipped model library (`xds:` asset paths)
+│   ├── library/models/<id>/       #   library models: model.glb + model.json
 │   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
 │   ├── browser.py                 #   Playwright: render slides, collect measurements
 │   ├── export.py                  #   audit gate → copy renders → export/<stamp>/
@@ -235,7 +237,7 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | GET | `/api/project` | the project, its designs (parsed manifests + SVG), `hash`, the gate's verdict, `apiVersion` |
 | PUT | `/api/project` | save `{ project, baseHash }`; `409` if the file changed since `baseHash` |
 | GET | `/api/events` | SSE stream: `changed` (with the new hash) when source files change on disk |
-| GET | `/api/files/{path}` | serve a project file (assets, fonts, designs, cache, export); path-contained |
+| GET | `/api/files/{path}` | serve a project file (assets, fonts, designs, cache, export); path-contained. An `xds:` path serves a library file |
 | GET | `/api/formats` | the format catalog + `guide` numbers for a size |
 | GET | `/api/projects` | list projects in the projects directory (default `~/xd-projects/`) |
 | POST | `/api/projects/open` | switch the active project |
@@ -247,6 +249,7 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | GET | `/api/screens/{id}.png` | a device screen rendered to PNG (cached under `cache/<hash>/screens/`) |
 | GET | `/api/starters` · POST `/api/designs/add` | starter designs, and copying one into `designs/` |
 | POST | `/api/models/import` | multipart upload; runs `xds model add` |
+| GET | `/api/library` · POST `/api/models/library` | the shipped models, and adding one by reference (`xds model add --library`) |
 | POST | `/api/fonts/fetch` | runs `xds fonts fetch` |
 
 Commands that change `project.json` on the server (`designs/add`, `models/import`, `fonts/fetch`)
@@ -272,6 +275,9 @@ xds export PROJECT [--out DIR] [--force]  # audit gate → export/<stamp>/
 xds migrate [PROJECT | --all] [--dry-run] [--conform]
 xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae
 xds model inspect FILE                    # parts, clips, screen meshes, convention warnings
+xds model library                         # the device models xds ships
+xds model add PROJECT --library ID [--slide ID] [--screen ID]   # reference one (not copied)
+xds model vendor PROJECT ASSET_ID         # copy a library model into the project
 xds screen add PROJECT ID [--device PRESET | --width W --height H --scale S]
 xds screen render PROJECT ID              # the screen page → PNG, to check it flat
 xds design add PROJECT STARTER

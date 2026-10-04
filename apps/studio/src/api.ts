@@ -102,8 +102,22 @@ export const api = {
     if (opts.replace) fd.set("replace", "true");
     return request<{ result: ModelImportResult }>("POST", "/api/models/import", fd);
   },
+  library: () => request<{ models: LibraryModel[] }>("GET", "/api/library"),
+  addLibraryModel: (model: string, opts: { id?: string; slide?: string; screen?: string } = {}) =>
+    request<{ result: { id: string; node: string | null } }>("POST", "/api/models/library", { model, ...opts }),
   fetchFonts: (family: string) => request<{ fonts: unknown[] }>("POST", "/api/fonts/fetch", { family }),
 };
+
+/** A device model that ships with xds; projects reference it by `path` (`xds:…`), never copy it. */
+export interface LibraryModel {
+  id: string;
+  path: string;
+  name: string;
+  description: string;
+  bytes: number;
+  screens: Record<string, { device: string }>;
+  parts: Record<string, string>;
+}
 
 /** URL of a project file (project-relative path). `hash` busts the browser cache when sources change. */
 export function fileUrl(path: string, hash?: string): string {

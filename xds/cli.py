@@ -206,7 +206,33 @@ def cmd_model(a: argparse.Namespace, out: Out) -> int:
         info = models3d.inspect(Path(a.file))
         out.emit({"model": info}, json.dumps(info, indent=2, default=str))
         return 0
+    if a.model_cmd == "library":
+        from . import library
+
+        items = library.models()
+        out.emit({"models": items}, "\n".join(
+            f"{m['id']:<16} {m['name']}  ({m['bytes'] / 1e6:.1f} MB)\n{'':<16} {m['description']}\n"
+            f"{'':<16} screens: " + ", ".join(f"{k} → --device {v['device']}" for k, v in m["screens"].items())
+            for m in items))
+        return 0
     root = proj.find_root(a.project)
+    if a.model_cmd == "vendor":
+        result = models3d.vendor(root, a.id)
+        out.emit({"result": result}, f"copied {result['from']} to {result['path']}")
+        return 0
+    if bool(a.file) == bool(a.library):
+        raise proj.XdsError("USAGE", "Give a FILE or --library ID (one of them).", status=2)
+    if a.library:
+        result = models3d.add_library(root, a.library, id=a.id, name=a.name, slide=a.slide,
+                                      screen=a.screen, replace=a.replace)
+        out.emit({"result": result}, f"added library model '{a.library}' as '{result['id']}'"
+                 + (f" on {a.slide} (node {result['node']})" if result["node"] else ""))
+        return 0
+    if not a.id:
+        raise proj.XdsError("USAGE", "--id is required when adding a file.", status=2)
+    if a.screen:
+        raise proj.XdsError("USAGE", "--screen works with --library; for a file, set the node's "
+                            "data.screens in project.json.", status=2)
     result = models3d.add(root, Path(a.file), id=a.id, name=a.name, slide=a.slide, replace=a.replace)
     warnings = result.get("warnings") or []
     text = f"added model '{a.id}'" + "".join(
@@ -377,13 +403,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("model", cmd_model, "add or inspect a 3D model")
     msub = sp.add_subparsers(dest="model_cmd", required=True)
-    m = msub.add_parser("add", parents=[common], help="check, convert and register a .glb/.gltf/.dae")
+    m = msub.add_parser("add", parents=[common],
+                        help="register a .glb/.gltf/.dae file, or a library model by reference")
     m.add_argument("project")
-    m.add_argument("file")
-    m.add_argument("--id", required=True)
+    m.add_argument("file", nargs="?")
+    m.add_argument("--library", metavar="MODEL", help="a model from `xds model library` (not copied)")
+    m.add_argument("--id", help="asset/object id (required for a file; defaults to the library id)")
     m.add_argument("--name")
     m.add_argument("--slide")
+    m.add_argument("--screen", help="with --library and --slide: show this screen on the model")
     m.add_argument("--replace", action="store_true")
+    m = msub.add_parser("library", parents=[common], help="the device models xds ships")
+    m = msub.add_parser("vendor", parents=[common], help="copy a library model into the project")
+    m.add_argument("project")
+    m.add_argument("id", help="the asset id")
     m = msub.add_parser("inspect", parents=[common], help="parts, clips, screen meshes, warnings")
     m.add_argument("file")
 

@@ -2,7 +2,7 @@
  * Commands that change project files on the server (designs/add, models/import, fonts/fetch).
  * They need a saved document: save first, run, then reload from disk.
  */
-import { api } from "../api";
+import { api, type LibraryModel } from "../api";
 import { useStudio } from "../store";
 
 export async function serverCommand<T>(what: string, run: () => Promise<T>): Promise<T | null> {
@@ -28,6 +28,22 @@ export async function addStarterBackground(starter: string) {
   const st = useStudio.getState();
   if (st.mode !== "ground") st.setMode("ground");
   useStudio.getState().addBackground(r.id);
+}
+
+/** Put a library model on this slide: the project references it once, then reuses its object. */
+export async function addLibraryModel(model: LibraryModel) {
+  const st = useStudio.getState();
+  const slide = st.activeSlideId;
+  const project = st.project;
+  const asset = project?.assets?.find((a) => a.path === model.path);
+  const existing = asset && project?.objects?.find((o) => o.asset === asset.id);
+  if (existing) st.addObjectToSlide(existing.id);
+  else if (!(await serverCommand("Adding a model", () => api.addLibraryModel(model.id, { slide })))) return;
+  const s = useStudio.getState();
+  if (s.mode !== "render") s.setMode("render");
+  const id = existing?.id ?? model.id;
+  const node = (s.project?.slides.find((x) => x.id === slide)?.nodes ?? []).find((n) => n.layer === "render" && n.data.object === id);
+  if (node) s.select([node.id]);
 }
 
 export async function importModel(file: File) {

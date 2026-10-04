@@ -194,13 +194,13 @@ def is_screen_name(name: str | None) -> bool:
 
 
 def screen_aspect(size: list[float]) -> tuple[float, float]:
-    """(width, height) of a flat screen from its world extents: drop the thinnest axis; if that
-    is y the screen lies flat (width x, height z), otherwise height is the y extent."""
+    """(width, height) of a flat screen from its world extents. The screen may lean about the X
+    axis (a laptop lid, a phone lying flat): width is the x extent and height spans y and z
+    together. A screen facing ±X (the thinnest axis is x) is z wide instead."""
     ex, ey, ez = size
-    thin = min(range(3), key=lambda i: size[i])
-    if thin == 1:
-        return ex, ez
-    return (ez if thin == 0 else ex), ey
+    if min(range(3), key=lambda i: size[i]) == 0:
+        return ez, math.hypot(ey, ex)
+    return ex, math.hypot(ey, ez)
 
 
 def recommend_screen(aspect: float) -> dict[str, Any]:
@@ -561,6 +561,77 @@ def add(root: Path, file: Path, *, id: str, name: str | None = None, slide: str 
             "warnings": notes + info["warnings"], "inspection": info}
 
 
+def add_library(root: Path, model_id: str, *, id: str | None = None, name: str | None = None,
+                slide: str | None = None, screen: str | None = None,
+                replace: bool = False) -> dict[str, Any]:
+    """`xds model add --library`: register a library model by reference (nothing is copied) and
+    its object and, with `slide`, a render node. `screen` puts that screen on the model's screen
+    mesh in that node."""
+    from . import library
+    from .project import XdsError, read_raw, write_project
+
+    meta = library.model(model_id)
+    root, id = Path(root).resolve(), id or model_id
+    project = Project.model_validate(read_raw(root))
+    existing = project.asset(id) or project.object(id)
+    if existing and not replace:
+        raise XdsError("MODEL_EXISTS", f"An asset or object '{id}' already exists; pass "
+                       "--replace to swap the model and keep poses.", status=409)
+    if slide and not project.slide(slide):
+        raise XdsError("UNKNOWN_SLIDE", f"No slide '{slide}'.", status=404)
+    if screen and not slide:
+        raise XdsError("SCREEN_NEEDS_SLIDE", "--screen needs --slide: the screen is set on that "
+                       "slide's render node.", status=422)
+    if screen and project.screen(screen) is None:
+        raise XdsError("UNKNOWN_SCREEN", f"No screen '{screen}'. Create it first with "
+                       f"`xds screen add PROJECT {screen} --device "
+                       f"{next(iter(meta['screens'].values()), {}).get('device', 'iphone')}`.",
+                       status=404)
+    asset = project.asset(id)
+    if asset:
+        asset.path, asset.kind = meta["path"], "model"
+    else:
+        project.assets.append(Asset(id=id, path=meta["path"], kind="model"))
+    obj = project.object(id)
+    if obj:
+        obj.kind, obj.asset, obj.material, obj.params = "model", id, None, None
+        if name:
+            obj.name = name
+    else:
+        project.objects.append(SceneObject(id=id, name=name or meta["name"], kind="model",
+                                           asset=id, pose=Pose()))
+    node_id = _add_render_node(project, slide, id, name or meta["name"]) if slide else None
+    if node_id and screen:
+        node = next(n for n in project.slide(slide).nodes if n.id == node_id)  # type: ignore[union-attr]
+        mesh = next(iter(meta["screens"]), "Screen")
+        node.data.screens = {**(node.data.screens or {}), mesh: screen}  # type: ignore[union-attr]
+    write_project(root, project)
+    return {"id": id, "asset": meta["path"], "object": id, "node": node_id,
+            "replaced": bool(existing), "library": model_id, "screens": meta["screens"]}
+
+
+def vendor(root: Path, asset_id: str) -> dict[str, Any]:
+    """`xds model vendor`: copy a library model into assets/models/<id>.glb and point the asset
+    at the copy, so the project opens without this xds install."""
+    from . import library
+    from .project import XdsError, read_raw, write_project
+
+    root = Path(root).resolve()
+    project = Project.model_validate(read_raw(root))
+    asset = project.asset(asset_id)
+    if asset is None:
+        raise XdsError("UNKNOWN_ASSET", f"No asset '{asset_id}'.", status=404)
+    if not library.is_library_path(asset.path):
+        raise XdsError("NOT_LIBRARY", f"Asset '{asset_id}' is already a project file "
+                       f"({asset.path}).", status=409)
+    dest = root / "assets" / "models" / f"{asset_id}.glb"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(library.resolve(asset.path), dest)
+    was, asset.path = asset.path, dest.relative_to(root).as_posix()
+    write_project(root, project)
+    return {"id": asset_id, "from": was, "path": asset.path}
+
+
 def _keep_source(root: Path, file: Path, id: str) -> str | None:
     """Copy an original .gltf/.dae (with its .bin and textures) into sources/<id>/."""
     sources = root / "sources"
@@ -605,7 +676,7 @@ _AXES = {"X": 0, "Y": 1, "Z": 2}
 
 def check_project(root: Path, project: Project) -> list[Finding]:
     """Check render nodes against their GLB: parts, clips, joint limits and screen aspects."""
-    from .project import XdsError, resolve_inside
+    from .project import XdsError, resolve_asset
 
     out: list[Finding] = []
     invalid_reported: set[str] = set()
@@ -618,7 +689,7 @@ def check_project(root: Path, project: Project) -> list[Finding]:
             if not asset or asset.kind != "model":
                 continue
             try:
-                path = resolve_inside(root, asset.path)
+                path = resolve_asset(root, asset.path)
             except XdsError:
                 continue
             if not path.is_file() or path.suffix.lower() != ".glb":

@@ -171,7 +171,7 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
 
     @app.get("/api/files/{path:path}")
     async def files(path: str) -> FileResponse:
-        target = proj.resolve_inside(state.require_root(), path)
+        target = proj.resolve_asset(state.require_root(), path)
         if not target.is_file():
             raise XdsError("NOT_FOUND", f"no file '{path}'", status=404)
         return FileResponse(target, headers={"Cache-Control": "no-cache"})
@@ -302,6 +302,21 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
                 shutil.copyfileobj(file.file, f)
             result = await run_in_threadpool(models3d.add, root, dest, id=id, name=name, slide=slide,
                                              replace=replace)
+        return ok(result=result)
+
+    @app.get("/api/library")
+    async def get_library() -> dict[str, Any]:
+        from . import library
+
+        return ok(models=library.models())
+
+    @app.post("/api/models/library")
+    async def add_library_model(body: dict[str, Any]) -> dict[str, Any]:
+        from . import models3d
+
+        result = await run_in_threadpool(
+            models3d.add_library, state.require_root(), body.get("model", ""), id=body.get("id"),
+            slide=body.get("slide"), screen=body.get("screen"))
         return ok(result=result)
 
     @app.post("/api/fonts/fetch")

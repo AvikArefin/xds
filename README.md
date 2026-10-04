@@ -55,6 +55,9 @@ status is 0 on success, 1 on failure or open audit errors.
 | `xds migrate [PROJECT \| --all] [--dry-run] [--conform]` | upgrade project files to the current schema |
 | `xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]` | check, convert (`.gltf`, `.dae`) and register a model |
 | `xds model inspect FILE` | parts, clips, screen meshes, convention warnings |
+| `xds model library` | the device models that ship with xds (iPhone 17 Pro, MacBook Pro 14″) |
+| `xds model add PROJECT --library ID [--slide ID] [--screen ID]` | use a library model by reference (not copied) |
+| `xds model vendor PROJECT ASSET_ID` | copy a library model into the project so it travels without xds |
 | `xds screen add PROJECT ID [--device PRESET \| --width W --height H --scale S]` | create a device-screen page |
 | `xds screen render PROJECT ID` | render a screen page to PNG to check it flat |
 | `xds design add PROJECT STARTER` | copy a starter background (`sweep`, `spotlight`, `aurora`, `grain-solid`, `split-tone`, `vignette-dark`) |

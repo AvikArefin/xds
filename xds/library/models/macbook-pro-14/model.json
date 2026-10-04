@@ -1,0 +1,10 @@
+{
+  "name": "MacBook Pro 14″ (M5)",
+  "description": "Laptop, lid open about 110°, screen facing +Z. 0.312 × 0.212 × 0.300 m.",
+  "screens": { "Screen": { "device": "macbook" } },
+  "parts": {
+    "Base": "keyboard deck and bottom case",
+    "Lid": "pivots on the hinge; rotateX 0 is the modeled open pose, 110 closes it, -25 opens it further",
+    "Screen": "the display (child of Lid); a screen page maps onto it"
+  }
+}

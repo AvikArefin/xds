@@ -13,7 +13,8 @@ from .conftest import edit
 def test_devices_table():
     assert screens.DEVICES["iphone"] == {"width": 393, "height": 852, "scale": 3,
                                          "safeArea": {"top": 59, "right": 0, "bottom": 34, "left": 0}}
-    assert set(screens.DEVICES) == {"iphone", "iphone-max", "android", "ipad", "macbook", "desktop"}
+    assert set(screens.DEVICES) == {"iphone", "iphone-17-pro", "iphone-max", "android", "ipad", "macbook",
+                                    "desktop"}
 
 
 def test_add_registers_screen(blank):

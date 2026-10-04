@@ -61,6 +61,33 @@ The app knows nothing about Blender. At runtime it loads only **binary glTF (`.g
 Blender is just one convenient way to make models. This section is the contract between the
 modeling tool and the app.
 
+### 3.0 Library models: devices that ship with xds
+
+xds ships ready-made device models. They already follow the conventions below, their screen mesh
+is named `Screen`, and each declares the screen size that fits it. **A project references a
+library model; it never copies it**, so every project shows the same device and the files stay
+with xds.
+
+```bash
+uv run xds model library            # what ships, with each model's screen device preset
+```
+
+| Library id | Model | Screen device preset | Parts |
+| --- | --- | --- | --- |
+| `iphone-17-pro` | iPhone 17 Pro, upright | `iphone-17-pro` (402 × 874 @3) | `Body`, `Display`, `Screen` |
+| `macbook-pro-14` | MacBook Pro 14″ (M5), lid open ~110° | `macbook` (1512 × 982 @2) | `Base`, `Lid` (`rotateX` −25…110, 110 closes it), `Screen` |
+
+`xds model add PROJECT --library ID --slide S [--screen SCREEN]` registers
+`{ "path": "xds:models/<id>/model.glb" }`: an `xds:` path resolves inside the xds install, not the
+project. Everything else (poses, `parts`, `screens`, the audit) works exactly as for a project
+model. To send a project somewhere without xds, `xds model vendor PROJECT ASSET_ID` copies the file
+into `assets/models/` and repoints the asset. In the studio, **Add model… → Library** does the same
+as `--library`.
+
+The library models are built from their raw downloads by `scripts/build_library_models.py`
+(Blender), which splits out and orients the screen, grounds and centers the model, names and pivots
+moving parts, and compresses it. New library models go through the same script.
+
 ### 3.1 Conventions for the model
 
 | Convention | Why |
@@ -171,6 +198,23 @@ Device models (a phone, a laptop) are fixed assets. The UI on their screens is a
 that you write. XDS renders the page to an image and maps it onto the device's `Screen` mesh, unlit,
 so the colors stay exact.
 
+### 4.0 Recipe: an app UI on the iPhone (or MacBook)
+
+```bash
+P=~/xd-projects/launch
+uv run xds screen add $P app-home --device iphone-17-pro        # 1. the screen page, sized for the model
+#                                                                 2. write screens/app-home/index.html (§4.3–4.4)
+uv run xds screen render $P app-home                             # 3. look at it flat
+uv run xds model add $P --library iphone-17-pro --slide s2 --screen app-home   # 4. the phone, showing it
+uv run xds render $P                                             # 5. look at the slide
+```
+
+Step 4 adds the render node `{ "object": "iphone-17-pro", "screens": { "Screen": "app-home" } }`.
+The phone is added once per project; on later slides, add another render node for the same object
+with a different screen. For the laptop use `--device macbook` and `--library macbook-pro-14`.
+A product shot and an app shot are just different slides: one slide's render node shows the
+product model, the next shows the phone.
+
 ### 4.1 Create a screen
 
 ```bash
@@ -183,6 +227,7 @@ The `--device` presets set the logical size, scale and safe area:
 | Device preset | Logical size | Scale | Safe area (top / bottom) |
 | --- | --- | --- | --- |
 | `iphone` (6.1″ Pro) | 393 × 852 | 3 | 59 / 34 |
+| `iphone-17-pro` (library model) | 402 × 874 | 3 | 62 / 34 |
 | `iphone-max` | 430 × 932 | 3 | 59 / 34 |
 | `android` | 412 × 915 | 2.625 | 24 / 24 |
 | `ipad` | 820 × 1180 | 2 | 24 / 20 |

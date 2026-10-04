@@ -39,6 +39,8 @@ ORIGIN = "http://xds.screen"
 DEVICES: dict[str, dict[str, Any]] = {
     "iphone": {"width": 393, "height": 852, "scale": 3,
                "safeArea": {"top": 59, "right": 0, "bottom": 34, "left": 0}},
+    "iphone-17-pro": {"width": 402, "height": 874, "scale": 3,
+                      "safeArea": {"top": 62, "right": 0, "bottom": 34, "left": 0}},
     "iphone-max": {"width": 430, "height": 932, "scale": 3,
                    "safeArea": {"top": 59, "right": 0, "bottom": 34, "left": 0}},
     "android": {"width": 412, "height": 915, "scale": 2.625,

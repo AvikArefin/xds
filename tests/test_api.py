@@ -63,3 +63,14 @@ def test_projects_listing(client, blank, monkeypatch):
     monkeypatch.setenv("XDS_PROJECTS_DIR", str(blank.parent))
     d = client.get("/api/projects").json()
     assert [p["active"] for p in d["projects"]] == [True]
+
+
+def test_library_models_by_reference(client, blank):
+    models = client.get("/api/library").json()["models"]
+    assert {m["id"] for m in models} >= {"iphone-17-pro", "macbook-pro-14"}
+    r = client.post("/api/models/library", json={"model": "iphone-17-pro", "slide": "s1"}).json()
+    assert r["result"]["asset"] == "xds:models/iphone-17-pro/model.glb"
+    # the studio's fileUrl() encodes the colon
+    glb = client.get("/api/files/xds%3Amodels/iphone-17-pro/model.glb")
+    assert glb.status_code == 200 and glb.content[:4] == b"glTF"
+    assert client.get("/api/files/xds%3A..%2Fcli.py").status_code == 400

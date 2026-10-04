@@ -1,0 +1,10 @@
+{
+  "name": "iPhone 17 Pro",
+  "description": "Phone, standing upright, screen facing +Z. 0.073 × 0.150 × 0.013 m.",
+  "screens": { "Screen": { "device": "iphone-17-pro" } },
+  "parts": {
+    "Body": "aluminum frame, back glass and cameras",
+    "Display": "front glass and bezel",
+    "Screen": "the display; a screen page maps onto it"
+  }
+}

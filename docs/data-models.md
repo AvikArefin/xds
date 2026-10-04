@@ -128,10 +128,13 @@ must name a declared role.
 
 ```ts
 FontFile = { family: string; path: string; weight: number; italic?: boolean };   // path under fonts/
-Asset    = { id: string; path: string; kind: "image" | "svg" | "model" };       // path under assets/
+Asset    = { id: string; path: string; kind: "image" | "svg" | "model" };       // under assets/, or xds:…
 ```
 
-Paths are project-relative, must not contain `..`, and must exist. A `model` asset is always a
+Paths are project-relative, must not contain `..`, and must exist. The one exception is an asset
+path starting with `xds:` (`xds:models/iphone-17-pro/model.glb`): it names a file in the model
+library that ships with xds, which projects reference instead of copying (see
+[agent guide §3.0](./agent-guide.md#30-library-models-devices-that-ship-with-xds)). A `model` asset is always a
 binary glTF 2.0 file (`.glb`), the one 3D format the app loads. `xds model add` accepts `.glb`,
 `.gltf` (with its `.bin` and textures) and `.dae` (Collada), and converts the last two to `.glb` on
 import (see [agent guide §3.3](./agent-guide.md#33-wiring-it-into-the-project)). The original file is
