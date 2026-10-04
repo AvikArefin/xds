@@ -1,5 +1,5 @@
 import { LAYER_LABELS, type Layer } from "@xds/protocol";
-import { layerOrder, useCanRedo, useCanUndo, useStudio, type Mode } from "../store";
+import { layerOrder, useStudio, type Mode } from "../store";
 import { EditableStage } from "./canvas/EditableStage";
 import { AlignBar } from "./inspectors/NodeInspectors";
 import { IconButton, Segmented } from "./ui";
@@ -11,12 +11,8 @@ export function StageToolbar() {
   const mode = useStudio((s) => s.mode);
   const snap = useStudio((s) => s.snap);
   const showGuides = useStudio((s) => s.showGuides);
-  const zoom = useStudio((s) => (s.zoom === "fit" ? s.fitZoom : s.zoom));
-  const isFit = useStudio((s) => s.zoom === "fit");
   const transformMode = useStudio((s) => s.transformMode);
   const transformSpace = useStudio((s) => s.transformSpace);
-  const canUndo = useCanUndo();
-  const canRedo = useCanRedo();
   const st = useStudio.getState();
   const layers = [...layerOrder(project)].reverse() as Layer[]; // front → back
 
@@ -60,20 +56,22 @@ export function StageToolbar() {
         </>
       )}
       {mode !== "present" && mode !== "render" && <AlignBar />}
-      <span className="spacer" />
-      <button type="button" className="btn ghost small" disabled={!canUndo} onClick={st.undo} title="Undo (⌘Z)">
-        Undo
+    </div>
+  );
+}
+
+/** Floats over the canvas's bottom-right corner, outside the scrolling viewport. */
+function ZoomControl() {
+  const zoom = useStudio((s) => (s.zoom === "fit" ? s.fitZoom : s.zoom));
+  const isFit = useStudio((s) => s.zoom === "fit");
+  const st = useStudio.getState();
+  return (
+    <div className="zoom">
+      <IconButton icon="minus" title="Zoom out" onClick={() => st.zoomBy(1 / 1.25)} />
+      <button type="button" className={`zoom-val${isFit ? " fit" : ""}`} title="Fit to window" onClick={() => st.setZoom("fit")}>
+        {Math.round(zoom * 100)}%
       </button>
-      <button type="button" className="btn ghost small" disabled={!canRedo} onClick={st.redo} title="Redo (⇧⌘Z)">
-        Redo
-      </button>
-      <div className="zoom">
-        <IconButton icon="minus" title="Zoom out" onClick={() => st.zoomBy(1 / 1.25)} />
-        <button type="button" className={`zoom-val${isFit ? " fit" : ""}`} title="Fit to window" onClick={() => st.setZoom("fit")}>
-          {Math.round(zoom * 100)}%
-        </button>
-        <IconButton icon="plus" title="Zoom in" onClick={() => st.zoomBy(1.25)} />
-      </div>
+      <IconButton icon="plus" title="Zoom in" onClick={() => st.zoomBy(1.25)} />
     </div>
   );
 }
@@ -83,6 +81,7 @@ export function StageArea() {
     <main className="stage-area">
       <StageToolbar />
       <EditableStage />
+      <ZoomControl />
     </main>
   );
 }

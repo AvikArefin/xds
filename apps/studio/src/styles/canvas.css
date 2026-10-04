@@ -38,9 +38,17 @@
   color: #fff;
 }
 .zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(20, 21, 24, 0.85);
 }
 .zoom-val {
   min-width: 48px;
@@ -118,6 +126,8 @@
 .stage-hint {
   left: auto;
   right: 12px;
+  /* clears the zoom control */
+  bottom: 50px;
 }
 
 /* overlays */

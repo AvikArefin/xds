@@ -251,8 +251,11 @@
   gap: 2px;
   padding: 6px 8px;
 }
-.rail-toolbar .btn {
+.rail-toolbar .rail-undo {
   margin-left: auto;
+}
+.rail-toolbar .btn {
+  margin-left: 4px;
 }
 
 /* side panels */
