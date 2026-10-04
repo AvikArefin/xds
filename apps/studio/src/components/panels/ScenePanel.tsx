@@ -4,7 +4,7 @@ import { nodesOf, useActiveSlide, useStudio } from "../../store";
 import { api, type LibraryModel } from "../../api";
 import { addLibraryModel, importModel } from "../commands";
 import { Icon } from "../Icon";
-import { IconButton, Menu, MenuItem } from "../ui";
+import { IconButton, ListRow, Menu, MenuItem } from "../ui";
 import { NodeRow } from "./LayerList";
 
 const SHAPES: SceneObject["kind"][] = ["box", "sphere", "cylinder", "torus", "plane"];
@@ -59,11 +59,12 @@ export function ScenePanel() {
           <div className="panel-sub">In the project, not on this slide</div>
           <ul className="node-list">
             {offSlide.map((o) => (
-              <li key={o.id} className="node-row ghost">
-                <span className="node-name">{o.name}</span>
-                <span className="muted small">{o.kind}</span>
-                <IconButton icon="plus" title="Add to this slide" size={12} disabled={readOnly} onClick={() => addObjectToSlide(o.id)} />
-              </li>
+              <ListRow
+                key={o.id}
+                label={o.name}
+                title={`${o.kind} · not on this slide`}
+                actions={<IconButton icon="plus" title="Add to this slide" size={12} disabled={readOnly} onClick={() => addObjectToSlide(o.id)} />}
+              />
             ))}
           </ul>
         </>

@@ -662,6 +662,68 @@ export function MenuItem({ children, onClick, disabled, hint }: { children: Reac
   );
 }
 
+/**
+ * One row of a side-panel list (layers, nodes, 3D objects): drag handle, name, actions that
+ * brighten on hover or selection. Every list uses it, so rows look and behave the same.
+ * Drag-and-drop is scoped by `dragType`: rows only accept drops of their own kind.
+ */
+export function ListRow({
+  label,
+  title,
+  selected,
+  hidden,
+  dragType,
+  dragId,
+  onDropFrom,
+  onClick,
+  onDoubleClick,
+  actions,
+}: {
+  label: React.ReactNode;
+  title?: string;
+  selected?: boolean;
+  hidden?: boolean;
+  /** Enables the drag handle; rows only accept drops with the same type. */
+  dragType?: string;
+  dragId?: string;
+  onDropFrom?: (fromId: string) => void;
+  onClick?: (e: React.MouseEvent) => void;
+  onDoubleClick?: () => void;
+  actions?: React.ReactNode;
+}) {
+  const readOnly = useStudio((s) => s.readOnly);
+  const [over, setOver] = useState(false);
+  const draggable = !!dragType && !!dragId && !readOnly;
+  return (
+    <li
+      className={`node-row${selected ? " selected" : ""}${hidden ? " is-hidden" : ""}${over ? " drop" : ""}`}
+      title={title}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(dragType!, dragId!);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(e) => {
+        if (!onDropFrom || !dragType || !e.dataTransfer.types.includes(dragType)) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        setOver(false);
+        const from = dragType ? e.dataTransfer.getData(dragType) : "";
+        if (from && from !== dragId) onDropFrom?.(from);
+      }}
+    >
+      {dragType && <Icon name="grip" size={12} className={`grip${draggable ? "" : " off"}`} />}
+      <span className="node-name">{label}</span>
+      <span className="node-actions">{actions}</span>
+    </li>
+  );
+}
+
 /** Helper: the shared value of a field across several items, or MIXED. */
 export function shared<T, V>(items: T[], get: (t: T) => V): V | typeof MIXED | undefined {
   if (!items.length) return undefined;

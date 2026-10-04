@@ -313,13 +313,12 @@
 .node-row.drop {
   border-top-color: var(--accent);
 }
-.node-row.ghost {
-  cursor: default;
-  color: var(--text-dim);
-}
 .grip {
   color: var(--text-muted);
   cursor: grab;
+}
+.grip.off {
+  visibility: hidden;
 }
 .node-name {
   flex: 1;
@@ -334,18 +333,12 @@
   opacity: 0.25;
 }
 .node-row:hover .node-actions,
-.node-row.selected .node-actions,
-.node-actions.always {
+.node-row.selected .node-actions {
   opacity: 1;
 }
 .node-actions .icon-btn {
   width: 20px;
   height: 20px;
-}
-.layer-index {
-  width: 14px;
-  color: var(--text-muted);
-  font-size: 10px;
 }
 .job-lines {
   margin: 0 10px 6px;

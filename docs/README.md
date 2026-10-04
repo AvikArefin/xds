@@ -17,6 +17,8 @@ design-rule audit.
   models (e.g. from Blender).
 - **[Human interaction](./human-interaction.md)**: the editor screen, modes, shortcuts and
   walkthroughs.
+- **[UI](./ui.md)**: Studio's shared building blocks (list rows, dropdowns, number fields,
+  buttons), the style tokens, and the conventions new UI follows.
 - **[Dataflow](./dataflow.md)**: every input, transformation and destination.
 
 The user-facing quickstart and CLI reference is the repository's root [`README.md`](../README.md).

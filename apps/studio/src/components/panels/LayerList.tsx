@@ -5,7 +5,7 @@ import { api } from "../../api";
 import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
 import { addStarterBackground } from "../commands";
 import { Icon } from "../Icon";
-import { IconButton, Menu, MenuItem } from "../ui";
+import { IconButton, ListRow, Menu, MenuItem } from "../ui";
 
 export function NodeRow({
   node,
@@ -27,57 +27,43 @@ export function NodeRow({
   const project = useStudio((s) => s.project);
   const readOnly = useStudio((s) => s.readOnly);
   const { toggleHidden, toggleLock } = useStudio.getState();
-  const [over, setOver] = useState(false);
   return (
-    <li
-      className={`node-row${selected ? " selected" : ""}${node.hidden ? " is-hidden" : ""}${over ? " drop" : ""}`}
+    <ListRow
+      label={nodeLabel(node, project)}
+      title={node.id}
+      selected={selected}
+      hidden={!!node.hidden}
+      dragType={draggable ? "text/x-xds-node" : undefined}
+      dragId={node.id}
+      onDropFrom={onDrop}
       onClick={onSelect}
-      draggable={draggable && !readOnly}
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/x-xds-node", node.id);
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      onDragOver={(e) => {
-        if (!onDrop || !e.dataTransfer.types.includes("text/x-xds-node")) return;
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        setOver(false);
-        const id = e.dataTransfer.getData("text/x-xds-node");
-        if (id && id !== node.id) onDrop?.(id);
-      }}
-    >
-      {draggable && <Icon name="grip" size={12} className="grip" />}
-      <span className="node-name" title={node.id}>
-        {nodeLabel(node, project)}
-      </span>
-      <span className="node-actions">
-        {extra}
-        <IconButton
-          icon={node.hidden ? "eyeOff" : "eye"}
-          title={node.hidden ? "Show" : "Hide"}
-          size={12}
-          disabled={readOnly}
-          active={!!node.hidden}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleHidden(node.id);
-          }}
-        />
-        <IconButton
-          icon={locked ? "lock" : "unlock"}
-          title={locked ? "Unlock (editor only)" : "Lock (editor only)"}
-          size={12}
-          active={locked}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleLock(node.id);
-          }}
-        />
-      </span>
-    </li>
+      actions={
+        <>
+          {extra}
+          <IconButton
+            icon={node.hidden ? "eyeOff" : "eye"}
+            title={node.hidden ? "Show" : "Hide"}
+            size={12}
+            disabled={readOnly}
+            active={!!node.hidden}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleHidden(node.id);
+            }}
+          />
+          <IconButton
+            icon={locked ? "lock" : "unlock"}
+            title={locked ? "Unlock (editor only)" : "Lock (editor only)"}
+            size={12}
+            active={locked}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLock(node.id);
+            }}
+          />
+        </>
+      }
+    />
   );
 }
 

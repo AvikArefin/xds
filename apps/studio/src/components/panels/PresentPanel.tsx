@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { LAYER_LABELS, type Layer } from "@xds/protocol";
 import { layerOrder, useStudio } from "../../store";
 import { Icon } from "../Icon";
-import { IconButton } from "../ui";
+import { IconButton, ListRow } from "../ui";
 
 function fmtStamp(stamp: string) {
   const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/.exec(stamp);
@@ -16,7 +16,6 @@ export function PresentPanel() {
   const exportJob = useStudio((s) => s.jobs.export);
   const hiddenLayers = useStudio((s) => s.hiddenLayers);
   const { setLayerOrder, setMode, exportPng, loadExports, toggleLayer } = useStudio.getState();
-  const [dragOver, setDragOver] = useState<Layer | null>(null);
   useEffect(() => {
     void loadExports();
   }, [loadExports]);
@@ -38,35 +37,19 @@ export function PresentPanel() {
         <span className="muted small">front → back</span>
       </div>
       <ul className="node-list">
-        {frontToBack.map((l, k) => {
+        {frontToBack.map((l) => {
           const shown = !hiddenLayers.includes(l);
           return (
-            <li
+            <ListRow
               key={l}
-              className={`node-row${shown ? "" : " is-hidden"}${dragOver === l ? " drop" : ""}`}
-              onDoubleClick={() => setMode(l)}
+              label={LAYER_LABELS[l]}
               title="Drag to reorder · double-click to edit this layer"
-              draggable={!readOnly}
-              onDragStart={(e) => {
-                e.dataTransfer.setData("text/x-xds-layer", l);
-                e.dataTransfer.effectAllowed = "move";
-              }}
-              onDragOver={(e) => {
-                if (!e.dataTransfer.types.includes("text/x-xds-layer")) return;
-                e.preventDefault();
-                setDragOver(l);
-              }}
-              onDragLeave={() => setDragOver(null)}
-              onDrop={(e) => {
-                setDragOver(null);
-                const from = e.dataTransfer.getData("text/x-xds-layer") as Layer;
-                if (from) moveTo(from, l);
-              }}
-            >
-              {!readOnly && <Icon name="grip" size={12} className="grip" />}
-              <span className="layer-index">{k + 1}</span>
-              <span className="node-name">{LAYER_LABELS[l]}</span>
-              <span className="node-actions always">
+              hidden={!shown}
+              dragType="text/x-xds-layer"
+              dragId={l}
+              onDropFrom={(from) => moveTo(from as Layer, l)}
+              onDoubleClick={() => setMode(l)}
+              actions={
                 <IconButton
                   icon={shown ? "eye" : "eyeOff"}
                   title={`${shown ? "Hide" : "Show"} on the canvas while editing (not saved; exports always include every layer)`}
@@ -77,8 +60,8 @@ export function PresentPanel() {
                     toggleLayer(l);
                   }}
                 />
-              </span>
-            </li>
+              }
+            />
           );
         })}
       </ul>

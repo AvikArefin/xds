@@ -281,7 +281,7 @@ AuditReport = {
 `cache/<hash>/annotated/<n>-<slide>.png` draws every finding's region in its severity color, with
 its number, together with the margin, the safe zones and the third lines. A multimodal agent can
 look at the annotated image and the JSON together. The Studio draws the same overlay on the
-canvas (see [human interaction](./human-interaction.md#run-the-audit)).
+canvas (see [human interaction §4](./human-interaction.md#4-walkthroughs)).
 
 ---
 
