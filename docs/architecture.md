@@ -63,7 +63,7 @@ xds/
 │   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, `xds model add`
 │   ├── library.py                 #   the shipped models and logos (`xds:` asset paths)
 │   ├── library/models/<id>/       #   library models: model.glb + model.json
-│   ├── library/brands/<id>/       #   brand logos: SVGs (+ PNG copies) + brand.json
+│   ├── library/brands/<id>/       #   brand logos: SVGs + brand.json   
 │   ├── library/fonts/<Family>/    #   font library: Fontshare downloads + family.json (not committed)
 │   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
 │   ├── browser.py                 #   Playwright: render slides, collect measurements

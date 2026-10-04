@@ -171,16 +171,18 @@ Text style is resolved as: node override → its role → the level's default fo
 
 ### 4.5 The logo (cortextech)
 
-These slides are cortextech's. **Every deck shows the cortextech logo** (at least on the first or
-the last slide; small, in a corner, inside the margin), and the logo is always one of these files
-that ship with xds, never an image you make, trace, redraw or recolor:
+These slides are cortextech's. **Every slide shows the full cortextech logo**: the mark and the
+wordmark together, as **one image**, small, in a corner, inside the margin, in the same place on
+every slide. The logo is always one of these files that ship with xds, never an image you make,
+trace, redraw or recolor:
 
 | Logo id | Size (w × h) | Use |
 | --- | --- | --- |
-| `cortextech/full-logomark` | 4419 × 983 | full logo for **dark** backgrounds: white wordmark, transparent |
-| `cortextech/full-logomark-white-bg` | 4419 × 983 | full logo on a white rectangle: only on **white** backgrounds |
-| `cortextech/brain-x` | 1024 × 1024 | the blue mark alone, transparent; any background; where the full logo is too wide |
-| `cortextech/brain-x-white-bg` | 1024 × 1024 | the mark on a white square |
+| `cortextech/full-logomark` | 4419 × 983 | for **dark** backgrounds: white wordmark, transparent |
+| `cortextech/full-logomark-white-bg` | 4419 × 983 | for **white or light** backgrounds: black wordmark, transparent |
+
+Never show the mark and the name separately: no mark-only logo, and no "cortextech" typed as a
+text node next to (or instead of) the logo. The full logo already contains the name.
 
 ```bash
 xds logo library                                  # the same list, plus the brand color
@@ -188,18 +190,18 @@ xds logo add . cortextech/full-logomark           # registers asset "cortextech-
 ```
 
 `xds logo add` registers the logo **by reference** (`"kind": "svg", "path":
-"xds:brands/cortextech/full-logomark.svg"`). Place it with an image node, a box with the logo's
-aspect and `"fit": "contain"`:
+"xds:brands/cortextech/full-logomark.svg"`). Place it on every slide with an image node, a box
+with the logo's aspect (4.5 : 1) and `"fit": "contain"`:
 
 ```jsonc
-{ "id": "logo", "name": "Logo", "layer": "image",
+{ "id": "logo-s1", "name": "Logo", "layer": "image",
   "box": { "x": 5.93, "y": 91.3, "w": 22, "h": 3.9 },  // 1080 × 1350: 22% = 238 px wide; 238 / 4.5 = 53 px = 3.9% tall
   "data": { "asset": "cortextech-full-logomark", "fit": "contain" } }
 ```
 
-Pick the variant by what is behind it: the white wordmark on dark backgrounds, the mark alone
-(`brain-x`) where it would be too small to read or the background is light but not white. The
-logo's blue is `#4266AF`; add it to `brand.colors` only if the design uses it.
+Pick the variant by what is behind it: `full-logomark` on dark or saturated backgrounds,
+`full-logomark-white-bg` on white or light ones. Both are transparent. The logo's blue is `#4266AF`;
+add it to `brand.colors` only if the design uses it.
 
 ## 5. 3D
 

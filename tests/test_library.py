@@ -88,12 +88,12 @@ def test_screen_aspect_counts_the_lean():
 
 def test_logos_are_listed_with_sizes_and_paths():
     logos = {l["id"]: l for l in library.logos()}
-    assert set(logos) == {"cortextech/full-logomark", "cortextech/full-logomark-white-bg",
-                          "cortextech/brain-x", "cortextech/brain-x-white-bg"}
+    # only the full logo is offered; the mark alone (brain-x) is never a logo on its own
+    assert set(logos) == {"cortextech/full-logomark", "cortextech/full-logomark-white-bg"}
     for l in logos.values():
         assert library.resolve(l["path"]).is_file() and l["width"] and l["height"]
     assert logos["cortextech/full-logomark"]["path"] == "xds:brands/cortextech/full-logomark.svg"
-    assert "fill=\"white\"/>" not in library.resolve(logos["cortextech/brain-x"]["path"]).read_text()[:400]
+    assert library.resolve("xds:brands/cortextech/brain-x.svg").is_file()   # old references resolve
     with pytest.raises(XdsError) as e:
         library.logo("nope/logo")
     assert e.value.code == "UNKNOWN_LIBRARY_LOGO"
@@ -111,7 +111,7 @@ def test_add_logo_by_reference(blank):
     again = library.add_logo(blank, "cortextech/full-logomark")
     assert again["id"] == r["id"] and not again["added"]
     with pytest.raises(XdsError) as e:
-        library.add_logo(blank, "cortextech/brain-x", id="cortextech-full-logomark")
+        library.add_logo(blank, "cortextech/full-logomark-white-bg", id="cortextech-full-logomark")
     assert e.value.code == "ASSET_EXISTS"
     edit(blank, lambda d: d["slides"][0]["nodes"].append(
         {"id": "logo", "layer": "image", "box": {"x": 6, "y": 91, "w": 22, "h": 3.9},

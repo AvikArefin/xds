@@ -59,16 +59,17 @@ as percentages, so you don't have to convert by hand.
 
 ### 2.1 The brand logo
 
-The cortextech logos ship with xds in `xds/library/brands/cortextech/` (SVG, with PNG copies for
-tools outside xds). Like the library models, **a project references them and never copies
+The cortextech logos ship with xds in `xds/library/brands/cortextech/` as transparent SVGs. Like the library models, **a project references them and never copies
 them**: `xds logo add PROJECT cortextech/full-logomark` registers an `svg` asset with the path
 `xds:brands/cortextech/full-logomark.svg`, and an image node places it (`"fit": "contain"`, a box
 with the logo's aspect). `xds logo library` lists the logos, their sizes and which background each
 is for; `brand.json` in the folder is where that is written. In the studio, **New image… →
 Library** registers and places one in a single undo step.
 
-The project template's `AGENTS.md` tells project agents that every deck shows the logo and which
-variant to use, since they can't read this guide.
+The project template's `AGENTS.md` tells project agents that every slide shows the full logo (mark and
+wordmark as one image, never the mark alone or the name as text) and which variant to use, since
+they can't read this guide. Only the two `full-logomark` files are listed in `brand.json`; the
+`brain-x` mark files stay in the folder but aren't offered.
 
 ---
 

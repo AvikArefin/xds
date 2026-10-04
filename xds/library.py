@@ -20,7 +20,7 @@ Each brand is a folder `xds/library/brands/<id>/` with its logo SVGs and `brand.
 
 A logo's id is `<brand>/<file stem>` (`cortextech/full-logomark`); `add_logo` registers it as an
 `svg` asset by reference (`xds:brands/<brand>/<file>`). Files in the folder that `logos` doesn't
-list (PNG copies for tools outside xds) are not offered to projects.
+list (the brain-x mark on its own) are not offered to projects.
 """
 
 from __future__ import annotations

@@ -94,7 +94,7 @@ reloads from disk. Undo has one step per drag or field change.
   **+ New background…** adds a project design or a starter on top. The audit reports
   `UNCOVERED_CANVAS` if nothing covers the canvas.
 - **Logo**: `3` → **+ New image…** → **Library** → a cortextech logo (`full-logomark` on dark
-  backgrounds, `-white-bg` on white, `brain-x` the mark alone). It's referenced, never copied, and
+  backgrounds, `-white-bg` on white; always the full logo, on every slide). It's referenced, never copied, and
   arrives at its own aspect with Contain fit.
 - **3D model**: `4` → **+ Add model…** → **Library** (iPhone 17 Pro, MacBook Pro 14″, referenced,
   never copied) or **From file…** (`.glb`, `.gltf`, `.dae`, or drop on the canvas). It arrives
