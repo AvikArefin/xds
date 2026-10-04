@@ -157,9 +157,6 @@ export function BrandInspector() {
                   }
                 />
               </div>
-              <Row label="Level">
-                <Select value={role.level} options={LEVELS} disabled={readOnly} onChange={(v) => v && patchRole(name, { level: v })} />
-              </Row>
               <Row label="Font">
                 <Select
                   value={role.font}
@@ -169,6 +166,17 @@ export function BrandInspector() {
                   onChange={(v) => v && patchRole(name, { font: v })}
                 />
               </Row>
+              <Row label="Size range">
+                <Select
+                  value={role.level}
+                  options={LEVELS.map((l) => {
+                    const b = guide?.bands?.[l];
+                    return { value: l, label: b ? `${l} · ${b.min}–${b.max} px` : l };
+                  })}
+                  disabled={readOnly}
+                  onChange={(v) => v && patchRole(name, { level: v })}
+                />
+              </Row>
               <div className="field-grid">
                 <NumberField label="Weight" value={role.weight} placeholder={400} step={100} min={100} max={900} disabled={readOnly} onChange={(weight) => patchRole(name, { weight })} />
                 <NumberField
@@ -176,6 +184,7 @@ export function BrandInspector() {
                   value={role.size}
                   placeholder={band?.default}
                   range={band ? [band.min, band.max] : undefined}
+                  rangeLabel={false}
                   min={1}
                   unit="px"
                   disabled={readOnly}

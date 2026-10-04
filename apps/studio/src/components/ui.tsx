@@ -99,6 +99,7 @@ export function NumberField({
   min,
   max,
   range,
+  rangeLabel = true,
   track,
   unit,
   disabled,
@@ -113,6 +114,8 @@ export function NumberField({
   min?: number;
   max?: number;
   range?: [number, number];
+  /** Set false to keep the amber out-of-range warning but drop the "min–max" text under the field. */
+  rangeLabel?: boolean;
   /** Set false to hide the fill track on a bounded field whose bounds are only sanity limits. */
   track?: boolean;
   unit?: string;
@@ -263,7 +266,7 @@ export function NumberField({
           <span className={`num-fill${value === undefined ? " inherited" : ""}`} style={{ width: `${(ratio * 100).toFixed(2)}%` }} />
         </span>
       )}
-      {range && (
+      {range && rangeLabel && (
         <span className="num-range" title="Guide range for this format">
           {fmt(range[0], step)}–{fmt(range[1], step)}
         </span>
