@@ -304,6 +304,13 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
                                              replace=replace)
         return ok(result=result)
 
+    @app.post("/api/migrate")
+    async def migrate_project() -> dict[str, Any]:
+        """`xds migrate` for the active project (backs up project.json first)."""
+        from . import migrate
+
+        return ok(report=await run_in_threadpool(migrate.run, state.require_root()))
+
     @app.get("/api/library")
     async def get_library() -> dict[str, Any]:
         from . import library

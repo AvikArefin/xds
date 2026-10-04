@@ -338,7 +338,9 @@ export const useStudio = create<Studio>()(
           return;
         }
         const raw = data.project as Project | null;
-        const parsed = raw && typeof raw === "object" && Array.isArray((raw as Project).slides) ? raw : null;
+        // An older schema has slides too, but not the shapes the editor reads: show the migrate screen instead.
+        const migrate = data.check.findings.some((f) => f.rule === "MIGRATION_NEEDED");
+        const parsed = !migrate && raw && typeof raw === "object" && Array.isArray((raw as Project).slides) ? raw : null;
         const readOnly = data.readOnly || !data.check.ok || !parsed;
         const keepSession = reason === "external" || reason === "conflict" || reason === "refresh";
         const slides = parsed?.slides ?? [];

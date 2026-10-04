@@ -5,6 +5,8 @@ import pytest
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from fastapi.testclient import TestClient  # noqa: E402
 
+from .conftest import edit  # noqa: E402
+
 from xds.api import create_app  # noqa: E402
 
 
@@ -74,3 +76,11 @@ def test_library_models_by_reference(client, blank):
     glb = client.get("/api/files/xds%3Amodels/iphone-17-pro/model.glb")
     assert glb.status_code == 200 and glb.content[:4] == b"glTF"
     assert client.get("/api/files/xds%3A..%2Fcli.py").status_code == 400
+
+
+def test_migrate_route(client, blank):
+    r = client.post("/api/migrate").json()["report"]
+    assert r["written"] is False and not r.get("unresolved")  # already current: nothing to do
+    edit(blank, lambda d: d.update(schemaVersion="beta"))
+    r = client.post("/api/migrate").json()["report"]
+    assert r["written"] is False and r["unresolved"]  # refused, file untouched

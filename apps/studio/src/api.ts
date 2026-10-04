@@ -102,6 +102,11 @@ export const api = {
     if (opts.replace) fd.set("replace", "true");
     return request<{ result: ModelImportResult }>("POST", "/api/models/import", fd);
   },
+  migrate: () =>
+    request<{ report: { fromVersion?: unknown; toVersion?: unknown; written: boolean; backup: string | null; unresolved?: unknown[] } }>(
+      "POST",
+      "/api/migrate",
+    ),
   library: () => request<{ models: LibraryModel[] }>("GET", "/api/library"),
   addLibraryModel: (model: string, opts: { id?: string; slide?: string; screen?: string } = {}) =>
     request<{ result: { id: string; node: string | null } }>("POST", "/api/models/library", { model, ...opts }),

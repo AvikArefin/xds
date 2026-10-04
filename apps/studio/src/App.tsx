@@ -2,7 +2,8 @@
  * The Studio editor (human-interaction.md): SlideRail | Stage | side panel | Inspector, with a
  * status bar, the command palette and the project browser.
  */
-import { Component, type ReactNode } from "react";
+import { Component, useState, type ReactNode } from "react";
+import { api } from "./api";
 import { FindingItem } from "./components/AuditPanel";
 import { CommandPalette } from "./components/CommandPalette";
 import { ExportBlockedDialog, PromptDialog, StatusBar } from "./components/Dialogs";
@@ -73,6 +74,57 @@ function BrokenProject() {
   );
 }
 
+/** An older project: the editor can't draw it until `xds migrate` upgrades project.json. */
+function NeedsMigration() {
+  const root = useStudio((s) => s.root);
+  const finding = useStudio((s) => s.check.findings.find((f) => f.rule === "MIGRATION_NEEDED"));
+  const [busy, setBusy] = useState(false);
+  const [problems, setProblems] = useState<string[]>([]);
+  const migrate = async () => {
+    setBusy(true);
+    try {
+      const { report } = await api.migrate();
+      const unresolved = (report.unresolved ?? []).map((u) =>
+        typeof u === "object" && u && "message" in u ? String((u as { message: unknown }).message) : String(u),
+      );
+      setProblems(unresolved);
+      if (report.written) useStudio.getState().notify("success", `Migrated. The old project.json is saved at ${report.backup}.`);
+      await useStudio.getState().load("refresh");
+    } catch (e) {
+      useStudio.getState().notify("error", `Migration failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="broken">
+      <h2>This project needs migrating</h2>
+      <p className="muted">
+        {root} was made with an older XDS ({finding?.message}). Migrating upgrades project.json to the current format and keeps a backup
+        of the old file in <code>.migrate-backup/</code>. It's the same as running <code>uv run xds migrate</code>.
+      </p>
+      {problems.length > 0 && (
+        <ul className="findings">
+          <li className="small">Not migrated. Nothing was changed:</li>
+          {problems.map((p, i) => (
+            <li key={i} className="muted small">
+              {p}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="dialog-actions" style={{ justifyContent: "flex-start" }}>
+        <button type="button" className="btn primary" disabled={busy} onClick={() => void migrate()}>
+          {busy ? "Migrating…" : "Migrate project"}
+        </button>
+        <button type="button" className="btn" onClick={() => useStudio.getState().setProjectBrowser("open")}>
+          Open another project…
+        </button>
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   useDocumentSync();
   useGuideSync();
@@ -80,6 +132,7 @@ export default function App() {
   const status = useStudio((s) => s.status);
   const loadError = useStudio((s) => s.loadError);
   const hasProject = useStudio((s) => !!s.project);
+  const needsMigration = useStudio((s) => s.check.findings.some((f) => f.rule === "MIGRATION_NEEDED"));
 
   let body: ReactNode;
   if (status === "loading") body = <div className="splash">Loading project…</div>;
@@ -98,6 +151,7 @@ export default function App() {
         </div>
       </div>
     );
+  else if (needsMigration) body = <NeedsMigration />;
   else if (!hasProject) body = <BrokenProject />;
   else
     body = (
