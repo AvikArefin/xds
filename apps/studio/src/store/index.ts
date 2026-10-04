@@ -102,7 +102,8 @@ export interface StudioState {
   fitZoom: number;
   snap: boolean;
   showGuides: boolean;
-  layerSolo: Layer | null;
+  /** Layers hidden on the canvas while editing. A view setting: never saved, not in undo. */
+  hiddenLayers: Layer[];
   inspectorTab: string;
   commandPaletteOpen: boolean;
   projectBrowser: null | "open" | "new";
@@ -150,6 +151,7 @@ export interface StudioActions {
   setFitZoom(z: number): void;
   toggleSnap(): void;
   toggleGuides(): void;
+  toggleLayer(layer: Layer): void;
   setPalette(open: boolean): void;
   setProjectBrowser(tab: StudioState["projectBrowser"]): void;
 
@@ -224,7 +226,7 @@ const initial: StudioState = {
   fitZoom: 0.5,
   snap: true,
   showGuides: false,
-  layerSolo: null,
+  hiddenLayers: [],
   inspectorTab: "",
   commandPaletteOpen: false,
   projectBrowser: null,
@@ -521,6 +523,10 @@ export const useStudio = create<Studio>()(
         setFitZoom: (fitZoom) => set({ fitZoom }),
         toggleSnap: () => set((s) => ({ snap: !s.snap })),
         toggleGuides: () => set((s) => ({ showGuides: !s.showGuides })),
+        toggleLayer: (layer) =>
+          set((s) => ({
+            hiddenLayers: s.hiddenLayers.includes(layer) ? s.hiddenLayers.filter((l) => l !== layer) : [...s.hiddenLayers, layer],
+          })),
         setPalette: (commandPaletteOpen) => set({ commandPaletteOpen }),
         setProjectBrowser: (projectBrowser) => set({ projectBrowser }),
 

@@ -37,15 +37,16 @@ flowchart LR
 | Heading | "Slides", count | **`+`** add slide |
 | Slide list | thumbnail, name, finding count badge | click to activate; drag to reorder; trash to delete (not the last slide) |
 | Audit | `AuditPanel`: errors/warnings/info counts and the findings list | **Run audit**; click a finding to select its node and zoom to it |
-| Format | `FormatSelect`: grouped presets (Social / Video / Print / Custom) | pick a preset or type a custom size |
-| Toolbar | Open project, Search, Export, Save | see shortcuts |
+| Format | `FormatSelect`: grouped presets (Social / Video / Print / Custom) | pick a preset (the list is searchable), or **Custom…** and type the size |
+| Toolbar | Open project, Search, Export PNG, **Undo**, **Redo**, Save | see shortcuts |
 
 ### 1.2 Center: the Stage
 
 - **Canvas toolbar.** The mode switcher (`Present`, then the layers front → back, following
   `layerOrder`). In 3D mode it also has **Move / Rotate / Scale** and **World / Local**. In every
   mode except Present it has **Snap** and **Guides**.
-- **Zoom control**: `−` / percentage / `+`.
+- **Zoom control**: `−` / percentage / `+`, floating at the canvas's bottom-right corner (it stays
+  put while a zoomed-in canvas scrolls). Click the percentage to fit the slide to the window.
 - **The canvas**: the same `SlideStage` the export renders, so what you see is what is exported.
   Clicking empty canvas clears the selection.
 - **Guides** (`G`): the margin, the platform safe zones (hatched), the `u` spacing grid, and the
@@ -58,22 +59,64 @@ flowchart LR
 
 | Mode | Panel | Contents |
 | --- | --- | --- |
-| Present | `PresentPanel` | the layer stack front → back with up/down buttons that reorder `layerOrder`; the **Exports** list |
-| 3D | `ScenePanel` | the slide's 3D objects (select, hide, lock, remove from slide); **+ Add model…**, **+ Add shape…** |
-| Text / 2D / Background | `LayerList` | the layer's nodes (select, hide, lock, delete, reorder); **+ New text…** / **+ New image…** / **+ New background…** |
+| Present | `PresentPanel` | **Layers** (the stack front → back) and the **Exports** list |
+| 3D | `ScenePanel` | the slide's 3D objects (select, hide, lock, remove from slide); **+ Add model…** (**Library**: the device models that ship with xds, or **From file…**), **+ Add shape…** |
+| Text / 2D / Background | `LayerList` | the layer's nodes; **+ New text…** / **+ New image…** / **+ New background…** |
+
+**Layers (Present).** Each row is one layer:
+
+- **drag handle** (left): drag a row onto another to move the layer to that position. This
+  reorders `layerOrder` and is saved;
+- **eye** (right): hides the layer **on the canvas only**, so you can see and work on what's under
+  it. Its nodes can't be clicked while it's hidden. This is a view setting: it is never saved, and
+  renders and exports always include every layer. A hidden layer's row is dimmed and struck
+  through;
+- **double-click** the row to switch to that layer's mode.
+
+**Node rows (Text / 2D / Background / 3D lists)**, front → back: a **drag handle** to reorder within
+the layer, the node's name, an **eye** that hides the node (saved: `hidden` in `project.json`, so
+it is left out of renders and exports too), and a **lock** that stops canvas edits (editor only,
+not saved). When a row is selected it also shows **bring forward**, **send backward** and
+**delete**. Click to select, `Shift + click` to add to the selection.
 
 ### 1.4 Right sidebar: `Inspector`
 
 | Mode | Inspector | What you edit |
 | --- | --- | --- |
-| Present | `BrandInspector` | colors, type roles, fonts, project default lighting |
+| Present | `BrandInspector` | colors, type roles, project default lighting |
 | 3D | `SceneInspector` | the selected object's pose; the slide's **Camera** and **Lighting** |
 | Text / 2D / Background | `TransformInspector` + `TypeInspector` / `ImageInspector` / `GroundInspector` | the selected node |
 
-Number fields in the type and transform inspectors show the guide range next to them (for example
-size `70` with `54–97` in muted text) and turn amber outside it.
+Slides are renamed in the slide rail (double-click the name). A slide has no page color: its
+background is its back Background node (see *Add a background*).
 
-### 1.5 `CommandPalette` (⌘K / Ctrl+K)
+### 1.5 Controls
+
+Every inspector uses the same two kinds of field.
+
+**Dropdowns.** Click to open the list; the current value has a check mark. A short list opens as a
+plain list. A list long enough to scroll (more than 11 rows, counting group headings such as
+Social / Video / Print) turns the box into a **search field** while it's open: type to filter by
+name, description or group. Keyboard: `↑`/`↓` move, `Enter` picks, `Escape` closes (without
+clearing the canvas selection). The list opens upward near the bottom of the window and grows
+leftward near its right edge. Brand color pickers are the same control, with swatches and hex
+codes.
+
+**Number fields.**
+
+- **Drag** anywhere on the field to scrub the value (one undo step per drag). A **click** without
+  dragging puts the cursor in it to type; `Enter` or clicking away commits, `Escape` cancels.
+- A field with a **minimum and maximum** (opacity, weight, field of view, light elevation and
+  brightness, design params, …) shows a thin **fill bar** along its bottom edge. Dragging across
+  the field's width sweeps the whole range, and the fill follows the pointer; hold `Alt` for fine
+  steps. The bar is grey when the value is inherited (shown as a placeholder).
+- A field without a range moves one step per 2 px of drag (`Shift` ×10, `Alt` ×0.1).
+- While a field is focused, `↑`/`↓` and the **mouse wheel** step it (`Shift` ×10). The wheel only
+  acts on a focused field, so scrolling the panel never changes a value by accident.
+- A field with a **guide range** (type sizes, line height, frame height, …) turns **amber** when the
+  value is outside it, and most show the range in muted text below (for example `54–97`).
+
+### 1.6 `CommandPalette` (⌘K / Ctrl+K)
 
 Filter and `Enter` to run: Open project…, New project…, Add slide, Save, Run audit, Export, Toggle
 guides, Switch to Text / 2D / 3D / Background, Go to slide N, Apply lighting look…, Add
@@ -94,7 +137,8 @@ A mode is `present` (the read-only composite) or one of the four layer ids. **Te
 | **3D** | `4` | `render` | ScenePanel | SceneInspector |
 | **Background** | `5` | `ground` | LayerList | GroundInspector |
 
-All layers are always visible. The mode decides which one you can edit. Store actions reject an
+All layers are visible unless you hide one with its eye in **Layers** (a view setting). The mode
+decides which one you can edit. Store actions reject an
 edit whose node layer doesn't match the mode, so this is enforced, not just hidden.
 
 ---
@@ -167,7 +211,10 @@ an AI agent how to work in the project. Nothing is pre-designed.
 
 `Cmd/Ctrl + O`, the toolbar folder icon, or the palette. The browser lists projects in
 `~/xd-projects/` with an **Active** badge. **Browse…** opens the macOS folder picker. If you
-have unsaved edits, it warns before switching.
+have unsaved edits, it warns before switching. A project made with an older XDS (its badge says
+*needs migrate*) opens on a **This project needs migrating** screen: **Migrate project** upgrades
+it, the same as `xds migrate`, keeping a backup of the old files in `.migrate-backup/`. If it
+can't, the screen says why and changes nothing.
 
 ### Add text
 
@@ -179,16 +226,27 @@ have unsaved edits, it warns before switching.
 
 ### Add a background
 
-1. Press `5` (Background) → **+ New background…** → pick a project design, or **From starters…**
-   (sweep, spotlight, aurora, …), which copies the file into `designs/`.
-2. The `GroundInspector` shows one control per design param (number scrubber, brand-color
-   swatch, select, checkbox, text) and the design's variants.
+There is no page color: the Background layer paints the whole canvas. Every slide's back
+Background node covers it (box 0/0/100/100). New projects start with the `solid` design (one
+color), and a new slide starts with a copy of the previous slide's background. The audit reports
+`UNCOVERED_CANVAS` for a slide where nothing covers the canvas.
+
+1. To change a slide's background, press `5` (Background), select its background node, and change
+   its design or knobs. **+ New background…** adds another design on top: pick a project design,
+   or **From starters…** (solid, sweep, spotlight, aurora, …), which copies the file into
+   `designs/`.
+2. The `GroundInspector` shows one control per design param (number field, brand-color picker,
+   select, checkbox, text) and the design's variants.
 
 ### Add a 3D model
 
-1. Press `4` (3D) → **+ Add model…** → choose a `.glb`, `.gltf` or `.dae` file (or drop it on the
-   canvas). This runs the same conversion and check as `xds model add` and shows any convention
-   warnings (units, origin, size).
+1. Press `4` (3D) → **+ Add model…**:
+   - **Library** lists the device models that ship with xds (iPhone 17 Pro, MacBook Pro 14″). The
+     project references the model instead of copying it; adding it again on another slide reuses
+     the same object.
+   - **From file…** takes a `.glb`, `.gltf` or `.dae` (or drop one on the canvas). This runs the
+     same conversion and check as `xds model add` and shows any convention warnings (units,
+     origin, size).
 2. The model appears framed and lit with no further steps.
 3. Place it on the canvas with **right-drag** (position) and **scroll** (size), or type
    `x`, `y`, `height` under **Camera**. **Left-drag** changes the viewing angle.
@@ -202,18 +260,25 @@ have unsaved edits, it warns before switching.
 You usually don't need to do anything. To change it, open **Lighting** in the 3D inspector:
 
 - **Look**: four thumbnails (Softbox, Contrast, Rim, Bright), rendered with your model.
-- **Angle / Elevation**: a dial and a slider, or `L` + drag in the viewport.
+- **Angle / Elevation**: a dial and a number field (0–80°, with a fill bar), or `L` + drag in the
+  viewport.
 - **Shadow**: Contact · Soft · None.
-- **Brightness**: one slider, ±1 stop.
+- **Brightness**: a number field, −1…+1 stop (EV), with a fill bar.
 - **Tint**: optional brand color for reflections.
 
 The settings apply to this slide. **Use for all slides** writes them to the project default.
 
 ### Edit the brand
 
-In Present mode the inspector shows `BrandInspector`: **Colors** (swatches, add, delete),
-**Typography** (roles with level, font, weight, size, color), **Fonts** (files in `fonts/`;
-**Fetch from Fontshare…** downloads one) and **Default lighting**.
+In Present mode the inspector shows `BrandInspector`:
+
+- **Colors**: swatches with names and hex codes; add, delete.
+- **Typography**: one card per role, in this order: **Font**; **Size range**, the level with its
+  px range for this format (for example *caption · 28–35 px*); **Weight** and **Size**; **Color**.
+  The size range is the level the audit checks the size against. Size turns amber outside it. The
+  header has **+** (add a role) and a **download** button: **Fetch a font from Fontshare…**, which
+  downloads the family once into the xds font library and makes it available to the project.
+- **Default lighting**: the project's lighting, which slides override.
 
 ### Choose the format
 
@@ -253,7 +318,8 @@ still exists.
 | Audit panel | left rail | counts and the findings list |
 | Audit overlay | canvas | finding regions with message and fix on hover |
 | Slide badges | slide list | per-slide open error/warning counts |
-| Guide ranges | inspectors | the recommended range next to size and spacing fields |
+| Guide ranges | inspectors | amber fields outside the recommended range, the range in muted text below most of them, and the fill bar on bounded fields |
+| Migration screen | whole window | an older project that needs `xds migrate`, with a **Migrate project** button |
 | Exports | Present panel | progress per slide and step; finished files with links |
 
 Closing the tab with unsaved edits triggers the browser's `beforeunload` prompt.

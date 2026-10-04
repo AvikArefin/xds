@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LAYER_LABELS, type Layer } from "@xds/protocol";
 import { layerOrder, useStudio } from "../../store";
 import { Icon } from "../Icon";
@@ -14,19 +14,20 @@ export function PresentPanel() {
   const readOnly = useStudio((s) => s.readOnly);
   const exports = useStudio((s) => s.exports);
   const exportJob = useStudio((s) => s.jobs.export);
-  const { setLayerOrder, setMode, exportPng, loadExports } = useStudio.getState();
+  const hiddenLayers = useStudio((s) => s.hiddenLayers);
+  const { setLayerOrder, setMode, exportPng, loadExports, toggleLayer } = useStudio.getState();
+  const [dragOver, setDragOver] = useState<Layer | null>(null);
   useEffect(() => {
     void loadExports();
   }, [loadExports]);
 
   const order = layerOrder(project); // back → front
   const frontToBack = [...order].reverse();
-  const move = (layer: Layer, dir: 1 | -1) => {
-    const i = order.indexOf(layer);
-    const j = i + dir;
-    if (j < 0 || j >= order.length) return;
-    const next = [...order];
-    [next[i], next[j]] = [next[j], next[i]];
+  /** Drop `from` onto `to`'s row: `from` takes `to`'s place in the stack. */
+  const moveTo = (from: Layer, to: Layer) => {
+    if (from === to) return;
+    const next = order.filter((l) => l !== from);
+    next.splice(order.indexOf(to), 0, from);
     setLayerOrder(next);
   };
 
@@ -37,22 +38,49 @@ export function PresentPanel() {
         <span className="muted small">front → back</span>
       </div>
       <ul className="node-list">
-        {frontToBack.map((l, k) => (
-          <li key={l} className="node-row" onDoubleClick={() => setMode(l)} title="Double-click to edit this layer">
-            <span className="layer-index">{k + 1}</span>
-            <span className="node-name">{LAYER_LABELS[l]}</span>
-            <span className="node-actions always">
-              <IconButton icon="up" title="Move toward the front" size={12} disabled={readOnly || k === 0} onClick={() => move(l, 1)} />
-              <IconButton
-                icon="down"
-                title="Move toward the back"
-                size={12}
-                disabled={readOnly || k === frontToBack.length - 1}
-                onClick={() => move(l, -1)}
-              />
-            </span>
-          </li>
-        ))}
+        {frontToBack.map((l, k) => {
+          const shown = !hiddenLayers.includes(l);
+          return (
+            <li
+              key={l}
+              className={`node-row${shown ? "" : " is-hidden"}${dragOver === l ? " drop" : ""}`}
+              onDoubleClick={() => setMode(l)}
+              title="Drag to reorder · double-click to edit this layer"
+              draggable={!readOnly}
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/x-xds-layer", l);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (!e.dataTransfer.types.includes("text/x-xds-layer")) return;
+                e.preventDefault();
+                setDragOver(l);
+              }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={(e) => {
+                setDragOver(null);
+                const from = e.dataTransfer.getData("text/x-xds-layer") as Layer;
+                if (from) moveTo(from, l);
+              }}
+            >
+              {!readOnly && <Icon name="grip" size={12} className="grip" />}
+              <span className="layer-index">{k + 1}</span>
+              <span className="node-name">{LAYER_LABELS[l]}</span>
+              <span className="node-actions always">
+                <IconButton
+                  icon={shown ? "eye" : "eyeOff"}
+                  title={`${shown ? "Hide" : "Show"} on the canvas while editing (not saved; exports always include every layer)`}
+                  size={12}
+                  active={!shown}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleLayer(l);
+                  }}
+                />
+              </span>
+            </li>
+          );
+        })}
       </ul>
 
       <div className="panel-head">

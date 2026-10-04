@@ -35,7 +35,9 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const all = nodesOf(slide).filter((n): n is BoxNode => n.layer !== "render");
-  const layerNodes = all.filter((n) => n.layer === layer);
+  const layerHidden = useStudio((s) => s.hiddenLayers.includes(layer));
+  // a layer switched off on the canvas can't be clicked or marquee-selected
+  const layerNodes = layerHidden ? [] : all.filter((n) => n.layer === layer);
   const selected = layerNodes.filter((n) => selectedIds.includes(n.id));
 
   const toCanvas = (e: React.PointerEvent | PointerEvent) => {

@@ -723,6 +723,3 @@ textarea.text-input {
 .palette-list li.sel {
   background: var(--accent-soft);
 }
-.inline > .sel {
-  flex: 1;
-}

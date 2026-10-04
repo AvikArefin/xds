@@ -42,6 +42,7 @@ export function EditableStage() {
   const hash = useStudio((s) => s.hash);
   const slideId = useStudio((s) => s.activeSlideId);
   const mode = useStudio((s) => s.mode);
+  const hiddenLayers = useStudio((s) => s.hiddenLayers);
   const zoomSetting = useStudio((s) => s.zoom);
   const fitZoom = useStudio((s) => s.fitZoom);
   const showGuides = useStudio((s) => s.showGuides);
@@ -268,7 +269,8 @@ export function EditableStage() {
               hash={hash}
               guide={guide}
               mode="editor"
-              interactiveLayer={mode === "render" ? "render" : null}
+              interactiveLayer={mode === "render" && !hiddenLayers.includes("render") ? "render" : null}
+              visibleLayers={(["ground", "render", "image", "type"] as const).filter((l) => !hiddenLayers.includes(l))}
               freezeCamera={frozen}
               onObjectPointerDown={onObjectPointerDown}
               sceneChildren={<Scene3D onDragChange={setFrozen} />}

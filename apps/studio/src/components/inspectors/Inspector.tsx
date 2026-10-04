@@ -2,7 +2,7 @@ import type { GroundNode, ImageNode, RenderNode, TypeNode } from "@xds/protocol"
 import { LAYER_LABELS } from "@xds/protocol";
 import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
 import { TextField } from "../ui";
-import { BrandInspector, SlideSection } from "./BrandInspector";
+import { BrandInspector } from "./BrandInspector";
 import { GroundInspector, ImageInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
 import { SceneInspector } from "./SceneInspector";
 
@@ -38,7 +38,6 @@ export function Inspector() {
     else if (!nodes.length)
       body = (
         <div className="inspector-body">
-          <SlideSection />
           <div className="muted small pad">
             Select a {LAYER_LABELS[mode]} block on the canvas or in the list. Shift+click adds to the selection; drag on empty canvas to
             marquee-select.

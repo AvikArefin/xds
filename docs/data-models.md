@@ -526,7 +526,7 @@ A zustand store with the `zundo` middleware for undo and redo, split into slices
 | --- | --- |
 | `document` | `project`, `designs`, `baseHash` (hash of the last loaded/saved file), `dirty` |
 | `selection` | `mode`, `activeSlideId`, `selectedIds: string[]` (multi-select, within one layer), `transformMode`, `transformSpace` |
-| `view` | `zoom`, `snap`, `showGuides`, `layerSolo`, `inspectorTab`, `commandPaletteOpen` |
+| `view` | `zoom`, `snap`, `showGuides`, `hiddenLayers` (layers switched off on the canvas while editing; never saved), `inspectorTab`, `commandPaletteOpen` |
 | `audit` | the latest `AuditReport`, `auditing` |
 | `jobs` | running/finished exports with their progress lines |
 
