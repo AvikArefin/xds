@@ -222,7 +222,8 @@ project.xds/
 └── export/<stamp>/     # derived: deliverable PNGs + export.json
 ```
 
-The source hash covers `project.json`, `designs/`, `screens/`, `assets/` and `fonts/`. `cache/` can always be
+The source hash covers `project.json`, `designs/`, `screens/`, `assets/` and `fonts/`, plus every `xds:`
+library file project.json references (so editing a shipped logo or model re-renders). `cache/` can always be
 deleted, and `export/` holds only finished deliverables.
 
 ---

@@ -106,9 +106,47 @@ def file_hash(path: Path) -> str:
     return h.hexdigest()
 
 
+def library_refs(raw: Any) -> list[str]:
+    """`xds:path:sha256` for every library file (logo, model, font) that project.json references,
+    so editing a shipped file invalidates the renders that use it."""
+    from . import library
+
+    found: set[str] = set()
+
+    def walk(v: Any) -> None:
+        if isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif isinstance(v, str) and library.is_library_path(v):
+            found.add(v)
+
+    walk(raw)
+    out = []
+    for rel in sorted(found):
+        try:
+            path = library.resolve(rel)
+        except XdsError:
+            continue
+        if path.is_file():
+            out.append(f"{rel}:{file_hash(path)}")
+    return out
+
+
+def _raw_or_none(root: Path) -> Any:
+    try:
+        return json.loads((root / PROJECT_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def source_hash(root: Path) -> str:
-    """sha256 over `path:sha256` lines of every source file, sorted by path (dataflow §8)."""
+    """sha256 over `path:sha256` lines of every source file, sorted by path, plus the library
+    files project.json references (dataflow §8)."""
     lines = [f"{p.relative_to(root).as_posix()}:{file_hash(p)}" for p in source_files(root)]
+    lines += library_refs(_raw_or_none(root))
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()[:HASH_LENGTH]
 
 

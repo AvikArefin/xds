@@ -85,7 +85,8 @@ UNVERSIONED_KEYS = {"slides", "createdAt", "updatedAt"}
 
 def slide_key(loaded: proj.Loaded, slide_id: str, index: int) -> str:
     """Everything one slide's render depends on: its own JSON, its position, the rest of
-    project.json except other slides, every other source file, and the studio build."""
+    project.json except other slides, every other source file, the library files it references,
+    and the studio build."""
     from .api import STUDIO_DIST
 
     root, raw = loaded.root, loaded.raw or {}
@@ -96,7 +97,7 @@ def slide_key(loaded: proj.Loaded, slide_id: str, index: int) -> str:
     doc = {
         "project": {k: v for k, v in raw.items() if k not in UNVERSIONED_KEYS},
         "slide": next((s for s in slides if s.get("id") == slide_id), None),
-        "index": index, "count": len(slides), "files": others,
+        "index": index, "count": len(slides), "files": others, "library": proj.library_refs(raw),
         "studio": proj.file_hash(studio) if studio.exists() else "", "gl": GL_ARGS,
     }
     return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()[:24]

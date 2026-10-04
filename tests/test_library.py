@@ -119,3 +119,14 @@ def test_add_logo_by_reference(blank):
     loaded = proj.load(blank)
     assert loaded.ok and not [f for f in loaded.findings if f.severity == "error"], loaded.findings
     assert not (blank / "assets").exists() or not any((blank / "assets").rglob("*.svg"))
+
+
+def test_library_files_are_in_the_source_hash(blank, monkeypatch, tmp_path):
+    before = proj.source_hash(blank)
+    library.add_logo(blank, "cortextech/full-logomark")
+    with_logo = proj.source_hash(blank)
+    assert with_logo != before
+    fake = tmp_path / "logo.svg"
+    fake.write_text("<svg/>")
+    monkeypatch.setattr(library, "resolve", lambda rel: fake)
+    assert proj.source_hash(blank) != with_logo   # the shipped file changed → new hash
