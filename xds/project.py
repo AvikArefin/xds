@@ -422,7 +422,7 @@ def init(path: str | Path, *, name: str | None = None, preset: str = "instagram-
         elif not dst.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
-    for d in ("designs", "screens", "assets", "fonts", "sources"):
+    for d in ("designs", "screens", "assets", "sources"):  # fonts come from the xds font library
         (root / d).mkdir(exist_ok=True)
 
     doc = json.loads((template / PROJECT_FILE).read_text())

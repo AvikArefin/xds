@@ -111,3 +111,13 @@ def test_paths_stay_inside(blank):
         with pytest.raises(XdsError):
             proj.resolve_inside(blank, bad)
     assert proj.resolve_inside(blank, "assets/x.png") == (blank / "assets" / "x.png").resolve()
+
+
+def test_project_agents_md_is_self_contained(blank):
+    """Agents in a project read only its AGENTS.md and xds output, never the repo's docs."""
+    text = (blank / "AGENTS.md").read_text()
+    assert "docs/" not in text and ".md)" not in text and "uv run" not in text
+    for must in ("xds guide", "xds model library", "xds screen add", "xds fonts fetch",
+                 "data-xds-repeat", "\"mode\": \"frame\""):
+        assert must in text, must
+    assert not (blank / "fonts").exists()  # fonts come from the xds font library

@@ -3,6 +3,11 @@
 This page is for an LLM agent (or a person working like one) building slides without the
 editor. Everything here goes through files and the `xds` CLI. Every command takes `--json`.
 
+> Agents working **in a project** never read this page: they read only the project's `AGENTS.md`
+> (from `xds/resources/template/AGENTS.md`) and `xds` output, and stay inside the project folder.
+> That file must therefore carry everything here that an agent needs. When you change this page,
+> change the template too. `tests/test_project.py` checks it stays self-contained.
+
 ---
 
 ## 1. The loop
