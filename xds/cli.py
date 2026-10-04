@@ -284,6 +284,24 @@ def cmd_fonts(a: argparse.Namespace, out: Out) -> int:
     return 0
 
 
+def cmd_logo(a: argparse.Namespace, out: Out) -> int:
+    from . import library
+
+    if a.logo_cmd == "library":
+        items = library.brands()
+        out.emit({"brands": items}, "\n".join(
+            f"{b['name']}: {b['description']}\n"
+            + (f"  colors: {', '.join(f'{k} {v}' for k, v in b['colors'].items())}\n" if b["colors"] else "")
+            + "\n".join(f"  {l['id']:<34} {l['width']:g}×{l['height']:g}  {l['description']}"
+                        if l["width"] else f"  {l['id']:<34} {l['description']}" for l in b["logos"])
+            for b in items) or "(no logos)")
+        return 0
+    result = library.add_logo(proj.find_root(a.project), a.logo, id=a.id)
+    out.emit({"result": result}, f"{'registered' if result['added'] else 'already registered as'} "
+                                 f"asset '{result['id']}' → {result['path']}")
+    return 0
+
+
 def cmd_formats(a: argparse.Namespace, out: Out) -> int:
     cat = formats.catalog_json()
     out.emit({"formats": cat}, "\n".join(
@@ -458,6 +476,15 @@ def build_parser() -> argparse.ArgumentParser:
     f = fsub.add_parser("vendor", parents=[common], help="copy library fonts into the project")
     f.add_argument("project")
     f.add_argument("family", nargs="?")
+
+    sp = add("logo", cmd_logo, "brand logos that ship with xds")
+    lsub = sp.add_subparsers(dest="logo_cmd", required=True)
+    lg = lsub.add_parser("library", parents=[common], help="the brands and logos in the xds library")
+    lg = lsub.add_parser("add", parents=[common],
+                         help="register a library logo as an svg asset (by reference, not copied)")
+    lg.add_argument("project")
+    lg.add_argument("logo", help="a logo id from `xds logo library`, e.g. cortextech/full-logomark")
+    lg.add_argument("--id", help="the asset id (default: <brand>-<logo>)")
 
     add("formats", cmd_formats, "the format catalog")
 

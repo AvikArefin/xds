@@ -107,7 +107,7 @@ export const api = {
       "POST",
       "/api/migrate",
     ),
-  library: () => request<{ models: LibraryModel[] }>("GET", "/api/library"),
+  library: () => request<{ models: LibraryModel[]; logos: LibraryLogo[] }>("GET", "/api/library"),
   addLibraryModel: (model: string, opts: { id?: string; slide?: string; screen?: string } = {}) =>
     request<{ result: { id: string; node: string | null } }>("POST", "/api/models/library", { model, ...opts }),
   fetchFonts: (family: string) => request<{ fonts: unknown[] }>("POST", "/api/fonts/fetch", { family }),
@@ -122,6 +122,17 @@ export interface LibraryModel {
   bytes: number;
   screens: Record<string, { device: string }>;
   parts: Record<string, string>;
+}
+
+/** A brand logo that ships with xds; projects register it as an `svg` asset by `path` (`xds:…`). */
+export interface LibraryLogo {
+  id: string;
+  brand: string;
+  file: string;
+  path: string;
+  description: string;
+  width: number | null;
+  height: number | null;
 }
 
 /** URL of a project file (project-relative path). `hash` busts the browser cache when sources change. */

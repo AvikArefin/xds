@@ -315,7 +315,7 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
     async def get_library() -> dict[str, Any]:
         from . import library
 
-        return ok(models=library.models())
+        return ok(models=library.models(), logos=library.logos())
 
     @app.post("/api/models/library")
     async def add_library_model(body: dict[str, Any]) -> dict[str, Any]:

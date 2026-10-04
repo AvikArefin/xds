@@ -29,7 +29,7 @@ editor.
 | --- | --- |
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings); **Format** (preset or custom size); toolbar: Open, Search, Export PNG, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
-| **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. Text / 2D / Background: the layer's nodes and **+ New …** |
+| **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields. |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
@@ -93,6 +93,9 @@ reloads from disk. Undo has one step per drag or field change.
   new slides copy the previous slide's. To change it: `5`, select it, change its design or knobs.
   **+ New background…** adds a project design or a starter on top. The audit reports
   `UNCOVERED_CANVAS` if nothing covers the canvas.
+- **Logo**: `3` → **+ New image…** → **Library** → a cortextech logo (`full-logomark` on dark
+  backgrounds, `-white-bg` on white, `brain-x` the mark alone). It's referenced, never copied, and
+  arrives at its own aspect with Contain fit.
 - **3D model**: `4` → **+ Add model…** → **Library** (iPhone 17 Pro, MacBook Pro 14″, referenced,
   never copied) or **From file…** (`.glb`, `.gltf`, `.dae`, or drop on the canvas). It arrives
   framed and lit. Right-drag and scroll to place it; the gizmo or pose fields tilt it on this

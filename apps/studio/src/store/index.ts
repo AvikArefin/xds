@@ -48,6 +48,7 @@ import {
   type AlignHow,
   type ReorderTo,
 } from "@xds/editor-core";
+import type { LibraryLogo } from "../api";
 import { ServerError, server, subscribeEvents } from "./server";
 import type { DesignInfoJson, ExportEntry, GuideJson, Job, Mode, Notice, NoticeLevel } from "./types";
 import { boxPx, effectiveLighting, getSlide, nodesOf, typeStyle } from "./model";
@@ -170,7 +171,9 @@ export interface StudioActions {
   distribute(axis: "x" | "y", snapped: boolean): void;
 
   addText(role: string): void;
-  addImage(assetId: string): void;
+  addImage(assetId: string, aspect?: number): void;
+  /** Register a library logo as an asset (by reference) if the project hasn't yet, and place it. */
+  addLibraryLogo(logo: LibraryLogo): void;
   addBackground(designId: string): void;
   addShape(kind: SceneObject["kind"]): void;
   addObjectToSlide(objectId: string): void;
@@ -294,6 +297,21 @@ export const useStudio = create<Studio>()(
       };
 
       const slideOf = () => getSlide(get().project, get().activeSlideId);
+
+      /** Add an image node for `assetId` inside the margin; a wide (or tall) one keeps `aspect`. */
+      const placeImage = (project: Project, assetId: string, aspect?: number) => {
+        const s = get();
+        const node: ImageNode = {
+          id: assetId,
+          layer: "image",
+          box: { x: 0, y: 0, w: 10, h: 10 },
+          data: { asset: assetId, fit: "contain" },
+        };
+        const side = (s.guide ? Math.min(s.guide.content.x1 - s.guide.content.x0, s.guide.content.y1 - s.guide.content.y0) : 400) * 0.4;
+        const size = aspect ? (aspect >= 1 ? { w: side, h: side / aspect } : { w: side * aspect, h: side }) : { w: side, h: side };
+        const r = addNode(project, s.activeSlideId, node, s.guide ?? undefined, size);
+        commit(r.project, { selectedIds: [r.id] });
+      };
 
       /** Node ids on the active slide that pass the guard. */
       const guardIds = (ids: string[], opts: { ignoreLock?: boolean; quiet?: boolean } = {}): string[] => {
@@ -673,19 +691,25 @@ export const useStudio = create<Studio>()(
           const r = addNode(s.project, s.activeSlideId, node, guide ?? undefined, size);
           commit(r.project, { selectedIds: [r.id] });
         },
-        addImage: (assetId) => {
+        addImage: (assetId, aspect) => {
           const s = get();
           if (!canEditDoc() || !s.project) return;
           if (s.mode !== "image") return notify("info", "Switch to 2D (3) to add an image.");
-          const node: ImageNode = {
-            id: assetId,
-            layer: "image",
-            box: { x: 0, y: 0, w: 10, h: 10 },
-            data: { asset: assetId, fit: "contain" },
-          };
-          const side = (s.guide ? Math.min(s.guide.content.x1 - s.guide.content.x0, s.guide.content.y1 - s.guide.content.y0) : 400) * 0.4;
-          const r = addNode(s.project, s.activeSlideId, node, s.guide ?? undefined, { w: side, h: side });
-          commit(r.project, { selectedIds: [r.id] });
+          placeImage(s.project, assetId, aspect);
+        },
+        addLibraryLogo: (logo) => {
+          const s = get();
+          if (!canEditDoc() || !s.project) return;
+          if (s.mode !== "image") return notify("info", "Switch to 2D (3) to add an image.");
+          const assets = s.project.assets ?? [];
+          let asset = assets.find((a) => a.path === logo.path);
+          let project = s.project;
+          if (!asset) {
+            const base = `${logo.brand}-${logo.file.replace(/\.[^.]+$/, "")}`;
+            asset = { id: freshId(base, new Set(assets.map((a) => a.id))), path: logo.path, kind: "svg" };
+            project = { ...project, assets: [...assets, asset] };
+          }
+          placeImage(project, asset.id, logo.width && logo.height ? logo.width / logo.height : undefined);
         },
         addBackground: (designId) => {
           const s = get();

@@ -1,0 +1,11 @@
+{
+  "name": "cortextech",
+  "description": "The cortextech brand: a blue brain-loop mark (brain-x) and the full logo, the mark plus the 'cortex tech' wordmark with 'tech' in a solid box.",
+  "colors": { "cortex-blue": "#4266AF" },
+  "logos": {
+    "full-logomark.svg": "Full logo for dark backgrounds: white wordmark, 'tech' cut out of a white box, transparent around it.",
+    "full-logomark-white-bg.svg": "Full logo for white backgrounds: black wordmark, 'tech' in a black box, on a white rectangle (shows as a white panel on any other color).",
+    "brain-x.svg": "The mark alone, transparent; blue, so it works on light and dark backgrounds. Use it where the full logo would be too wide (small corners, avatars, app icons).",
+    "brain-x-white-bg.svg": "The mark alone on a white square."
+  }
+}

@@ -6,8 +6,8 @@ checks, audits and exports them.
 
 **Everything you need is in this file and in `xds` output.** Stay inside this project folder. Run
 `xds` commands (all take `--json`), but never read or edit files outside the project. Device
-models and fonts belong to xds and are referenced with `xds:` paths. You don't need to look at
-them, and you must never copy them in.
+models, the brand logos and fonts belong to xds and are referenced with `xds:` paths. You don't
+need to look at them, and you must never copy them in.
 
 If the XDS editor is open, it reloads your edits as soon as you save. The file on disk is the
 truth.
@@ -74,7 +74,7 @@ mistake with its JSON path.
 
 ```jsonc
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "launch",                    // [a-z0-9-]+
   "name": "Launch", "description": "",
   "format": { "preset": "instagram-portrait", "width": 1080, "height": 1350 },  // `xds formats`
@@ -168,6 +168,38 @@ gives the margin and unit as percentages too, so you don't need to convert.
 ```
 
 Text style is resolved as: node override → its role → the level's default for this format.
+
+### 4.5 The logo (cortextech)
+
+These slides are cortextech's. **Every deck shows the cortextech logo** (at least on the first or
+the last slide; small, in a corner, inside the margin), and the logo is always one of these files
+that ship with xds, never an image you make, trace, redraw or recolor:
+
+| Logo id | Size (w × h) | Use |
+| --- | --- | --- |
+| `cortextech/full-logomark` | 4419 × 983 | full logo for **dark** backgrounds: white wordmark, transparent |
+| `cortextech/full-logomark-white-bg` | 4419 × 983 | full logo on a white rectangle: only on **white** backgrounds |
+| `cortextech/brain-x` | 1024 × 1024 | the blue mark alone, transparent; any background; where the full logo is too wide |
+| `cortextech/brain-x-white-bg` | 1024 × 1024 | the mark on a white square |
+
+```bash
+xds logo library                                  # the same list, plus the brand color
+xds logo add . cortextech/full-logomark           # registers asset "cortextech-full-logomark"
+```
+
+`xds logo add` registers the logo **by reference** (`"kind": "svg", "path":
+"xds:brands/cortextech/full-logomark.svg"`). Place it with an image node, a box with the logo's
+aspect and `"fit": "contain"`:
+
+```jsonc
+{ "id": "logo", "name": "Logo", "layer": "image",
+  "box": { "x": 5.93, "y": 91.3, "w": 22, "h": 3.9 },  // 1080 × 1350: 22% = 238 px wide; 238 / 4.5 = 53 px = 3.9% tall
+  "data": { "asset": "cortextech-full-logomark", "fit": "contain" } }
+```
+
+Pick the variant by what is behind it: the white wordmark on dark backgrounds, the mark alone
+(`brain-x`) where it would be too small to read or the background is light but not white. The
+logo's blue is `#4266AF`; add it to `brand.colors` only if the design uses it.
 
 ## 5. 3D
 
@@ -379,7 +411,7 @@ yourself. `xds fonts library` lists the families already available offline.
 
 - Don't edit `cache/`, `export/` or `.migrate-backup/`, and don't hand-edit the `fonts` or
   `screens` entries. Use the commands.
-- Don't copy device models or fonts into the project, and don't leave this folder.
+- Don't copy device models, logos or fonts into the project, and don't leave this folder.
 - Don't move the product by editing the background, or the other way round: designs follow
   `subject.*`.
 - Don't use lorem ipsum, and don't add exceptions just to pass the audit.

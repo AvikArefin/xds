@@ -132,9 +132,11 @@ Asset    = { id: string; path: string; kind: "image" | "svg" | "model" };       
 ```
 
 Paths are project-relative, must not contain `..`, and must exist. The one exception is an asset
-path starting with `xds:` (`xds:models/iphone-17-pro/model.glb`): it names a file in the model
-library that ships with xds, which projects reference instead of copying (see
-[agent guide §3.0](./agent-guide.md#30-library-models-devices-that-ship-with-xds)). A `model` asset is always a
+path starting with `xds:` (`xds:models/iphone-17-pro/model.glb`,
+`xds:brands/cortextech/full-logomark.svg`): it names a file in the library that ships with xds,
+which projects reference instead of copying (see
+[agent guide §3.0](./agent-guide.md#30-library-models-devices-that-ship-with-xds) and
+[§2.1](./agent-guide.md#21-the-brand-logo)). A `model` asset is always a
 binary glTF 2.0 file (`.glb`), the one 3D format the app loads. `xds model add` accepts `.glb`,
 `.gltf` (with its `.bin` and textures) and `.dae` (Collada), and converts the last two to `.glb` on
 import (see [agent guide §3.3](./agent-guide.md#33-wiring-it-into-the-project)). The original file is

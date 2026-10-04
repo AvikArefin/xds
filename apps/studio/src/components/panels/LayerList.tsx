@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Layer, Node } from "@xds/protocol";
 import { LAYER_LABELS } from "@xds/protocol";
-import { api } from "../../api";
+import { api, type LibraryLogo } from "../../api";
 import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
 import { addStarterBackground } from "../commands";
 import { Icon } from "../Icon";
@@ -71,7 +71,8 @@ function AddMenu({ layer }: { layer: Layer }) {
   const project = useStudio((s) => s.project)!;
   const designs = useStudio((s) => s.designs);
   const readOnly = useStudio((s) => s.readOnly);
-  const { addText, addImage, addBackground, setMode } = useStudio.getState();
+  const { addText, addImage, addLibraryLogo, addBackground, setMode } = useStudio.getState();
+  const [logos, setLogos] = useState<LibraryLogo[] | null>(null);
   const [starters, setStarters] = useState<string[] | null>(null);
   const [showStarters, setShowStarters] = useState(false);
   useEffect(() => {
@@ -123,33 +124,60 @@ function AddMenu({ layer }: { layer: Layer }) {
     );
   }
   if (layer === "image") {
-    const assets = (project.assets ?? []).filter((a) => a.kind === "image" || a.kind === "svg");
+    // library logos are offered from the library list, registered or not
+    const assets = (project.assets ?? []).filter((a) => (a.kind === "image" || a.kind === "svg") && !a.path.startsWith("xds:"));
     return (
       <Menu
         trigger={(toggle) => (
-          <button type="button" className="btn small block" disabled={readOnly} onClick={toggle}>
+          <button
+            type="button"
+            className="btn small block"
+            disabled={readOnly}
+            onClick={() => {
+              if (!logos) api.library().then((r) => setLogos(r.logos), () => setLogos([]));
+              toggle();
+            }}
+          >
             <Icon name="plus" size={12} /> New image…
           </button>
         )}
       >
-        {(close) =>
-          assets.length ? (
-            assets.map((a) => (
+        {(close) => (
+          <>
+            <div className="menu-label">Library</div>
+            {logos === null && <div className="menu-note">Loading…</div>}
+            {logos?.map((l) => (
               <MenuItem
-                key={a.id}
-                hint={a.path}
+                key={l.id}
+                hint={l.brand}
                 onClick={() => {
-                  addImage(a.id);
+                  addLibraryLogo(l);
                   close();
                 }}
               >
-                {a.id}
+                {l.file.replace(/\.[^.]+$/, "")}
               </MenuItem>
-            ))
-          ) : (
-            <div className="menu-note">No image assets. Put files in assets/ and register them in project.json.</div>
-          )
-        }
+            ))}
+            <div className="menu-sep" />
+            <div className="menu-label">Project</div>
+            {assets.length ? (
+              assets.map((a) => (
+                <MenuItem
+                  key={a.id}
+                  hint={a.path}
+                  onClick={() => {
+                    addImage(a.id);
+                    close();
+                  }}
+                >
+                  {a.id}
+                </MenuItem>
+              ))
+            ) : (
+              <div className="menu-note">No image assets. Put files in assets/ and register them in project.json.</div>
+            )}
+          </>
+        )}
       </Menu>
     );
   }
