@@ -1,7 +1,6 @@
 import type { Lighting, Project, TypeRole } from "@xds/protocol";
 import { LEVELS, LIGHTING_DEFAULTS, getSlide, useStudio, type Level } from "../../store";
 import { fetchFont } from "../commands";
-import { Icon } from "../Icon";
 import { ColorTokenSelect, IconButton, NumberField, Row, Section, Select, TextField } from "../ui";
 import { LightingControls } from "./LightingControls";
 
@@ -76,7 +75,7 @@ export function BrandInspector() {
   };
   const addRole = async () => {
     if (!families.length)
-      return notify("warning", "A type role needs a font. Fetch one from Fontshare (Fonts below) or add files under fonts/ first.");
+      return notify("warning", "A type role needs a font. Fetch one from Fontshare (the download button on Typography) or add files under fonts/ first.");
     const name = await ask({ title: "Add type role", label: "Role name (e.g. headline, kicker, price)", confirm: "Add" });
     if (!name?.trim()) return;
     if (roles[name.trim()]) return notify("warning", `A role named “${name}” exists.`);
@@ -138,7 +137,12 @@ export function BrandInspector() {
 
       <Section
         title="Typography"
-        actions={<IconButton icon="plus" title="Add type role" size={12} disabled={readOnly} onClick={addRole} />}
+        actions={
+          <>
+            <IconButton icon="download" title="Fetch a font from Fontshare…" size={12} disabled={readOnly} onClick={() => fetchFont()} />
+            <IconButton icon="plus" title="Add type role" size={12} disabled={readOnly} onClick={addRole} />
+          </>
+        }
       >
         {!Object.keys(roles).length && <div className="muted small">No roles yet. Add one, pick its level, and new text uses it.</div>}
         {Object.entries(roles).map(([name, role]) => {
@@ -197,30 +201,6 @@ export function BrandInspector() {
             </div>
           );
         })}
-      </Section>
-
-      <Section
-        title="Fonts"
-        actions={
-          <button type="button" className="link-btn" disabled={readOnly} onClick={() => fetchFont()}>
-            Fetch from Fontshare…
-          </button>
-        }
-      >
-        <ul className="font-list">
-          {(project.fonts ?? []).map((f) => (
-            <li key={f.path}>
-              <Icon name="type" size={12} />
-              <span>{f.family}</span>
-              <span className="muted">
-                {f.weight ?? 400}
-                {f.italic ? " italic" : ""}
-              </span>
-              <span className="muted mono small">{f.path}</span>
-            </li>
-          ))}
-          {!(project.fonts ?? []).length && <li className="muted small">No font files. Fetch one, or add files under fonts/.</li>}
-        </ul>
       </Section>
 
       <Section title="Default lighting">
