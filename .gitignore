@@ -12,5 +12,7 @@ export/
 .DS_Store
 *.tsbuildinfo
 
-# Fontshare fonts are downloaded by the tests (xds fonts fetch), not redistributed
-tests/fixtures/example/fonts/
+
+# The shared font library: Fontshare downloads (`xds fonts fetch`), fetched on demand, not
+# redistributed
+xds/library/fonts/

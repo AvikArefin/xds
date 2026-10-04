@@ -1,4 +1,4 @@
-"""The built-in model library: device models that ship with xds and stay with it.
+"""The xds library: device models that ship with xds, and the shared font library (fonts.py).
 
 Projects reference a library model by an asset path starting with `xds:` (for example
 `xds:models/iphone-17-pro/model.glb`) instead of copying the file. `resolve` maps that path into

@@ -256,13 +256,13 @@ provided by the workspace and compiled by `xds` at render time:
 | **Tailwind CSS v4** | utility classes; only the classes you use are compiled |
 | **Basecoat UI** | shadcn/ui-style components (buttons, cards, inputs, tabs, badges, tables) as plain HTML + Tailwind, no React |
 | **Lucide icons** (`lucide-static`) | write `<i data-lucide="bell"></i>`; replaced with the inline SVG at render time |
-| Project `fonts/` | the brand fonts, so the UI matches the slide's type |
+| The project's fonts (`xds fonts fetch`) | the brand fonts, so the UI matches the slide's type |
 
 The page receives CSS variables `--safe-top/right/bottom/left` from the screen's `safeArea`, and
 `data-device="iphone"` on `<html>`. `--font-sans` is the project's body-role font. Partials are
 included with `<xds-include src="status-bar"></xds-include>`, which is replaced with
-`screens/<id>/partials/status-bar.html` (falling back to the starter's copy). `/fonts/...` and
-relative URLs resolve inside the project; any other network request is blocked, so a screen
+`screens/<id>/partials/status-bar.html` (falling back to the starter's copy). The project's fonts
+(including `xds:` library fonts) and relative URLs resolve locally; any other network request is blocked, so a screen
 renders the same offline.
 
 A mesh counts as a screen when its name, before any `.suffix`, ends in "screen" (`Screen`,

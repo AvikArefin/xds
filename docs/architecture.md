@@ -63,6 +63,7 @@ xds/
 │   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, `xds model add`
 │   ├── library.py                 #   the shipped model library (`xds:` asset paths)
 │   ├── library/models/<id>/       #   library models: model.glb + model.json
+│   ├── library/fonts/<Family>/    #   font library: Fontshare downloads + family.json (not committed)
 │   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
 │   ├── browser.py                 #   Playwright: render slides, collect measurements
 │   ├── export.py                  #   audit gate → copy renders → export/<stamp>/
@@ -281,7 +282,9 @@ xds model vendor PROJECT ASSET_ID         # copy a library model into the projec
 xds screen add PROJECT ID [--device PRESET | --width W --height H --scale S]
 xds screen render PROJECT ID              # the screen page → PNG, to check it flat
 xds design add PROJECT STARTER
-xds fonts fetch PROJECT FAMILY
+xds fonts fetch PROJECT FAMILY           # downloaded once into the font library, referenced
+xds fonts library                         # the families already downloaded
+xds fonts vendor PROJECT [FAMILY]         # copy library fonts into the project
 xds formats
 xds schema --emit-types | --check
 xds clean PROJECT                         # delete cache/

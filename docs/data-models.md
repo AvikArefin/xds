@@ -127,7 +127,7 @@ must name a declared role.
 ### 2.3 `FontFile` and `Asset`
 
 ```ts
-FontFile = { family: string; path: string; weight: number; italic?: boolean };   // path under fonts/
+FontFile = { family: string; path: string; weight: number; italic?: boolean };   // xds:fonts/…, or under fonts/
 Asset    = { id: string; path: string; kind: "image" | "svg" | "model" };       // under assets/, or xds:…
 ```
 
@@ -139,8 +139,13 @@ binary glTF 2.0 file (`.glb`), the one 3D format the app loads. `xds model add` 
 `.gltf` (with its `.bin` and textures) and `.dae` (Collada), and converts the last two to `.glb` on
 import (see [agent guide §3.3](./agent-guide.md#33-wiring-it-into-the-project)). The original file is
 kept in `sources/` for reference. Fonts are files on disk rather than a network stylesheet, so a headless
-render is deterministic and works offline. `xds fonts fetch PROJECT FAMILY` downloads a
-Fontshare family into `fonts/` and registers it.
+render is deterministic and works offline. Like the device models, they live with xds, not in each
+project: `xds fonts fetch PROJECT FAMILY` downloads a Fontshare family once into the font library
+(`xds/library/fonts/<Family>/`, not committed; re-fetched on demand) and registers its styles with
+`xds:fonts/<Family>/<file>` paths. Every later project that uses the family reuses the same files
+offline. `xds fonts library` lists what is there, and `xds fonts vendor PROJECT [FAMILY]` copies a
+project's fonts into its own `fonts/` folder when it has to travel without xds. A path under
+`fonts/` works as before.
 
 ### 2.4 `Slide`
 

@@ -235,9 +235,9 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
                           f"Use one of: {', '.join(sorted(colors))}.", **kw))
 
     def file(rel: str, path: str, under: str | None = None) -> Path | None:
-        library = under == "assets" and rel.startswith("xds:")
+        library = under in ("assets", "fonts") and rel.startswith("xds:")
         try:
-            target = resolve_asset(root, rel) if under == "assets" else resolve_inside(root, rel)
+            target = resolve_asset(root, rel) if library else resolve_inside(root, rel)
         except XdsError as e:
             out.append(_f("PATH_ESCAPE", path, e.message))
             return None
@@ -245,7 +245,9 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
             out.append(_f("PATH_LOCATION", path, f"'{rel}' must be under {under}/."))
         if not target.exists():
             out.append(_f("MISSING_FILE", path, f"'{rel}' does not exist."
-                          + (" Run `xds model library` for the models xds ships." if library else "")))
+                          + ((" Run `xds fonts fetch` to download it into the font library."
+                              if under == "fonts" else
+                              " Run `xds model library` for the models xds ships.") if library else "")))
             return None
         return target
 

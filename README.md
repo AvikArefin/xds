@@ -61,7 +61,8 @@ status is 0 on success, 1 on failure or open audit errors.
 | `xds screen add PROJECT ID [--device PRESET \| --width W --height H --scale S]` | create a device-screen page |
 | `xds screen render PROJECT ID` | render a screen page to PNG to check it flat |
 | `xds design add PROJECT STARTER` | copy a starter background (`sweep`, `spotlight`, `aurora`, `grain-solid`, `split-tone`, `vignette-dark`) |
-| `xds fonts fetch PROJECT FAMILY` | download a Fontshare family into `fonts/` and register it |
+| `xds fonts fetch PROJECT FAMILY` | use a Fontshare family: downloaded once into the xds font library, referenced by the project |
+| `xds fonts library` · `xds fonts vendor PROJECT [FAMILY]` | the downloaded families · copy a project's fonts into its own `fonts/` |
 | `xds formats` | the format catalog |
 | `xds schema --emit-types \| --check` | regenerate or check `packages/protocol/src/generated/project.ts` |
 | `xds clean PROJECT` | delete `cache/` |

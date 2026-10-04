@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from xds import browser, export
+from xds import project as proj
 from xds.api import STUDIO_DIST
 from xds.models import SlideMeasure
 
@@ -20,7 +21,8 @@ pytestmark = pytest.mark.skipif(not (STUDIO_DIST / "index.html").exists(),
 def example(tmp_path_factory):
     root = tmp_path_factory.mktemp("render") / "example"
     shutil.copytree(EXAMPLE, root, ignore=shutil.ignore_patterns("cache", "export"))
-    if not all((root / f["path"]).exists() for f in json.loads((root / "project.json").read_text())["fonts"]):
+    if not all(proj.resolve_asset(root, f["path"]).exists()
+               for f in json.loads((root / "project.json").read_text())["fonts"]):
         from xds import fonts
         try:
             for family in ("Satoshi", "General Sans"):

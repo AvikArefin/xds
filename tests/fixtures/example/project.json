@@ -4,7 +4,7 @@
   "name": "Example",
   "description": "A fully authored example used by the tests.",
   "createdAt": "2026-10-03T22:34:02Z",
-  "updatedAt": "2026-10-03T22:34:05Z",
+  "updatedAt": "2026-10-04T08:57:18Z",
   "format": {
     "preset": "instagram-portrait",
     "width": 1080,
@@ -43,8 +43,8 @@
         "font": "General Sans",
         "weight": 500,
         "color": "accent",
-        "uppercase": true,
-        "letterSpacing": 0.08
+        "letterSpacing": 0.08,
+        "uppercase": true
       },
       "headline": {
         "level": "headline",
@@ -63,122 +63,122 @@
   "fonts": [
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-Black.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-Black.woff2",
       "weight": 900
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-BlackItalic.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-BlackItalic.woff2",
       "weight": 900,
       "italic": true
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-Bold.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-Bold.woff2",
       "weight": 700
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-BoldItalic.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-BoldItalic.woff2",
       "weight": 700,
       "italic": true
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-Italic.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-Italic.woff2",
       "weight": 400,
       "italic": true
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-Light.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-Light.woff2",
       "weight": 300
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-LightItalic.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-LightItalic.woff2",
       "weight": 300,
       "italic": true
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-Medium.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-Medium.woff2",
       "weight": 500
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-MediumItalic.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-MediumItalic.woff2",
       "weight": 500,
       "italic": true
     },
     {
       "family": "Satoshi",
-      "path": "fonts/Satoshi/Satoshi-Regular.woff2",
+      "path": "xds:fonts/Satoshi/Satoshi-Regular.woff2",
       "weight": 400
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Bold.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Bold.woff2",
       "weight": 700
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-BoldItalic.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-BoldItalic.woff2",
       "weight": 700,
       "italic": true
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Extralight.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Extralight.woff2",
       "weight": 200
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-ExtralightItalic.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-ExtralightItalic.woff2",
       "weight": 200,
       "italic": true
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Italic.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Italic.woff2",
       "weight": 400,
       "italic": true
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Light.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Light.woff2",
       "weight": 300
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-LightItalic.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-LightItalic.woff2",
       "weight": 300,
       "italic": true
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Medium.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Medium.woff2",
       "weight": 500
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-MediumItalic.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-MediumItalic.woff2",
       "weight": 500,
       "italic": true
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Regular.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Regular.woff2",
       "weight": 400
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-Semibold.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-Semibold.woff2",
       "weight": 600
     },
     {
       "family": "General Sans",
-      "path": "fonts/GeneralSans/GeneralSans-SemiboldItalic.woff2",
+      "path": "xds:fonts/GeneralSans/GeneralSans-SemiboldItalic.woff2",
       "weight": 600,
       "italic": true
     }
@@ -210,7 +210,7 @@
       "id": "matte-stone",
       "name": "Matte stone",
       "color": "#D9D5CE",
-      "metalness": 0,
+      "metalness": 0.0,
       "roughness": 0.9
     }
   ],
@@ -250,19 +250,19 @@
       "material": "matte-stone",
       "pose": {
         "position": [
-          0,
-          0,
-          0
+          0.0,
+          0.0,
+          0.0
         ],
         "rotation": [
-          0,
-          0,
-          0
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          1,
-          1,
-          1
+          1.0,
+          1.0,
+          1.0
         ]
       }
     }
@@ -278,16 +278,24 @@
       "id": "s1",
       "name": "Hero",
       "background": "paper",
+      "camera": {
+        "mode": "frame",
+        "x": 50.0,
+        "y": 62.0,
+        "height": 55.0
+      },
       "nodes": [
         {
           "id": "bg1",
           "name": "Backdrop",
           "layer": "ground",
           "box": {
-            "x": 0,
-            "y": 0,
-            "w": 100,
-            "h": 100
+            "x": 0.0,
+            "y": 0.0,
+            "w": 100.0,
+            "h": 100.0,
+            "rotation": 0.0,
+            "opacity": 1.0
           },
           "data": {
             "design": "spotlight",
@@ -310,19 +318,19 @@
             "object": "phone",
             "pose": {
               "position": [
-                0,
+                0.0,
                 0.02,
-                0
+                0.0
               ],
               "rotation": [
-                0,
-                -15,
-                0
+                0.0,
+                -15.0,
+                0.0
               ],
               "scale": [
-                1,
-                1,
-                1
+                1.0,
+                1.0,
+                1.0
               ]
             },
             "screens": {
@@ -337,12 +345,16 @@
           "box": {
             "x": 5.93,
             "y": 4.74,
-            "w": 60,
-            "h": 3.5
+            "w": 60.0,
+            "h": 3.5,
+            "rotation": 0.0,
+            "opacity": 1.0
           },
           "data": {
             "text": "New",
             "role": "kicker",
+            "align": "left",
+            "valign": "top",
             "group": "intro"
           }
         },
@@ -353,22 +365,20 @@
           "box": {
             "x": 5.93,
             "y": 9.5,
-            "w": 70,
-            "h": 12
+            "w": 70.0,
+            "h": 12.0,
+            "rotation": 0.0,
+            "opacity": 1.0
           },
           "data": {
             "text": "Your day,\nat a glance",
             "role": "headline",
+            "align": "left",
+            "valign": "top",
             "group": "intro"
           }
         }
-      ],
-      "camera": {
-        "mode": "frame",
-        "x": 50,
-        "y": 62,
-        "height": 55
-      }
+      ]
     },
     {
       "id": "s2",
@@ -376,7 +386,13 @@
       "background": "night",
       "lighting": {
         "look": "rim",
-        "angle": 210
+        "angle": 210.0
+      },
+      "camera": {
+        "mode": "frame",
+        "x": 50.0,
+        "y": 56.0,
+        "height": 52.0
       },
       "nodes": [
         {
@@ -384,10 +400,12 @@
           "name": "Backdrop",
           "layer": "ground",
           "box": {
-            "x": 0,
-            "y": 0,
-            "w": 100,
-            "h": 100
+            "x": 0.0,
+            "y": 0.0,
+            "w": 100.0,
+            "h": 100.0,
+            "rotation": 0.0,
+            "opacity": 1.0
           },
           "data": {
             "design": "spotlight",
@@ -402,19 +420,19 @@
             "object": "phone",
             "pose": {
               "position": [
-                0,
-                0,
-                0
+                0.0,
+                0.0,
+                0.0
               ],
               "rotation": [
-                0,
-                20,
-                0
+                0.0,
+                20.0,
+                0.0
               ],
               "scale": [
-                1,
-                1,
-                1
+                1.0,
+                1.0,
+                1.0
               ]
             },
             "screens": {
@@ -430,13 +448,16 @@
             "x": 5.93,
             "y": 4.74,
             "w": 88.14,
-            "h": 12
+            "h": 12.0,
+            "rotation": 0.0,
+            "opacity": 1.0
           },
           "data": {
             "text": "Built for focus",
             "role": "headline",
-            "color": "snow",
-            "align": "center"
+            "align": "center",
+            "valign": "top",
+            "color": "snow"
           }
         },
         {
@@ -444,25 +465,22 @@
           "name": "Body",
           "layer": "type",
           "box": {
-            "x": 15,
-            "y": 84,
-            "w": 70,
-            "h": 10
+            "x": 15.0,
+            "y": 84.0,
+            "w": 70.0,
+            "h": 10.0,
+            "rotation": 0.0,
+            "opacity": 1.0
           },
           "data": {
             "text": "Everything you need, nothing you don't.",
             "role": "body",
-            "color": "snow",
-            "align": "center"
+            "align": "center",
+            "valign": "top",
+            "color": "snow"
           }
         }
-      ],
-      "camera": {
-        "mode": "frame",
-        "x": 50,
-        "y": 56,
-        "height": 52
-      }
+      ]
     }
   ]
 }

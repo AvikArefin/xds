@@ -75,7 +75,7 @@ export async function fetchFont() {
   const st = useStudio.getState();
   const family = await st.ask({
     title: "Fetch from Fontshare",
-    message: "Downloads the family into fonts/ and registers its files.",
+    message: "Downloads the family once into the xds font library (shared by every project) and registers it here.",
     label: "Family name (e.g. Satoshi, General Sans)",
     confirm: "Fetch",
   });

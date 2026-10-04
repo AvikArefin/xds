@@ -269,6 +269,15 @@ def cmd_design(a: argparse.Namespace, out: Out) -> int:
 def cmd_fonts(a: argparse.Namespace, out: Out) -> int:
     from . import fonts
 
+    if a.fonts_cmd == "library":
+        fams = sorted(fonts.library_families().values(), key=lambda f: f["name"])
+        out.emit({"families": fams}, "\n".join(
+            f"{f['name']:<24} {len(f['files'])} styles" for f in fams) or "(no fonts yet)")
+        return 0
+    if a.fonts_cmd == "vendor":
+        copied = fonts.vendor(proj.find_root(a.project), a.family)
+        out.emit({"copied": copied}, "\n".join(copied) or "nothing to copy")
+        return 0
     added = fonts.fetch(proj.find_root(a.project), a.family)
     out.emit({"fonts": added}, "\n".join(f"{f['family']} {f['weight']}{' italic' if f.get('italic') else ''}"
                                           f"  {f['path']}" for f in added))
@@ -441,9 +450,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("fonts", cmd_fonts, "font files")
     fsub = sp.add_subparsers(dest="fonts_cmd", required=True)
-    f = fsub.add_parser("fetch", parents=[common], help="download a Fontshare family into fonts/")
+    f = fsub.add_parser("fetch", parents=[common],
+                        help="use a Fontshare family (downloaded once into the xds font library)")
     f.add_argument("project")
     f.add_argument("family")
+    f = fsub.add_parser("library", parents=[common], help="the families in the xds font library")
+    f = fsub.add_parser("vendor", parents=[common], help="copy library fonts into the project")
+    f.add_argument("project")
+    f.add_argument("family", nargs="?")
 
     add("formats", cmd_formats, "the format catalog")
 

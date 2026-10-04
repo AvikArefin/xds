@@ -16,7 +16,8 @@
    (default 3 for widths under 600 px, else 2).
 
 The page is served from a virtual origin whose paths map to the project, so relative URLs in
-`index.html` (e.g. `img/avatar.jpg` next to it) and `/fonts/...` resolve to project files.
+`index.html` (e.g. `img/avatar.jpg` next to it) resolve to project files, and `/xds:…` (library
+fonts) to the xds library.
 """
 
 from __future__ import annotations
@@ -231,7 +232,7 @@ def build_page(root: Path, project: Project, screen: Screen) -> str:
 
 def render(root: Path, screen_id: str, out_png: Path, *, browser: Any = None) -> Path:
     """Render screen `screen_id` to `out_png` at width × height × scale."""
-    from .project import XdsError, read_raw, resolve_inside
+    from .project import XdsError, read_raw, resolve_asset
 
     root = Path(root).resolve()
     project = Project.model_validate(read_raw(root))
@@ -247,7 +248,7 @@ def render(root: Path, screen_id: str, out_png: Path, *, browser: Any = None) ->
         if url == page_url:
             return route.fulfill(body=page_html, content_type="text/html; charset=utf-8")
         try:
-            target = resolve_inside(root, rel)
+            target = resolve_asset(root, rel)  # project files, or `xds:` library fonts
         except XdsError:
             return route.fulfill(status=403, body="outside the project")
         if not target.is_file():

@@ -11,7 +11,7 @@ If the XDS editor is open, it reloads your changes immediately — the file on d
 | `project.json` | the whole design: format, brand, 3D objects, slides and their nodes |
 | `designs/*.svg` | background designs (artwork + parameters) |
 | `screens/<id>/index.html` | UI shown on device screens |
-| `assets/`, `fonts/` | images, GLB models, font files |
+| `assets/` | images, GLB models (device models and fonts come from xds: `xds:` paths) |
 | `sources/` | yours: `.blend` files, originals, references — XDS ignores it |
 | `cache/`, `export/` | generated; never edit |
 
