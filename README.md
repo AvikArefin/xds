@@ -20,6 +20,13 @@ uv run playwright install chromium       # the renderer
 npm run build                            # the studio, served by `xds` for headless renders
 ```
 
+Then put `xds` on your PATH, so it works from inside a project folder. The project's `AGENTS.md`
+tells agents to run plain `xds` there and never leave the project:
+
+```bash
+uv tool install --editable . --force     # `xds` everywhere, running this checkout
+```
+
 ## Quickstart
 
 ```bash
