@@ -23,6 +23,7 @@ import io
 import json
 import os
 import shutil
+import sys
 import socket
 import threading
 import time
@@ -39,13 +40,12 @@ from .models import Project, SlideMeasure
 from .project import XdsError
 
 Progress = Callable[[str], None]
-CHROMIUM_ARGS = [
-    "--use-angle=swiftshader",  # WebGL without a GPU, identical on every machine
-    "--enable-unsafe-swiftshader",
-    "--ignore-gpu-blocklist",
-    "--font-render-hinting=none",
-    "--hide-scrollbars",
-]
+# WebGL on the GPU (Metal on macOS): ~10x faster than software. XDS_SOFTWARE_GL=1 switches to
+# SwiftShader, for machines without a GPU (CI); pixels then differ slightly at anti-aliased edges.
+SOFTWARE_GL = os.environ.get("XDS_SOFTWARE_GL") == "1"
+GL_ARGS = (["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] if SOFTWARE_GL
+           else ["--use-angle=metal" if sys.platform == "darwin" else "--use-angle=default", "--enable-gpu"])
+CHROMIUM_ARGS = [*GL_ARGS, "--ignore-gpu-blocklist", "--font-render-hinting=none", "--hide-scrollbars"]
 READY_TIMEOUT_MS = 90_000
 
 
@@ -97,7 +97,7 @@ def slide_key(loaded: proj.Loaded, slide_id: str, index: int) -> str:
         "project": {k: v for k, v in raw.items() if k not in UNVERSIONED_KEYS},
         "slide": next((s for s in slides if s.get("id") == slide_id), None),
         "index": index, "count": len(slides), "files": others,
-        "studio": proj.file_hash(studio) if studio.exists() else "",
+        "studio": proj.file_hash(studio) if studio.exists() else "", "gl": GL_ARGS,
     }
     return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()[:24]
 
