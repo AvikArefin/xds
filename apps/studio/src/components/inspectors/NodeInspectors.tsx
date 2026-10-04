@@ -322,7 +322,6 @@ function ParamControl({
           min={param.min}
           max={param.max}
           step={param.step ?? (param.max !== undefined && param.min !== undefined && param.max - param.min <= 2 ? 0.01 : 1)}
-          range={param.min !== undefined && param.max !== undefined ? [param.min, param.max] : undefined}
           disabled={disabled}
           onChange={onChange}
         />

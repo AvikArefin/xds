@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { FormatProfile } from "../types";
 import { useStudio } from "../store";
-import { NumberField } from "./ui";
+import { NumberField, Select, type SelectOption } from "./ui";
 
 const GROUPS = ["Social", "Video", "Print"];
 
@@ -22,6 +22,13 @@ export function useFormatCatalog(): FormatProfile[] {
   return catalog;
 }
 
+/** The catalog as grouped select options, Social / Video / Print. */
+export function formatOptions(catalog: FormatProfile[]): SelectOption<string>[] {
+  return GROUPS.flatMap((g) =>
+    catalog.filter((p) => p.group === g).map((p) => ({ value: p.key, label: `${p.label} · ${p.width}×${p.height}`, group: g })),
+  );
+}
+
 /** Grouped presets (Social / Video / Print / Custom) plus a custom size. */
 export function FormatSelect() {
   const format = useStudio((s) => s.project?.format);
@@ -36,37 +43,25 @@ export function FormatSelect() {
 
   return (
     <div className="format-select">
-      <select
-        className="select"
+      <Select
         value={value}
         disabled={readOnly}
-        onChange={(e) => {
-          if (e.target.value === "__custom") {
+        options={[
+          ...formatOptions(catalog),
+          { value: "__custom", label: `Custom…${isCustom ? ` · ${format.width}×${format.height}` : ""}`, group: "Custom" },
+        ]}
+        onChange={(v) => {
+          if (v === "__custom") {
             setCustom(true);
             return;
           }
-          const p = catalog.find((c) => c.key === e.target.value);
+          const p = catalog.find((c) => c.key === v);
           if (p) {
             setCustom(false);
             setFormat({ preset: p.key, width: p.width, height: p.height });
           }
         }}
-      >
-        {GROUPS.map((g) => (
-          <optgroup key={g} label={g}>
-            {catalog
-              .filter((p) => p.group === g)
-              .map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.label} · {p.width}×{p.height}
-                </option>
-              ))}
-          </optgroup>
-        ))}
-        <optgroup label="Custom">
-          <option value="__custom">Custom…{isCustom ? ` · ${format.width}×${format.height}` : ""}</option>
-        </optgroup>
-      </select>
+      />
       {isCustom && (
         <div className="format-custom">
           <NumberField
@@ -74,6 +69,7 @@ export function FormatSelect() {
             value={format.width}
             min={16}
             max={20000}
+            track={false}
             disabled={readOnly}
             onChange={(v) => v && setFormat({ width: Math.round(v), height: format.height })}
           />
@@ -82,6 +78,7 @@ export function FormatSelect() {
             value={format.height}
             min={16}
             max={20000}
+            track={false}
             disabled={readOnly}
             onChange={(v) => v && setFormat({ width: format.width, height: Math.round(v) })}
           />

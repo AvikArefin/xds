@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { Lighting, Project } from "@xds/protocol";
 import { LIGHTING_DEFAULTS, useStudio } from "../../store";
-import { ColorTokenSelect, Row, Segmented } from "../ui";
+import { ColorTokenSelect, NumberField, Row, Segmented } from "../ui";
 
 const LOOKS: { value: NonNullable<Lighting["look"]>; label: string; hint: string }[] = [
   { value: "softbox", label: "Softbox", hint: "anything; catalog shots" },
@@ -81,42 +81,6 @@ function AngleDial({ value, onChange, disabled }: { value: number; onChange: (v:
   );
 }
 
-/** A range slider whose drag is one undo step. */
-export function Slider({
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  disabled,
-  format,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  format?: (v: number) => string;
-}) {
-  return (
-    <div className="slider">
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onPointerDown={() => useStudio.getState().beginGesture()}
-        onPointerUp={() => useStudio.getState().endGesture()}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-      <span className="slider-val mono">{format ? format(value) : value}</span>
-    </div>
-  );
-}
-
 export function LightingControls({
   project,
   value,
@@ -157,7 +121,7 @@ export function LightingControls({
         </div>
       </Row>
       <Row label={<span className={`lbl${mark("elevation")}`}>Elevation</span>}>
-        <Slider value={value.elevation} min={0} max={80} step={1} onChange={(elevation) => onPatch({ elevation })} disabled={disabled} format={(v) => `${v}°`} />
+        <NumberField value={value.elevation} min={0} max={80} unit="°" disabled={disabled} onChange={(elevation) => elevation !== undefined && onPatch({ elevation })} />
       </Row>
       <Row label={<span className={`lbl${mark("shadow")}`}>Shadow</span>}>
         <Segmented
@@ -172,14 +136,14 @@ export function LightingControls({
         />
       </Row>
       <Row label={<span className={`lbl${mark("brightness")}`}>Brightness</span>}>
-        <Slider
+        <NumberField
           value={value.brightness}
           min={-1}
           max={1}
           step={0.05}
-          onChange={(brightness) => onPatch({ brightness })}
+          unit="EV"
           disabled={disabled}
-          format={(v) => `${v > 0 ? "+" : ""}${v.toFixed(2)} EV`}
+          onChange={(brightness) => brightness !== undefined && onPatch({ brightness })}
         />
       </Row>
       <Row label={<span className={`lbl${mark("tint")}`}>Tint</span>}>

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { ProjectListItem } from "../types";
 import { isDirty, useStudio } from "../store";
-import { useFormatCatalog } from "./FormatSelect";
+import { formatOptions, useFormatCatalog } from "./FormatSelect";
 import { Icon } from "./Icon";
-import { IconButton } from "./ui";
+import { IconButton, Select } from "./ui";
 
 async function confirmSwitch(): Promise<boolean> {
   const st = useStudio.getState();
@@ -134,19 +134,7 @@ function NewTab() {
       </label>
       <label>
         <span>Format</span>
-        <select className="select" value={format} onChange={(e) => setFormat(e.target.value)}>
-          {["Social", "Video", "Print"].map((g) => (
-            <optgroup key={g} label={g}>
-              {catalog
-                .filter((p) => p.group === g)
-                .map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {p.label} · {p.width}×{p.height}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
+        <Select value={format} options={formatOptions(catalog)} onChange={(v) => v && setFormat(v)} />
       </label>
       <div className="dialog-actions">
         <button type="button" className="btn primary" disabled={busy || !name.trim() || !path} onClick={create}>

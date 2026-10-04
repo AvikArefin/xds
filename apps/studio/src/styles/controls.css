@@ -242,6 +242,13 @@
   padding: 0 4px;
   font-variant-numeric: tabular-nums;
 }
+.num:not(.focused):not(.disabled),
+.num:not(.focused):not(.disabled) input {
+  cursor: ew-resize;
+}
+.num.scrubbing {
+  border-color: var(--accent);
+}
 .num input::placeholder {
   color: var(--text-muted);
 }
@@ -250,6 +257,28 @@
   padding-right: 5px;
   color: var(--text-muted);
   font-size: 10px;
+}
+.num-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  overflow: hidden;
+  pointer-events: none;
+}
+.num-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.75;
+}
+.num-fill.inherited {
+  background: var(--text-muted);
+}
+.num.out .num-fill {
+  background: var(--amber);
 }
 .num-range {
   position: absolute;
@@ -268,8 +297,7 @@
   margin-bottom: 8px;
 }
 
-.text-input,
-.select {
+.text-input {
   width: 100%;
   min-width: 0;
   height: 24px;
@@ -285,8 +313,7 @@ textarea.text-input {
   resize: vertical;
   line-height: 1.4;
 }
-.text-input:focus,
-.select:focus {
+.text-input:focus {
   border-color: var(--accent);
 }
 .text-input.slim {
@@ -296,8 +323,102 @@ textarea.text-input {
   font-family: var(--mono);
   font-size: 11px;
 }
-.select {
-  padding-right: 2px;
+
+/* select */
+.sel {
+  position: relative;
+  min-width: 0;
+}
+.sel-trigger {
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.sel-trigger:focus-visible,
+.sel.open .sel-trigger {
+  border-color: var(--accent);
+  outline: 0;
+}
+.sel-trigger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sel-trigger > svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.sel-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sel-search {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+}
+.sel-search::placeholder {
+  color: var(--text-muted);
+}
+.sel-pop {
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(360px, 90vw);
+}
+.sel-pop.end {
+  left: auto;
+  right: 0;
+}
+.sel-pop.up {
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+.sel-opt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  flex: none;
+}
+.sel-opt-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sel-opt.hi {
+  background: var(--bg-hover);
+}
+.sel-opt.sel {
+  color: var(--accent);
+}
+.sel-opt > svg {
+  flex: none;
 }
 .check {
   display: inline-flex;
@@ -316,7 +437,7 @@ textarea.text-input {
   flex-wrap: wrap;
 }
 
-/* swatches / token select */
+/* swatches */
 .swatch {
   display: inline-block;
   width: 14px;
@@ -340,30 +461,6 @@ textarea.text-input {
   opacity: 0;
   cursor: pointer;
 }
-.token-select {
-  position: relative;
-  min-width: 0;
-}
-.token-current {
-  width: 100%;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  cursor: pointer;
-  text-align: left;
-}
-.token-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .popover {
   position: absolute;
   z-index: 50;
@@ -377,11 +474,6 @@ textarea.text-input {
   background: var(--bg-elev);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
-.token-pop {
-  left: 0;
-  right: 0;
-}
-.token-opt,
 .menu-item {
   width: 100%;
   display: flex;
@@ -395,19 +487,14 @@ textarea.text-input {
   cursor: pointer;
   text-align: left;
 }
-.token-opt > span:nth-child(2),
 .menu-item > span:first-child {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.token-opt:hover,
 .menu-item:hover:not(:disabled) {
   background: var(--bg-hover);
-}
-.token-opt.sel {
-  background: var(--accent-soft);
 }
 .menu-anchor {
   position: relative;
@@ -470,22 +557,7 @@ textarea.text-input {
   color: var(--text);
 }
 
-/* slider and dial */
-.slider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.slider input {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--accent);
-}
-.slider-val {
-  width: 56px;
-  text-align: right;
-  color: var(--text-dim);
-}
+/* dial */
 .dial-row {
   display: flex;
   align-items: center;

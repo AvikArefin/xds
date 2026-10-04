@@ -1,5 +1,5 @@
 /** Small controls shared by the panels and inspectors. */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Project } from "@xds/protocol";
 import { useStudio } from "../store";
 import { Icon, type IconName } from "./Icon";
@@ -80,10 +80,15 @@ const fmt = (v: number, step: number) => {
   return String(Number(v.toFixed(d)));
 };
 
+/** Below this much pointer travel a press is a click (focus and type), not a scrub. */
+const DRAG_THRESHOLD_PX = 3;
+
 /**
- * A number input with a scrubbable label. Typing commits on Enter/blur (one undo step); dragging
- * the label is one gesture (one undo step). `range` shows the guide range muted and turns the field
- * amber outside it.
+ * A number input. Typing commits on Enter/blur (one undo step). Dragging the field scrubs it as one
+ * gesture (one undo step); a press that doesn't move focuses it for typing. With both `min` and
+ * `max` it draws a fill track and a drag across the field's width sweeps the whole range (Alt for
+ * fine); without, every 2px is one step (Shift ×10, Alt ×0.1). While focused, the arrow keys and
+ * the wheel step by `step`. `range` shows the guide range muted and turns the field amber outside it.
  */
 export function NumberField({
   label,
@@ -94,6 +99,7 @@ export function NumberField({
   min,
   max,
   range,
+  track,
   unit,
   disabled,
   title,
@@ -107,6 +113,8 @@ export function NumberField({
   min?: number;
   max?: number;
   range?: [number, number];
+  /** Set false to hide the fill track on a bounded field whose bounds are only sanity limits. */
+  track?: boolean;
   unit?: string;
   disabled?: boolean;
   title?: string;
@@ -115,11 +123,15 @@ export function NumberField({
   const shown = value === MIXED ? "" : value === undefined ? "" : fmt(value, step);
   const [text, setText] = useState(shown);
   const [focused, setFocused] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!focused) setText(shown);
   }, [shown, focused]);
 
   const clamp = (v: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
+  const tracked = track !== false && min !== undefined && max !== undefined && max > min;
   const commitText = () => {
     const t = text.trim();
     if (t === "") {
@@ -138,43 +150,88 @@ export function NumberField({
     value === MIXED ? undefined : value ?? (typeof placeholder === "number" ? placeholder : undefined);
   const out = range && effective !== undefined && (effective < range[0] - 1e-9 || effective > range[1] + 1e-9);
 
-  const scrub = useRef<{ x: number; v: number } | null>(null);
+  const stepBy = (n: number) => {
+    const t = Number(text);
+    const base = text.trim() !== "" && Number.isFinite(t) ? t : effective ?? 0;
+    const v = clamp(Number((base + n * step).toFixed(6)));
+    setText(fmt(v, step));
+    onChange(v);
+  };
+  // The native wheel listener is attached once, so it reads the latest stepBy.
+  const stepRef = useRef(stepBy);
+  stepRef.current = stepBy;
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      // Only a focused field takes the wheel; otherwise it scrolls the panel as usual.
+      if (document.activeElement !== el) return;
+      const d = e.deltaY || e.deltaX;
+      if (Math.abs(d) < 1) return;
+      e.preventDefault();
+      stepRef.current((d < 0 ? 1 : -1) * (e.shiftKey ? 10 : 1));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const scrub = useRef<{ x: number; v: number; w: number; active: boolean } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
-    if (disabled || e.button !== 0) return;
-    const start = effective ?? 0;
-    scrub.current = { x: e.clientX, v: start };
-    (e.target as Element).setPointerCapture(e.pointerId);
-    useStudio.getState().beginGesture();
+    if (disabled || focused || e.button !== 0) return;
+    // Focus waits for the release, so a drag never drops a caret where it ended.
+    e.preventDefault();
+    scrub.current = { x: e.clientX, v: effective ?? 0, w: rootRef.current?.getBoundingClientRect().width ?? 0, active: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const s = scrub.current;
     if (!s) return;
     const dx = e.clientX - s.x;
-    if (Math.abs(dx) < 2) return;
-    const mult = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
-    const v = clamp(Number((s.v + Math.round(dx / 2) * step * mult).toFixed(6)));
-    onChange(v);
+    if (!s.active) {
+      if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
+      s.active = true;
+      setScrubbing(true);
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      useStudio.getState().beginGesture();
+    }
+    let v: number;
+    if (tracked && s.w > 0) {
+      // The fill follows the pointer 1:1; values land on the step grid.
+      const raw = s.v + ((dx * (e.altKey ? 0.1 : 1)) / s.w) * (max! - min!);
+      v = clamp(Number((Math.round(raw / step) * step).toFixed(6)));
+    } else {
+      const mult = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+      v = clamp(Number((s.v + Math.round(dx / 2) * step * mult).toFixed(6)));
+    }
+    if (v !== value) onChange(v);
   };
-  const onPointerUp = () => {
-    if (!scrub.current) return;
+  const endScrub = (e: React.PointerEvent, cancelled: boolean) => {
+    const s = scrub.current;
     scrub.current = null;
-    useStudio.getState().endGesture();
+    if (!s) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    if (s.active) {
+      setScrubbing(false);
+      useStudio.getState().endGesture();
+    } else if (!cancelled) inputRef.current?.focus();
   };
 
+  const ratio = tracked && effective !== undefined ? Math.min(1, Math.max(0, (effective - min!) / (max! - min!))) : 0;
+
   return (
-    <div className={`num${out ? " out" : ""}${disabled ? " disabled" : ""}`} title={title} style={width ? { width } : undefined}>
-      {label !== undefined && (
-        <span
-          className="num-label"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          {label}
-        </span>
-      )}
+    <div
+      ref={rootRef}
+      className={`num${out ? " out" : ""}${disabled ? " disabled" : ""}${focused ? " focused" : ""}${scrubbing ? " scrubbing" : ""}`}
+      title={title ?? (disabled ? undefined : "Drag to scrub, click to type")}
+      style={width ? { width } : undefined}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={(e) => endScrub(e, false)}
+      onPointerCancel={(e) => endScrub(e, true)}
+    >
+      {label !== undefined && <span className="num-label">{label}</span>}
       <input
+        ref={inputRef}
         type="text"
         inputMode="decimal"
         value={text}
@@ -196,14 +253,16 @@ export function NumberField({
             (e.target as HTMLInputElement).blur();
           } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
             e.preventDefault();
-            const base = Number(text) || effective || 0;
-            const v = clamp(base + (e.key === "ArrowUp" ? 1 : -1) * step * (e.shiftKey ? 10 : 1));
-            setText(fmt(v, step));
-            onChange(v);
+            stepBy((e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1));
           }
         }}
       />
       {unit && <span className="num-unit">{unit}</span>}
+      {tracked && (
+        <span className="num-track" aria-hidden="true">
+          <span className={`num-fill${value === undefined ? " inherited" : ""}`} style={{ width: `${(ratio * 100).toFixed(2)}%` }} />
+        </span>
+      )}
       {range && (
         <span className="num-range" title="Guide range for this format">
           {fmt(range[0], step)}–{fmt(range[1], step)}
@@ -277,36 +336,201 @@ export function TextField({
   );
 }
 
+export type SelectOption<T extends string> = {
+  value: T;
+  label: string;
+  /** Options sharing a group are listed under its heading, in the order given. */
+  group?: string;
+  /** Muted text after the label; also matched by search. */
+  hint?: string;
+  swatch?: string;
+};
+
+/** Past this many rows (entries plus group headings) the popover scrolls, so the list gets a search field. */
+export const SEARCH_THRESHOLD = 11;
+
+type Entry<T> = { value: T | undefined; label: string; group?: string; hint?: string; swatch?: string };
+
+/**
+ * A dropdown. Short lists open as a plain list; past SEARCH_THRESHOLD rows the trigger turns into
+ * a search field while open (`searchable` forces either). `noneLabel` adds a first entry that
+ * clears the value.
+ */
 export function Select<T extends string>({
   value,
   options,
   onChange,
   disabled,
   placeholder,
+  noneLabel,
+  searchable,
 }: {
   value: T | undefined | typeof MIXED;
-  options: (T | { value: T; label: string })[];
+  options: (T | SelectOption<T>)[];
   onChange: (v: T | undefined) => void;
   disabled?: boolean;
   placeholder?: string;
+  noneLabel?: string;
+  searchable?: boolean;
 }) {
-  const opts = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
-  const v = value === MIXED ? "__mixed" : value ?? "";
+  const opts: Entry<T>[] = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+  const swatches = opts.some((o) => o.swatch !== undefined);
+  const entries: Entry<T>[] = noneLabel !== undefined ? [{ value: undefined, label: noneLabel }, ...opts] : opts;
+  const rows = entries.length + new Set(entries.map((e) => e.group).filter(Boolean)).size;
+  const search = searchable ?? rows > SEARCH_THRESHOLD;
+
+  const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
+  const [end, setEnd] = useState(false);
+  const [query, setQuery] = useState("");
+  const [hi, setHi] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Only the keyboard moves the list; hovering while wheel-scrolling must not yank it around.
+  const scrollToHi = useRef(false);
+  const refocus = useRef(false);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? entries.filter((e) => [e.label, e.hint, e.group].some((s) => s?.toLowerCase().includes(q)))
+    : entries;
+  const current = value === MIXED ? undefined : entries.find((e) => e.value === value);
+  const display =
+    value === MIXED ? "—" : current ? current.label : value !== undefined ? `${value} (missing)` : placeholder ?? "";
+
+  const openList = () => {
+    if (disabled) return;
+    const r = rootRef.current?.getBoundingClientRect();
+    setUp(!!r && window.innerHeight - r.bottom < 240 && r.top > window.innerHeight - r.bottom);
+    // The popover can grow past the trigger; near the right edge it grows leftward instead.
+    setEnd(!!r && r.left + 360 > window.innerWidth);
+    setQuery("");
+    setHi(Math.max(0, current ? entries.indexOf(current) : 0));
+    scrollToHi.current = true;
+    setOpen(true);
+  };
+  const close = (focusTrigger: boolean) => {
+    refocus.current = focusTrigger;
+    setOpen(false);
+    setQuery("");
+  };
+  const choose = (e: Entry<T>) => {
+    close(true);
+    if (e.value !== value) onChange(e.value);
+  };
+
+  useEffect(() => {
+    if (!open && refocus.current) {
+      refocus.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) close(false);
+    };
+    window.addEventListener("pointerdown", away);
+    return () => window.removeEventListener("pointerdown", away);
+  }, [open]);
+  useEffect(() => {
+    if (!scrollToHi.current) return;
+    scrollToHi.current = false;
+    listRef.current?.querySelector(`[data-i="${hi}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [hi, open]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        openList();
+      }
+      return;
+    }
+    const n = filtered.length;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      scrollToHi.current = true;
+      if (n) setHi((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filtered[hi]) choose(filtered[hi]);
+    } else if (e.key === "Escape") {
+      // Closing the list must not also clear the canvas selection.
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+    } else if (e.key === "Tab") close(false);
+  };
+
+  const swatch = (e: Entry<T> | undefined) =>
+    swatches && <span className="swatch" style={e?.swatch ? { background: e.swatch } : undefined} data-empty={!e?.swatch || undefined} />;
+
   return (
-    <select
-      className="select"
-      value={v}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value === "" ? undefined : (e.target.value as T))}
-    >
-      {value === MIXED && <option value="__mixed">—</option>}
-      {(placeholder !== undefined || value === undefined) && <option value="">{placeholder ?? ""}</option>}
-      {opts.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className={`sel${open ? " open" : ""}${disabled ? " disabled" : ""}`} ref={rootRef}>
+      {open && search ? (
+        <div className="sel-trigger">
+          <Icon name="search" size={12} />
+          <input
+            autoFocus
+            className="sel-search"
+            role="combobox"
+            aria-expanded
+            aria-autocomplete="list"
+            value={query}
+            placeholder={display || "Search…"}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHi(0);
+              scrollToHi.current = true;
+            }}
+            onKeyDown={onKeyDown}
+          />
+        </div>
+      ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          className="sel-trigger"
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => (open ? close(true) : openList())}
+          onKeyDown={onKeyDown}
+        >
+          {swatch(current)}
+          <span className={`sel-value${current || value === MIXED ? "" : " muted"}`}>{display}</span>
+          <Icon name="chevronDown" size={12} />
+        </button>
+      )}
+      {open && (
+        <div className={`popover sel-pop${up ? " up" : ""}${end ? " end" : ""}`} role="listbox" ref={listRef}>
+          {filtered.map((e, i) => (
+            <Fragment key={e.value ?? ""}>
+              {e.group && e.group !== filtered[i - 1]?.group && <div className="menu-label">{e.group}</div>}
+              <button
+                type="button"
+                role="option"
+                aria-selected={e === current}
+                data-i={i}
+                className={`sel-opt${e === current ? " sel" : ""}${i === hi ? " hi" : ""}`}
+                // Keep focus in the search field until the click lands.
+                onMouseDown={(ev) => ev.preventDefault()}
+                onMouseMove={() => i !== hi && setHi(i)}
+                onClick={() => choose(e)}
+              >
+                {swatch(e)}
+                <span className="sel-opt-label">{e.label}</span>
+                {e.hint && <span className="muted mono">{e.hint}</span>}
+                {e === current && <Icon name="check" size={12} />}
+              </button>
+            </Fragment>
+          ))}
+          {!filtered.length && <div className="menu-note">No matches</div>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -353,60 +577,16 @@ export function ColorTokenSelect({
   noneLabel?: string;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
-  }, [open]);
-  const cur = value === MIXED ? undefined : project.brand.colors.find((c) => c.name === value);
   return (
-    <div className="token-select" ref={ref}>
-      <button type="button" className="token-current" disabled={disabled} onClick={() => setOpen(!open)}>
-        <span className="swatch" style={{ background: cur?.hex ?? "transparent" }} data-empty={!cur || undefined} />
-        <span className="token-name">{value === MIXED ? "—" : cur?.name ?? (value ? `${value} (missing)` : noneLabel)}</span>
-        <Icon name="chevronDown" size={12} />
-      </button>
-      {open && (
-        <div className="popover token-pop">
-          {allowNone && (
-            <button
-              type="button"
-              className="token-opt"
-              onClick={() => {
-                onChange(undefined);
-                setOpen(false);
-              }}
-            >
-              <span className="swatch" data-empty />
-              <span>{noneLabel}</span>
-            </button>
-          )}
-          {project.brand.colors.map((c) => (
-            <button
-              type="button"
-              key={c.name}
-              className={`token-opt${c.name === value ? " sel" : ""}`}
-              onClick={() => {
-                onChange(c.name);
-                setOpen(false);
-              }}
-            >
-              <span className="swatch" style={{ background: c.hex }} />
-              <span>{c.name}</span>
-              <span className="muted mono">{c.hex}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Select
+      value={value}
+      options={project.brand.colors.map((c) => ({ value: c.name, label: c.name, hint: c.hex, swatch: c.hex }))}
+      noneLabel={allowNone ? noneLabel : undefined}
+      disabled={disabled}
+      onChange={onChange}
+    />
   );
 }
-
 /** A segmented control. */
 export function Segmented<T extends string>({
   value,
