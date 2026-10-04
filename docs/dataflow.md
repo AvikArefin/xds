@@ -177,7 +177,11 @@ sequenceDiagram
 ```
 
 If a slide's PNG for the current hash already exists, it is reused, so `audit` followed by `export`
-renders once. The ground resolves after the render layer reports subject bounds, so a spotlight
+renders once. A slide is also reused across hashes when its own key is unchanged (its JSON, its
+position, the rest of `project.json` minus other slides and timestamps, every other source file,
+and the studio build): `cache/slide-keys/<key>.json` points at the dir that has it, and its files are
+hard-linked in. Editing one slide re-renders only that slide. On the render page a hidden 3D layer
+stops drawing frames, because software WebGL replays every frame drawn while hidden. The ground resolves after the render layer reports subject bounds, so a spotlight
 background lands behind the product in the same frame.
 
 ---

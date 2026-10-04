@@ -193,6 +193,7 @@ export function SlideStage(props: SlideStageProps) {
                     height={height}
                     mode={mode}
                     showShadows={props.showShadows !== false}
+                    paused={mode === "render" && !show}
                     interactive={interactive}
                     freezeCamera={props.freezeCamera}
                     sceneChildren={props.sceneChildren}

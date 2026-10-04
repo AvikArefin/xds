@@ -8,14 +8,21 @@ For each slide this opens `/render?slide=<id>` at exactly the format size, waits
     masks/<id>-<layer>.png     each layer's alpha, drawn alone without shadows
     background/<id>.png        every layer except type, for contrast sampling
 
+A slide is also reused across source hashes: `cache/slide-keys/<key>.json` points at the
+cache dir that last rendered a slide with the same key (`slide_key`), and its files are linked
+into the new dir. So editing one slide re-renders only that slide.
+
 The page is served by an in-process FastAPI app (the same one the editor talks to) on a free
 local port, so a headless command needs one Python process and no Vite.
 """
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
+import os
+import shutil
 import socket
 import threading
 import time
@@ -69,6 +76,63 @@ class RenderResult:
 
 def slide_png_name(index: int, slide_id: str) -> str:
     return f"{index}-{slide_id}.png"
+
+
+# --- per-slide reuse -------------------------------------------------------------------------
+
+UNVERSIONED_KEYS = {"slides", "createdAt", "updatedAt"}
+
+
+def slide_key(loaded: proj.Loaded, slide_id: str, index: int) -> str:
+    """Everything one slide's render depends on: its own JSON, its position, the rest of
+    project.json except other slides, every other source file, and the studio build."""
+    from .api import STUDIO_DIST
+
+    root, raw = loaded.root, loaded.raw or {}
+    slides = raw.get("slides", [])
+    others = [f"{p.relative_to(root).as_posix()}:{proj.file_hash(p)}"
+              for p in proj.source_files(root) if p.name != proj.PROJECT_FILE or p.parent != root]
+    studio = STUDIO_DIST / "index.html"
+    doc = {
+        "project": {k: v for k, v in raw.items() if k not in UNVERSIONED_KEYS},
+        "slide": next((s for s in slides if s.get("id") == slide_id), None),
+        "index": index, "count": len(slides), "files": others,
+        "studio": proj.file_hash(studio) if studio.exists() else "",
+    }
+    return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()[:24]
+
+
+def _slide_files(project: Project, slide_id: str, index: int) -> list[str]:
+    return [f"slides/{slide_png_name(index, slide_id)}", f"measure/{slide_id}.json",
+            f"background/{slide_id}.png"] + [f"masks/{slide_id}-{l}.png" for l in project.layer_order]
+
+
+def _link(src: Path, dst: Path) -> None:
+    dst.unlink(missing_ok=True)
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
+def _reuse(root: Path, project: Project, key: str, slide_id: str, index: int, cache: Path) -> bool:
+    """Link a slide rendered under another source hash with the same key into `cache`."""
+    entry = root / "cache" / "slide-keys" / f"{key}.json"
+    if not entry.exists():
+        return False
+    src = root / "cache" / json.loads(entry.read_text()).get("hash", "")
+    files = _slide_files(project, slide_id, index)
+    if src == cache or not all((src / f).exists() for f in files):
+        return False
+    for f in files:
+        _link(src / f, cache / f)
+    return True
+
+
+def _remember(root: Path, key: str, source_hash: str) -> None:
+    d = root / "cache" / "slide-keys"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{key}.json").write_text(json.dumps({"hash": source_hash}))
 
 
 # --- the local server ------------------------------------------------------------------------
@@ -222,10 +286,13 @@ def render(path: str | Path, *, slide_ids: list[str] | None = None, progress: Pr
     result = RenderResult(loaded.hash, cache)
 
     todo = []
+    keys = {sid: slide_key(loaded, sid, positions[sid]) for sid in wanted}
     for sid in wanted:
         png = cache / "slides" / slide_png_name(positions[sid], sid)
         measure = cache / "measure" / f"{sid}.json"
-        reused = png.exists() and measure.exists()
+        reused = (png.exists() and measure.exists()) or _reuse(root, project, keys[sid], sid, positions[sid], cache)
+        if reused:
+            progress(f"render {positions[sid]}/{len(project.slides)}: {sid} unchanged, reused")
         result.slides.append(RenderedSlide(sid, positions[sid], png, measure, reused))
         if not reused:
             todo.append(sid)
@@ -242,6 +309,8 @@ def render(path: str | Path, *, slide_ids: list[str] | None = None, progress: Pr
                 _render_slide(browser, url, project, sid, positions[sid], cache)
     else:
         progress("render: reusing cached slides")
+    for sid in wanted:  # point every key at this dir, which now holds all of them
+        _remember(root, keys[sid], loaded.hash)
 
     if sheet and slide_ids is None:
         result.contact_sheet = contact_sheet([s.png for s in result.slides], cache / "contact-sheet.png")

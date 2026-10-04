@@ -40,6 +40,9 @@ export interface RenderLayerProps {
   height: number;
   mode: "render" | "editor";
   showShadows: boolean;
+  /** Stop drawing frames. Software WebGL queues every frame drawn while the canvas is hidden
+   *  and replays them when it is shown again (~15 s per hide on the render page). */
+  paused?: boolean;
   interactive: boolean;
   freezeCamera?: boolean;
   sceneChildren?: ReactNode;
@@ -67,7 +70,7 @@ export function RenderLayer(props: RenderLayerProps) {
       dpr={mode === "render" ? 1 : Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1, 2)}
       gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
       shadows
-      frameloop="always"
+      frameloop={props.paused ? "never" : "always"}
       camera={{ fov: 30, near: 0.01, far: 1000, position: [0, 1, 5] }}
       events={mode === "editor" ? scaledEvents : undefined}
       onCreated={({ gl }) => {
