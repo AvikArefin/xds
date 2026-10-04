@@ -39,13 +39,17 @@ class Report:
     unresolved: list[dict[str, str]] = field(default_factory=list)  # {rule, path, message}
     steps: list[str] = field(default_factory=list)  # explicit steps applied
     notes: list[str] = field(default_factory=list)  # free text from steps
+    files: dict[str, str] = field(default_factory=dict)  # side files a step rewrites (path → text)
+    fonts: list[str] = field(default_factory=list)  # font families to fetch after writing
+    retire: list[str] = field(default_factory=list)  # side files to move into the backup
 
     def unresolve(self, path: str, message: str) -> None:
         self.unresolved.append({"rule": "MIGRATION_UNRESOLVED", "path": path, "message": message})
 
     def to_json(self) -> dict[str, Any]:
         return {"steps": self.steps, "renamed": self.renamed, "defaulted": self.defaulted,
-                "dropped": self.dropped, "unresolved": self.unresolved, "notes": self.notes}
+                "dropped": self.dropped, "unresolved": self.unresolved, "notes": self.notes,
+                "files": sorted(self.files), "fonts": self.fonts, "retired": self.retire}
 
 
 def _join(path: str, key: str | int) -> str:

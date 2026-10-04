@@ -472,10 +472,18 @@ geometry in Python.
 
 1. **Explicit steps** (`xds/migrate/steps/m0002_*.py`, …): one small pure function per version,
    `def upgrade(doc: dict, report: Report) -> dict`, for structural changes that no default can
-   express. **v1 → v2** is one such step. It nests `nodes` under their slides (ordered by the old
-   `order`), merges `scene-data.json` into `objects`/`materials`, folds per-render-node camera
-   fields into `Slide.camera`, maps the old lighting block to the nearest `look`, turns
-   `publishTarget` into `format`, and converts `Material.color` from RGBA floats to hex.
+   express. **v1 → v2** (`m0002_v1_to_v2.py`, for XDS 1 files with `"schemaVersion": "1.0"`) is
+   one such step. It nests `nodes` under their slides (ordered by the old `order`), merges
+   `scene-data.json` into `objects`/`materials` (a scene object whose asset is a `.glb` becomes a
+   model), turns the first visible render node's camera into a free `Slide.camera`, keeps per-slide
+   object transforms as render-node poses, maps each slide's light rig to the nearest `look` with
+   the key light's angle and elevation, turns `publishTarget` into `format` and `canvas.background`
+   into `Slide.background`, writes each v1 text style out with the size, weight, line height,
+   tracking and case v1 drew it with, renames design params that clash with v2 built-ins (in the
+   SVG too, backed up), and converts `Material.color` from RGBA floats to hex. After writing, the
+   runner fetches the fonts the roles name into the font library (v1 loaded them from Fontshare at
+   render time), and moves the v1-only files (`scene-data.json`, `review-state.json`,
+   `project-scene.py`, and v1's `AGENTS.md`) into the backup folder, writing the v2 `AGENTS.md`.
 2. **Conform pass** (`xds/migrate/conform.py`), which runs after every migration and also on its own
    (`xds migrate --conform`). It walks the document against the current models and, to the best
    of its ability:

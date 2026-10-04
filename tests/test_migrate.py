@@ -61,11 +61,11 @@ def test_unresolved_is_not_written(blank):
     assert (blank / "project.json").read_text() == before
 
 
-def test_v1_has_no_step_yet(blank):
-    edit(blank, lambda d: d.update(schemaVersion=1))
+def test_unknown_version_is_unresolved(blank):
+    edit(blank, lambda d: d.update(schemaVersion="beta"))
     rep = migrate.run(blank)
-    assert not rep["ok"] and "no migration step" in rep["unresolved"][0]["message"]
-    assert registry() == {}
+    assert not rep["ok"] and "not a positive integer" in rep["unresolved"][0]["message"]
+    assert set(registry()) == {2}
     rep = migrate.run(blank, conform_only=True)
     assert not rep["ok"]
 
