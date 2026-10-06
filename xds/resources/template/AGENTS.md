@@ -35,6 +35,7 @@ xds render . --json     # slide PNGs + cache/<hash>/contact-sheet.png. Look at t
 xds audit . --json      # render + measure + design rules → findings, each with a `fix`
 #   look at cache/<hash>/annotated/*.png
 xds export . --json     # writes export/<stamp>/*.png (refuses while audit errors are open)
+xds export . --pdf --json   # the deck as one PDF instead, a page per slide (LinkedIn carousel)
 ```
 
 - Fix every audit **error**, then review the **warnings**. Ignore `info` until the slide is done.

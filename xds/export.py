@@ -1,5 +1,8 @@
 """Audit and export: render → measure → rules, then the gate that writes deliverables.
 
+The deliverables are one PNG per slide, or with `format="pdf"` the deck as one PDF, a page per
+slide (what LinkedIn takes for a carousel document post).
+
 `audit()` reuses the report already in cache/<hash>/ when it covers every slide, so
 `xds audit` followed by `xds export` renders and audits once.
 """
@@ -10,7 +13,7 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from . import browser, project as proj
 from .models import AuditReport, ExportRecord, Finding
@@ -52,9 +55,23 @@ def open_errors(report: AuditReport) -> list[Finding]:
     return [f for f in report.findings if f.severity == "error" and f.status == "open"]
 
 
+def _write_pdf(pngs: list[Path], dest: Path) -> None:
+    """The slides as one PDF, a page per slide at the slide's pixel size (JPEG q95 inside)."""
+    from PIL import Image
+
+    pages = [Image.open(p).convert("RGB") for p in pngs]
+    try:
+        pages[0].save(dest, "PDF", save_all=True, append_images=pages[1:], quality=95,
+                      title=dest.stem)
+    finally:
+        for page in pages:
+            page.close()
+
+
 def export(path: str | Path, *, out: str | Path | None = None, force: bool = False,
-           progress: browser.Progress = lambda s: None) -> dict[str, Any]:
-    """The audit gate, then copy the rendered slides to export/<stamp>/ with export.json."""
+           format: Literal["png", "pdf"] = "png", progress: browser.Progress = lambda s: None) -> dict[str, Any]:
+    """The audit gate, then write the rendered slides to export/<stamp>/ (as PNGs, or as one PDF)
+    with export.json."""
     loaded = proj.load(path, deep=False)
     root = loaded.root
     report = audit(root, progress=progress)
@@ -69,14 +86,20 @@ def export(path: str | Path, *, out: str | Path | None = None, force: bool = Fal
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dest = Path(out).expanduser().resolve() if out else root / "export" / stamp
     dest.mkdir(parents=True, exist_ok=True)
-    files = []
+    pngs = []
     for i, slide in enumerate(project.slides, start=1):
-        name = browser.slide_png_name(i, slide.id)
-        src = cache / "slides" / name
+        src = cache / "slides" / browser.slide_png_name(i, slide.id)
         if not src.exists():
             raise XdsError("RENDER_MISSING", f"no rendered PNG for slide '{slide.id}'", status=500)
-        shutil.copy2(src, dest / name)
-        files.append(name)
+        pngs.append(src)
+    if format == "pdf":
+        files = [f"{project.id}.pdf"]
+        _write_pdf(pngs, dest / files[0])
+    else:
+        files = [src.name for src in pngs]
+        for src in pngs:
+            shutil.copy2(src, dest / src.name)
+    for name in files:
         progress(f"export {name}")
 
     record = ExportRecord(

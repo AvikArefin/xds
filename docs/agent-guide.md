@@ -20,7 +20,7 @@ xds audit PROJECT --json      render + measure + rules → findings with fixes
   look at cache/<hash>/annotated/*.png and contact-sheet.png
   apply each finding's `fix`, or record a deliberate exception with a reason
 repeat until no errors, then review the warnings
-xds export PROJECT --json     writes export/<stamp>/*.png
+xds export PROJECT --json     writes export/<stamp>/*.png (--pdf: one PDF)
 ```
 
 Rules of the road:

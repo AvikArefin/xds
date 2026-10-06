@@ -48,3 +48,7 @@ def test_render_audit_export(example):
     out = export.export(example, force=True)
     record = json.loads((Path(out["dir"]) / "export.json").read_text())
     assert record["sourceHash"] == result.hash and len(record["files"]) == len(result.slides)
+    assert all(f.endswith(".png") for f in record["files"])
+
+    pdf = export.export(example, force=True, format="pdf", out=Path(out["dir"]) / "pdf")
+    assert len(pdf["files"]) == 1 and pdf["files"][0].endswith(".pdf") and Path(pdf["files"][0]).exists()

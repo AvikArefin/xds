@@ -40,6 +40,7 @@ The UI is dense and dark on purpose: the slide is the only bright thing on scree
 | `Row` | a label column (72 px) and a control, with an optional muted `hint` under it |
 | `.field-grid` | two controls side by side (e.g. Weight and Size) |
 | `.panel-head` | a side panel's title row: uppercase title left, a muted count or action right |
+| `.panel-actions` | several actions on the right of a `.panel-head`, kept together |
 | `.panel-foot` | the side panel's bottom actions (e.g. **+ Add model…**) |
 
 ## 3. List rows: `ListRow`

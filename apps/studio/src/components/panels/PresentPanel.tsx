@@ -15,7 +15,7 @@ export function PresentPanel() {
   const exports = useStudio((s) => s.exports);
   const exportJob = useStudio((s) => s.jobs.export);
   const hiddenLayers = useStudio((s) => s.hiddenLayers);
-  const { setLayerOrder, setMode, exportPng, loadExports, toggleLayer } = useStudio.getState();
+  const { setLayerOrder, setMode, exportSlides, loadExports, toggleLayer } = useStudio.getState();
   useEffect(() => {
     void loadExports();
   }, [loadExports]);
@@ -68,9 +68,20 @@ export function PresentPanel() {
 
       <div className="panel-head">
         <span className="panel-title">Exports</span>
-        <button type="button" className="btn small" disabled={readOnly || exportJob?.running} onClick={() => exportPng()}>
-          <Icon name="download" size={12} /> {exportJob?.running ? "Exporting…" : "Export PNG"}
-        </button>
+        <span className="panel-actions">
+          <button type="button" className="btn small" disabled={readOnly || exportJob?.running} onClick={() => exportSlides("png")}>
+            <Icon name="download" size={12} /> {exportJob?.running ? "Exporting…" : "PNG"}
+          </button>
+          <button
+            type="button"
+            className="btn small"
+            title="The deck as one PDF, a page per slide (for a LinkedIn carousel)"
+            disabled={readOnly || exportJob?.running}
+            onClick={() => exportSlides("pdf")}
+          >
+            <Icon name="download" size={12} /> PDF
+          </button>
+        </span>
       </div>
       {exportJob?.running && (
         <div className="job-lines">

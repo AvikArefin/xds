@@ -114,7 +114,6 @@ function SlideList() {
 
 function Toolbar() {
   const saving = useStudio((s) => s.saving);
-  const exporting = useStudio((s) => !!s.jobs.export?.running);
   const readOnly = useStudio((s) => s.readOnly);
   const dirty = useDirty();
   const canUndo = useCanUndo();
@@ -124,7 +123,6 @@ function Toolbar() {
     <div className="rail-toolbar">
       <IconButton icon="open" title="Open project (⌘O)" onClick={() => st.setProjectBrowser("open")} />
       <IconButton icon="search" title="Search commands (⌘K)" onClick={() => st.setPalette(true)} />
-      <IconButton icon="download" title="Export PNG" disabled={readOnly || exporting} onClick={() => st.exportPng()} />
       <IconButton icon="undo" title="Undo (⌘Z)" className="rail-undo" disabled={!canUndo} onClick={st.undo} />
       <IconButton icon="redo" title="Redo (⇧⌘Z)" disabled={!canRedo} onClick={st.redo} />
       <button

@@ -209,10 +209,11 @@ See [design rules](./design-rules.md) for every rule.
 ## 7. Export: findings → deliverables
 
 ```text
-xds export / POST /api/export
+xds export [--pdf] / POST /api/export { format: png | pdf }
   → audit (reuses cache when current)
   → open errors?  → EXPORT_BLOCKED with the findings   (unless --force)
   → copy cache/<hash>/slides/*.png → export/<stamp>/
+    (pdf: join them into export/<stamp>/<projectId>.pdf instead, a page per slide)
   → write export.json { sourceHash, format, files, audit summary, forced }
 ```
 

@@ -41,7 +41,7 @@ uv run xds guide ~/xd-projects/launch    # margins, spacing unit, type sizes for
 # edit project.json, designs/, screens/
 uv run xds check ~/xd-projects/launch    # schema + references, no browser
 uv run xds audit ~/xd-projects/launch    # render + measure + design rules
-uv run xds export ~/xd-projects/launch   # audit gate → export/<stamp>/*.png
+uv run xds export ~/xd-projects/launch   # audit gate → export/<stamp>/*.png (--pdf: one PDF)
 ```
 
 ## CLI reference
@@ -58,7 +58,7 @@ status is 0 on success, 1 on failure or open audit errors.
 | `xds rules [--project PROJECT]` | every audit rule with its principle and thresholds |
 | `xds render PROJECT [--slide ID]` | slide PNGs + contact sheet into `cache/<hash>/` |
 | `xds audit PROJECT [--slide ID]` | render + measure + rules → `audit.json` + annotated PNGs |
-| `xds export PROJECT [--out DIR] [--force]` | audit gate → `export/<stamp>/` (`--force` is recorded) |
+| `xds export PROJECT [--out DIR] [--force] [--pdf]` | audit gate → slide PNGs, or with `--pdf` the deck as one PDF, in `export/<stamp>/` (`--force` is recorded) |
 | `xds migrate [PROJECT \| --all] [--dry-run] [--conform]` | upgrade project files to the current schema |
 | `xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]` | check, convert (`.gltf`, `.dae`) and register a model |
 | `xds model inspect FILE` | parts, clips, screen meshes, convention warnings |

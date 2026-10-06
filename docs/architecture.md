@@ -67,7 +67,7 @@ xds/
 │   ├── library/fonts/<Family>/    #   font library: Fontshare downloads + family.json (not committed)
 │   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
 │   ├── browser.py                 #   Playwright: render slides, collect measurements
-│   ├── export.py                  #   audit gate → copy renders → export/<stamp>/
+│   ├── export.py                  #   audit gate → slide PNGs (or one PDF) → export/<stamp>/
 │   ├── migrate/                   #   conform pass + explicit version steps
 │   ├── resources/                 #   files the CLI copies into projects (package data)
 │   │   ├── template/              #     the blank project `xds init` copies (content-neutral),
@@ -199,7 +199,7 @@ Module responsibilities:
 - **`audit/`** runs the design rules on the measurements and pixels
   ([design rules](./design-rules.md)).
 - **`export.py`** runs the audit, blocks on errors (unless `--force`), and copies the rendered
-  slides into `export/<stamp>/` with an `export.json` record.
+  slides into `export/<stamp>/` (or, with `--pdf`, joins them into one PDF) with an `export.json` record.
 - **`migrate/`** upgrades old project files ([data models §6](./data-models.md#6-migration)).
 - **`models3d.py`** inspects and registers GLB files ([agent guide §3](./agent-guide.md#3-bringing-in-a-3d-model)).
 - **`formats.py`** holds the format catalog and the numbers derived from a format.
@@ -219,7 +219,7 @@ project.xds/
 ├── fonts/              # source: font files
 ├── sources/            # optional, ignored by the app: .blend files, references, scripts
 ├── cache/<hash>/       # derived: slide PNGs, measurements, audit.json, annotated PNGs
-└── export/<stamp>/     # derived: deliverable PNGs + export.json
+└── export/<stamp>/     # derived: deliverable PNGs (or <projectId>.pdf) + export.json
 ```
 
 The source hash covers `project.json`, `designs/`, `screens/`, `assets/` and `fonts/`, plus every `xds:`
@@ -274,7 +274,7 @@ xds guide PROJECT [--slide ID]            # the design numbers for this format
 xds rules                                 # every audit rule with principle + thresholds
 xds render PROJECT [--slide ID]           # slide PNGs + contact sheet → cache/<hash>/
 xds audit PROJECT [--slide ID]            # render + measure + rules → audit.json + annotated PNGs
-xds export PROJECT [--out DIR] [--force]  # audit gate → export/<stamp>/
+xds export PROJECT [--out DIR] [--force] [--pdf]  # audit gate → export/<stamp>/
 xds migrate [PROJECT | --all] [--dry-run] [--conform]
 xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae
 xds model inspect FILE                    # parts, clips, screen meshes, convention warnings

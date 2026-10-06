@@ -66,7 +66,7 @@ export function PromptDialog() {
 
 export function ExportBlockedDialog() {
   const blocked = useStudio((s) => s.exportBlocked);
-  const { dismissExportBlocked, exportPng, focusFinding } = useStudio.getState();
+  const { dismissExportBlocked, exportSlides, focusFinding } = useStudio.getState();
   if (!blocked) return null;
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && dismissExportBlocked()}>
@@ -94,7 +94,7 @@ export function ExportBlockedDialog() {
           <button type="button" className="btn" onClick={dismissExportBlocked}>
             Cancel
           </button>
-          <button type="button" className="btn danger" onClick={() => void exportPng(true)}>
+          <button type="button" className="btn danger" onClick={() => void exportSlides(useStudio.getState().exportFormat, true)}>
             Export anyway
           </button>
         </div>

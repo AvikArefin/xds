@@ -121,6 +121,8 @@ export interface StudioState {
   // --- jobs
   jobs: Record<string, Job>;
   exportBlocked: Finding[] | null;
+  /** The format of the last export started, so "Export anyway" repeats it. */
+  exportFormat: "png" | "pdf";
   exports: ExportEntry[];
 
   // --- notices
@@ -199,7 +201,8 @@ export interface StudioActions {
   focusFinding(f: Finding): void;
   setHoverFinding(f: Finding | null): void;
   markIntentional(f: Finding): Promise<void>;
-  exportPng(force?: boolean): Promise<void>;
+  /** PNGs, one per slide, or the deck as one PDF. */
+  exportSlides(format: "png" | "pdf", force?: boolean): Promise<void>;
   loadExports(): Promise<void>;
   dismissExportBlocked(): void;
   saveThen(what: string): Promise<boolean>;
@@ -244,6 +247,7 @@ const initial: StudioState = {
   hoverFinding: null,
   jobs: {},
   exportBlocked: null,
+  exportFormat: "png",
   exports: [],
   notices: [],
 };
@@ -942,16 +946,16 @@ export const useStudio = create<Studio>()(
         },
 
         // ---- export ----------------------------------------------------------------------------
-        exportPng: async (force = false) => {
+        exportSlides: async (format, force = false) => {
           const s = get();
           if (!s.project || s.jobs.export?.running) return;
           if (s.readOnly) return notify("warning", "Fix the structural findings first.");
           // The export must match the file on disk (dataflow §7), so it never saves on its own.
           if (isDirty(s)) return notify("warning", "Save first: the export renders the saved file.");
-          set({ exportBlocked: null });
+          set({ exportBlocked: null, exportFormat: format });
           job("export", { running: true, lines: [] });
           try {
-            const r = await server.exportPng(force);
+            const r = await server.exportSlides(format, force);
             notify("success", `Exported ${r.files.length} file(s) to ${r.dir}`);
             await get().loadExports();
           } catch (e) {

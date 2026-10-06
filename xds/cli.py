@@ -167,7 +167,8 @@ def cmd_audit(a: argparse.Namespace, out: Out) -> int:
 def cmd_export(a: argparse.Namespace, out: Out) -> int:
     from . import export
 
-    result = export.export(a.project, out=a.out, force=a.force, progress=out.line)
+    result = export.export(a.project, out=a.out, force=a.force, format="pdf" if a.pdf else "png",
+                           progress=out.line)
     forced = " (forced past open errors)" if result["record"]["forced"] else ""
     out.emit(result, f"exported {len(result['files'])} file(s) to {result['dir']}{forced}")
     return 0
@@ -420,6 +421,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("export", cmd_export, "audit gate → export/<stamp>/")
     sp.add_argument("project")
     sp.add_argument("--out")
+    sp.add_argument("--pdf", action="store_true", help="the deck as one PDF instead of a PNG per slide")
     sp.add_argument("--force", action="store_true", help="export despite open errors (recorded)")
 
     sp = add("migrate", cmd_migrate, "upgrade project files to the current schema")

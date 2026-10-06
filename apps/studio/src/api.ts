@@ -89,7 +89,7 @@ export const api = {
     request<{ root: string }>("POST", "/api/projects/init", body),
   chooseFolder: () => request<{ path: string | null }>("POST", "/api/projects/choose", {}),
   audit: (slideId?: string) => request<AuditResponse>("POST", "/api/audit", slideId ? { slideId } : {}),
-  export: (force = false) => request<ExportResponse>("POST", "/api/export", { force }),
+  export: (format: "png" | "pdf", force = false) => request<ExportResponse>("POST", "/api/export", { format, force }),
   exports: () => request<{ exports: ExportEntry[] }>("GET", "/api/exports"),
   starters: () => request<{ designs: string[] }>("GET", "/api/starters"),
   addDesign: (starter: string) => request<{ id: string }>("POST", "/api/designs/add", { starter }),

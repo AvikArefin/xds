@@ -14,7 +14,7 @@ export const server = {
   initProject: (path: string, name: string, format: string) => api.initProject({ path, name, format }),
   chooseFolder: api.chooseFolder,
   audit: api.audit,
-  exportPng: api.export,
+  exportSlides: api.export,
   exports: api.exports,
   starters: api.starters,
   addDesign: api.addDesign,

@@ -27,7 +27,7 @@ editor.
 
 | Area | Contents |
 | --- | --- |
-| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Export PNG, Undo, Redo, Save |
+| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields. |
@@ -108,8 +108,10 @@ reloads from disk. Undo has one step per drag or field change.
   afterwards.
 - **Audit**: `A` or **Run audit** (saves first). Click a finding to select its node. **Mark as
   intentional…** records an exception with your reason.
-- **Export**: toolbar **Export PNG** (save first). It stops on open audit errors; **Export anyway**
-  forces it and records that. Finished exports are listed in the Present panel.
+- **Export**: in the Present panel (`1`), **PNG** writes a PNG per slide and **PDF** the deck as
+  one PDF, ready to upload as a LinkedIn carousel (a document post). Save first. Both are also
+  in the command palette. It stops on open audit errors;
+  **Export anyway** forces it and records that. Finished exports are listed in the Present panel.
 - **Outside changes**: when an agent edits the files, the editor reloads at once. The file on disk
   is the truth, and unsaved editor edits are replaced (a notice says so).
 

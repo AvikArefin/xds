@@ -29,7 +29,7 @@ flowchart TB
   subgraph Derived["Derived (on disk, disposable)"]
     RN["cache/&lt;hash&gt;/slides/*.png<br/>rendered slides + contact sheet"]
     AU["cache/&lt;hash&gt;/audit.json<br/>+ *.annotated.png"]
-    EX["export/&lt;stamp&gt;/*.png<br/>deliverables + export.json"]
+    EX["export/&lt;stamp&gt;/*.png or .pdf<br/>deliverables + export.json"]
   end
 
   subgraph Memory["In memory (editor only)"]
@@ -444,7 +444,8 @@ folder.
 | `cache/<hash>/audit.json` | `xds audit` | `AuditReport` (see [design rules §6](./design-rules.md#6-the-report)) |
 | `cache/<hash>/annotated/<n>-<slideId>.png` | `xds audit` | the slide with every diagnostic drawn on it |
 | `export/<YYYYMMDD-HHMMSS>/<n>-<slideId>.png` | `xds export` | the deliverables |
-| `export/<stamp>/export.json` | `xds export` | `{ sourceHash, format, files[], audit: {errors, warnings}, forced }` |
+| `export/<stamp>/<projectId>.pdf` | `xds export --pdf` | instead of the PNGs: every slide in order, one page each at the slide's pixel size (a LinkedIn carousel document) |
+| `export/<stamp>/export.json` | `xds export` | `{ sourceHash, format, files[] (the PNGs, or the PDF), audit: {errors, warnings}, forced }` |
 
 `xds clean PROJECT` deletes `cache/`.
 

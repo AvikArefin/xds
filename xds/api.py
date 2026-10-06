@@ -266,7 +266,11 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
         from . import export
 
         root = state.require_root()
-        result = await run_in_threadpool(export.export, root, force=bool((body or {}).get("force")),
+        body = body or {}
+        fmt = body.get("format", "png")
+        if fmt not in ("png", "pdf"):
+            raise XdsError("BAD_REQUEST", f"unknown export format '{fmt}' (png or pdf)", status=422)
+        result = await run_in_threadpool(export.export, root, force=bool(body.get("force")), format=fmt,
                                          progress=state.progress("export"))
         return ok(**result)
 
