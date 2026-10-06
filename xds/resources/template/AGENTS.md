@@ -38,6 +38,11 @@ xds export . --json     # writes export/<stamp>/*.png (refuses while audit error
 ```
 
 - Fix every audit **error**, then review the **warnings**. Ignore `info` until the slide is done.
+- A clean audit is not a realistic product. Its product checks only catch clipped highlights,
+  crushed shadows and a silhouette lost in the background; a flat, washed-out or plastic-looking
+  product passes. Judge the 3D by eye: crop the product and compare it with a photo of the real one.
+- When tuning a product's look, render one slide at a time (`xds render . --slide s2 --json`) and
+  change one knob per render, so you can see what each change does.
 - `xds rules` explains every rule and its principle; `xds formats` lists the formats.
 - Don't add exceptions just to pass the audit. An exception needs a real artistic reason that a
   person would agree with: `"exceptions": [{ "rule": "RULE_ID", "reason": "…" }]` on the node
@@ -64,6 +69,9 @@ A finding looks like this. Apply its `fix` and audit again:
 - **Contrast**: text must stand out from whatever is behind it, at its weakest point.
 - **Keep the background quiet** behind the text and the product. The product, not the
   background, should be the most eye-catching thing.
+- **Ask what the product is made of** before you set its materials: which parts are metal,
+  plastic, 3D-printed, rubber, glass, and their colors. Better, ask for a photo of the real thing.
+  Don't infer materials from a marketing render, which may show a similar product, not this one.
 
 ## 4. `project.json`
 
@@ -248,6 +256,31 @@ keep the poses. Make models to these conventions (the inspect warnings name any 
   `xds.limits = {"rotateX": [-110, 0]}`;
 - a **device screen** is its own mesh named `Screen`, with UVs filling 0–1 the right way up.
 
+**Materials render exactly as exported.** xds only strips lights and cameras from the GLB, so all
+the realism has to be in the file:
+
+- `metallic` is **1 for metal, 0 for everything else** (plastic, 3D prints, rubber, silicone).
+  In-between values look like neither.
+- **Metal shows only what it reflects** (§5.5): its base color is the color of its reflections.
+  Very dark metal reflecting a dark-gray studio reads as a flat hole. Give black anodized metal a
+  charcoal base color (around linear 0.2) with roughness around 0.5.
+- **Black plastic** stays near black (linear around 0.02). A gray base color reads as gray, not
+  black. Its shape comes from a low-ish roughness (around 0.3), so faces facing the light pick up
+  a sheen.
+
+**CAD exports** (STEP/URDF/STL turned into GLB) are built for manufacturing, not rendering, and
+need preparing in Blender before they look real:
+
+- **Merge by distance first.** CAD meshes often come unwelded, every face a separate island, and
+  nothing else (bevels, smooth shading, finding parts) works until they're welded.
+- **Split parts that need different materials.** A CAD link often fuses a servo into its bracket,
+  or discs into a base plate, in one mesh with one material. Separate them, or assign
+  materials per face.
+- **Round the hard edges** (a Bevel modifier of about 0.5 mm at real scale, limited by angle,
+  with harden normals) and add **surface detail** (UVs plus a fine normal or roughness texture).
+  Razor-sharp, perfectly smooth surfaces are what make a part look "rendered", and dark parts
+  suffer most. Export with `export_apply=True` so the bevel is baked in.
+
 Blender export, run from this folder (keep `.blend` files and scripts in `sources/`):
 
 ```bash
@@ -307,6 +340,26 @@ Lighting is automatic, studio-style, and works at any model size. You only choos
 
 The audit checks the lit product (clipped highlights, crushed shadows, separation from the
 background), and its fixes name the knob to change.
+
+**How the light works**, so you can predict a change instead of guessing:
+
+- **The product is lit only by a studio environment**: the look's softboxes around a gray sphere.
+  There is no direct light, so **the product never shadows itself**. Parts don't cast shadows on
+  each other and recesses don't get darker. `shadow` only draws on the floor. Detailed
+  assemblies look flatter than in a photo; choose a look and angle that light the faces
+  differently, and keep any shading the model can carry (§5.2).
+- **Reflections show that studio, not your slide.** The background design is never reflected.
+  Each look's environment is a fixed gray: `rim` 0.24, `contrast` 0.30, `softbox` 0.42,
+  `bright` 0.62. On a dark set, metal under `bright` reflects a light-gray room, so it looks
+  washed out and pasted in. Prefer `contrast` (its two vertical strip lights draw crisp edge
+  highlights) or `rim`.
+- **`angle` is in world space, with the same convention as the camera's `yaw`.** `angle` equal to
+  the camera's `yaw` puts the key at the camera. It does not follow the camera: with `yaw: -55`,
+  the default `angle: 35` lights the product from 90° to the side. Work out the key relative to
+  `yaw`.
+- **`brightness` is exposure** (×2^brightness on the whole image). It brightens highlights and
+  shadows together and never adds shape. Don't raise it to rescue a flat or dark product; fix
+  the material, the look or the angle.
 
 ## 6. Device screens: an app UI on the phone or laptop
 
