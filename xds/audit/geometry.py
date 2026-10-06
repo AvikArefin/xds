@@ -22,6 +22,7 @@ class R:
 
     @classmethod
     def from_edges(cls, x0: float, y0: float, x1: float, y1: float) -> R:
+        x0, y0, x1, y1 = float(x0), float(y0), float(x1), float(y1)  # mask bboxes arrive as numpy ints
         return cls(x0, y0, max(0.0, x1 - x0), max(0.0, y1 - y0))
 
     @property

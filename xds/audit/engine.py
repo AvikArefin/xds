@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
+
+import numpy as np
 
 from ..models import AuditReport, AuditSummary, Finding, Project, SlideMeasure
 from ..project import XdsError
@@ -31,6 +33,17 @@ def _waivers(slide, finding: Finding) -> str | None:
     return None
 
 
+def _plain(v: Any) -> Any:
+    """`v` with numpy scalars and arrays turned into Python values, so the report serializes."""
+    if isinstance(v, (np.generic, np.ndarray)):
+        return v.tolist()
+    if isinstance(v, dict):
+        return {k: _plain(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_plain(x) for x in v]
+    return v
+
+
 def audit_slide(ms: MeasuredSlide, t: Thresholds, off: set[str]) -> list[Finding]:
     out: list[Finding] = []
     for spec in registry.RULES.values():
@@ -42,7 +55,7 @@ def audit_slide(ms: MeasuredSlide, t: Thresholds, off: set[str]) -> list[Finding
                 rule=spec.id, family=spec.family, severity=severity, slide_id=ms.id,
                 nodes=list(dict.fromkeys(hit.nodes)),
                 region=hit.region.to_model() if hit.region else None,
-                message=hit.message, measured=hit.measured, expected=hit.expected,
+                message=hit.message, measured=_plain(hit.measured), expected=_plain(hit.expected),
                 fix=hit.fix, principle=spec.principle,
             )
             reason = _waivers(ms.slide, f)

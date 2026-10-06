@@ -138,3 +138,15 @@ def test_registry_import_is_cheap():
     code = "import sys; import xds.audit.registry; print('cv2' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "False"
+
+
+def test_numpy_values_in_findings_serialize():
+    from xds.audit.engine import _plain
+    from xds.audit.geometry import R
+
+    r = R.from_edges(np.int64(3), np.int64(4), np.int64(10), np.int64(9))
+    assert all(type(v) is float for v in (r.x, r.y, r.w, r.h))
+    out = _plain({"n": np.int64(4), "f": np.float32(1.5), "xs": [np.int64(1), (np.bool_(True),)], "a": np.arange(2)})
+    assert out == {"n": 4, "f": 1.5, "xs": [1, [True]], "a": [0, 1]}
+    assert type(out["n"]) is int and type(out["xs"][1][0]) is bool
+    json.dumps(out)
