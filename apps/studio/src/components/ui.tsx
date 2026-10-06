@@ -129,6 +129,9 @@ export function NumberField({
   const [scrubbing, setScrubbing] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // What the field was editing when it took focus: the selection can change while the caret
+  // is still here, and the typed value belongs to the old node, not the new one.
+  const target = useRef<{ value: Maybe<number>; onChange: (v: number | undefined) => void } | null>(null);
   useEffect(() => {
     if (!focused) setText(shown);
   }, [shown, focused]);
@@ -136,15 +139,18 @@ export function NumberField({
   const clamp = (v: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
   const tracked = track !== false && min !== undefined && max !== undefined && max > min;
   const commitText = () => {
+    const to = target.current;
+    target.current = null;
+    if (!to) return; // cancelled with Escape
     const t = text.trim();
     if (t === "") {
-      if (value !== undefined && value !== MIXED) onChange(undefined);
+      if (to.value !== undefined && to.value !== MIXED) to.onChange(undefined);
       return;
     }
     const v = Number(t);
     if (Number.isFinite(v)) {
       const c = clamp(v);
-      if (c !== value) onChange(c);
+      if (c !== to.value) to.onChange(c);
       setText(fmt(c, step));
     } else setText(shown);
   };
@@ -242,6 +248,7 @@ export function NumberField({
         placeholder={value === MIXED ? "—" : placeholder !== undefined ? String(typeof placeholder === "number" ? fmt(placeholder, step) : placeholder) : ""}
         onChange={(e) => setText(e.target.value)}
         onFocus={(e) => {
+          target.current = { value, onChange };
           setFocused(true);
           e.target.select();
         }}
@@ -252,6 +259,7 @@ export function NumberField({
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           else if (e.key === "Escape") {
+            target.current = null;
             setText(shown);
             (e.target as HTMLInputElement).blur();
           } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -292,18 +300,30 @@ export function TextField({
 }) {
   const [text, setText] = useState(value);
   const [focused, setFocused] = useState(false);
+  // Same as NumberField: commit to what was being edited at focus, not the current selection.
+  const target = useRef<{ value: string; onChange: (v: string) => void } | null>(null);
   useEffect(() => {
     if (!focused) setText(value);
   }, [value, focused]);
   const commit = () => {
     setFocused(false);
-    if (text !== value) onChange(text);
+    const to = target.current;
+    target.current = null;
+    if (to && text !== to.value) to.onChange(text);
+  };
+  const cancel = (el: HTMLElement) => {
+    target.current = null;
+    setText(value);
+    setTimeout(() => el.blur());
   };
   const common = {
     value: text,
     disabled,
     placeholder: mixed ? "—" : placeholder,
-    onFocus: () => setFocused(true),
+    onFocus: () => {
+      target.current = { value, onChange };
+      setFocused(true);
+    },
     onBlur: commit,
   };
   if (multiline)
@@ -315,10 +335,7 @@ export function TextField({
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) (e.target as HTMLTextAreaElement).blur();
-          if (e.key === "Escape") {
-            setText(value);
-            setTimeout(() => (e.target as HTMLTextAreaElement).blur());
-          }
+          if (e.key === "Escape") cancel(e.target as HTMLElement);
         }}
       />
     );
@@ -330,10 +347,7 @@ export function TextField({
       onChange={(e) => setText(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        if (e.key === "Escape") {
-          setText(value);
-          setTimeout(() => (e.target as HTMLInputElement).blur());
-        }
+        if (e.key === "Escape") cancel(e.target as HTMLElement);
       }}
     />
   );
