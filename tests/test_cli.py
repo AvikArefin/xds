@@ -35,3 +35,17 @@ def test_guide_and_check_note_an_outdated_agents_md(blank, capsys):
     assert code == 0 and "`xds migrate .` updates it" in out.out
     code, out = run(capsys, "check", str(blank))
     assert json.loads(out.out)["agentsMdCurrent"] is False
+
+
+def test_every_help_text_formats():
+    """A stray % in a help string breaks `xds --help` (and, on Python 3.14, every command)."""
+    import argparse
+
+    def walk(parser):
+        parser.format_help()
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for sub in action.choices.values():
+                    walk(sub)
+
+    walk(cli.build_parser())

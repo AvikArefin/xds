@@ -597,7 +597,7 @@ def build_parser() -> argparse.ArgumentParser:
     lg.add_argument("logo", help="a logo id from `xds logo library`, e.g. cortextech/full-logomark")
     lg.add_argument("--id", help="the asset id (default: <brand>-<logo>)")
 
-    sp = add("grid", cmd_grid, "a copy of an image with a labeled % grid, to read positions off it")
+    sp = add("grid", cmd_grid, "a copy of an image with a labeled percent grid, to read positions off it")
     sp.add_argument("project")
     sp.add_argument("file", help="an image in the project (assets/…, screens/…, or a rendered slide in cache/)")
     sp.add_argument("--step", type=float, default=10, help="grid spacing in %% (default 10)")
