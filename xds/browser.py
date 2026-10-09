@@ -12,6 +12,9 @@ A slide is also reused across source hashes: `cache/slide-keys/<key>.json` point
 cache dir that last rendered a slide with the same key (`slide_key`), and its files are linked
 into the new dir. So editing one slide re-renders only that slide.
 
+Every edit makes a new hash dir, so `render` prunes: it keeps the `KEEP_HASHES` most recently
+used dirs and drops slide-keys that point at a deleted one. Linked files survive in the dirs kept.
+
 The page is served by an in-process FastAPI app (the same one the editor talks to) on a free
 local port, so a headless command needs one Python process and no Vite.
 """
@@ -134,6 +137,27 @@ def _remember(root: Path, key: str, source_hash: str) -> None:
     d = root / "cache" / "slide-keys"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{key}.json").write_text(json.dumps({"hash": source_hash}))
+
+
+KEEP_HASHES = 5
+
+
+def prune_cache(root: Path, current: str, keep: int = KEEP_HASHES) -> list[str]:
+    """Delete all but the `keep` most recently used cache/<hash>/ dirs (always keeping `current`)."""
+    base = root / "cache"
+    dirs = [d for d in base.iterdir() if d.is_dir() and d.name not in ("slide-keys", current)] if base.exists() else []
+    dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+    stale = dirs[max(keep - 1, 0):]
+    for d in stale:
+        shutil.rmtree(d, ignore_errors=True)
+    gone = {d.name for d in stale}
+    for entry in (base / "slide-keys").glob("*.json") if gone else ():
+        try:
+            if json.loads(entry.read_text()).get("hash") in gone:
+                entry.unlink(missing_ok=True)
+        except (OSError, ValueError):
+            entry.unlink(missing_ok=True)
+    return sorted(gone)
 
 
 # --- the local server ------------------------------------------------------------------------
@@ -278,6 +302,7 @@ def render(path: str | Path, *, slide_ids: list[str] | None = None, progress: Pr
     cache = root / "cache" / loaded.hash
     for d in ("slides", "measure", "masks", "background", "screens"):
         (cache / d).mkdir(parents=True, exist_ok=True)
+    os.utime(cache)  # mark as recently used, for prune_cache
 
     wanted = slide_ids or [s.id for s in project.slides]
     unknown = [s for s in wanted if project.slide(s) is None]
@@ -312,6 +337,7 @@ def render(path: str | Path, *, slide_ids: list[str] | None = None, progress: Pr
         progress("render: reusing cached slides")
     for sid in wanted:  # point every key at this dir, which now holds all of them
         _remember(root, keys[sid], loaded.hash)
+    prune_cache(root, loaded.hash)
 
     if sheet and slide_ids is None:
         result.contact_sheet = contact_sheet([s.png for s in result.slides], cache / "contact-sheet.png")
