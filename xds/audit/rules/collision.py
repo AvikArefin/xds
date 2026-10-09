@@ -216,13 +216,24 @@ def text_clipped(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             continue
         src = s.source(n.id)
         has_box = src is not None and hasattr(src, "box")
-        grow = f"set box.h to {min(100.0, src.box.h * 1.3):.1f}" if has_box else "enlarge the box"
+        need = 100 * (n.content_height + 1) / s.height if n.content_height else None
+        taller = has_box and need is not None and need > src.box.h + 0.05
+        if out:
+            fix = "Move the block inside the canvas" + (f" and set box.h to {min(100.0, need):.1f}"
+                                                        if taller else "") + ", or shorten the text"
+        elif taller:
+            fix = f"Set box.h to {min(100.0, need):.1f}, shorten the text, or lower data.size"
+        elif has_box and need is not None:
+            fix = "Widen box.w (a word is wider than the box), or lower data.size"
+        else:
+            grow = f"set box.h to {min(100.0, src.box.h * 1.3):.1f}" if has_box else "enlarge the box"
+            fix = f"{grow[0].upper()}{grow[1:]}, shorten the text, or lower data.size"
         yield Hit(
             nodes=[n.id], region=union_all(out) or R.of(n.box),
             message=f"'{s.name(n.id)}' doesn't fit: its text is cut off.",
             measured={"overflow": bool(n.overflow), "linesOffCanvas": len(out)},
             expected={"overflow": False},
-            fix=f"{grow[0].upper()}{grow[1:]}, shorten the text, or lower data.size",
+            fix=fix,
         )
 
 

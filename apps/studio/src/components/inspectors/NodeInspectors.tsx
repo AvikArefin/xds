@@ -1,5 +1,5 @@
 import type { Box, DesignParam, GroundNode, ImageNode, Node, TypeNode } from "@xds/protocol";
-import { boxPx, typeStyle, useStudio } from "../../store";
+import { boxPx, nodeLabel, nodesOf, typeStyle, useActiveSlide, useStudio } from "../../store";
 import { Icon } from "../Icon";
 import {
   Checkbox,
@@ -241,6 +241,22 @@ export function TypeInspector({ nodes }: { nodes: TypeNode[] }) {
           onChange={(v) => set("decorative", v || undefined)}
         />
       </div>
+      <Row label="Wrap" hint="balance: even lines (headlines) · pretty: no lone last word">
+        <Segmented
+          value={(() => {
+            const v = eff("wrap");
+            return v === MIXED ? undefined : (v as "normal" | "balance" | "pretty");
+          })()}
+          disabled={readOnly}
+          options={[
+            { value: "normal", label: "Normal" },
+            { value: "balance", label: "Balance" },
+            { value: "pretty", label: "Pretty" },
+          ]}
+          onChange={(v) => set("wrap", v)}
+        />
+      </Row>
+      {nodes.length === 1 && <StackRow node={nodes[0]} />}
       <Row label="Group" hint="blocks that belong together">
         <TextField
           value={d("group") === MIXED ? "" : ((d("group") as string | undefined) ?? "")}
@@ -255,6 +271,50 @@ export function TypeInspector({ nodes }: { nodes: TypeNode[] }) {
         </div>
       )}
     </Section>
+  );
+}
+
+/** `data.stack`: place the block a gap (in u) below or above another block, ink to ink. */
+function StackRow({ node }: { node: TypeNode }) {
+  const slide = useActiveSlide();
+  const readOnly = useStudio((s) => s.readOnly);
+  const patchData = useStudio((s) => s.patchData);
+  const project = useStudio((s) => s.project)!;
+  const stack = node.data.stack;
+  const others = nodesOf(slide).filter((n) => n.id !== node.id && (n.layer === "type" || n.layer === "image"));
+  const value = stack ? `${stack.below ? "below" : "above"}:${stack.below ?? stack.above}` : undefined;
+  return (
+    <>
+      <Row label="Stack" hint="place it a gap below or above another block, ink to ink; box Y then follows">
+        <Select
+          value={value}
+          noneLabel="Free (box Y)"
+          options={others.flatMap((o) => [
+            { value: `below:${o.id}`, label: `Below ${nodeLabel(o, project)}` },
+            { value: `above:${o.id}`, label: `Above ${nodeLabel(o, project)}` },
+          ])}
+          disabled={readOnly}
+          onChange={(v) => {
+            if (!v) return patchData([node.id], { stack: undefined });
+            const [dir, id] = [v.slice(0, v.indexOf(":")), v.slice(v.indexOf(":") + 1)];
+            patchData([node.id], { stack: { [dir]: id, gap: stack?.gap ?? 2 } });
+          }}
+        />
+      </Row>
+      {stack && (
+        <div className="field-grid">
+          <NumberField
+            label="Gap (u)"
+            value={stack.gap ?? 2}
+            step={0.5}
+            min={-20}
+            max={20}
+            disabled={readOnly}
+            onChange={(g) => g !== undefined && patchData([node.id], { stack: { ...stack, gap: g } })}
+          />
+        </div>
+      )}
+    </>
   );
 }
 

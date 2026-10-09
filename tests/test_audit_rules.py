@@ -311,3 +311,40 @@ def test_screen_rules(tmp_path):
     c.screens[0]["rect"]["w"] = 700
     found = rules_of(c.run())
     assert found["SCREEN_LOW_RES"][0].fix == "Set screens[0].scale to 2.7"
+
+
+# --- fixes that name the right knob --------------------------------------------------------------
+
+def test_low_contrast_names_the_size_band_and_a_size_that_passes(tmp_path):
+    # A custom size is shown 1:1: 24 px is still the 16–24 px band (Lc 60); 25 px needs only 45.
+    c = Case(tmp_path, width=1440, height=1080, preset=None)
+    c.text("eyebrow", 64, 300, ["RECOGNISED ON THE DOORBELL"], size=24, level="caption",
+           widths=[500], color="#909090", weight=400)  # Lc ≈ 59 on white
+    f = rules_of(c.run())["LOW_CONTRAST"][0]
+    assert f.expected == {"lcMin": 60, "sizeBand": "size 16–24 px"}
+    assert "(size 16–24 px, 24 px on screen)" in f.message
+    assert "set data.size to 25 (size > 24 px: Lc ≥ 45)" in f.fix
+
+
+def test_low_contrast_offers_no_size_that_would_not_pass(tmp_path):
+    c = Case(tmp_path, width=1440, height=1080, preset=None)
+    c.text("eyebrow", 64, 300, ["FAINT"], size=24, level="caption", widths=[200], color="#c8c8c8")
+    f = rules_of(c.run())["LOW_CONTRAST"][0]
+    assert "data.size" not in f.fix
+
+
+def test_moving_a_stacked_block_changes_its_gap(tmp_path):
+    c = Case(tmp_path)  # u = 8
+    c.text("title", 64, 200, ["Big title"], size=72, widths=[400])  # ink 200..279.2
+    c.text("sub", 64, 285, ["Small print"], size=40, level="subhead", widths=[300], weight=500)
+    c.nodes[-1]["data"]["stack"] = {"below": "title", "gap": 0.75}
+    f = rules_of(c.run())["TEXT_CROWDED"][0]
+    assert "data.stack.gap to" in f.fix and "box.y" not in f.fix
+
+
+def test_text_clipped_gives_the_box_height_the_text_needs(tmp_path):
+    c = Case(tmp_path)
+    c.text("title", 64, 300, ["Two lines", "of text"], size=72, widths=[400, 300], overflow=True)
+    c.measured[-1]["contentHeight"] = 200.0
+    f = rules_of(c.run())["TEXT_CLIPPED"][0]
+    assert f"Set box.h to {100 * 201 / 1350:.1f}" in f.fix

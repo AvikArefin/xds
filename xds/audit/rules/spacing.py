@@ -163,14 +163,14 @@ def spacing_inconsistent(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         lo, hi = min(gaps), max(gaps)
         if hi <= 0 or (hi - lo) / hi <= t["spacingVariation"]:
             continue
-        a, b, _ = max(pairs, key=lambda p: p[2])
         target = round(sum(gaps) / len(gaps) / t.u) * t.u or t.u
+        a, b, gap = max(pairs, key=lambda p: abs(p[2] - target))  # the gap furthest off
         yield Hit(
             nodes=[m.id for m in members], region=union_all(m.rect for m in members),
             message=f"Gaps in group {label} vary from {lo:.0f} to {hi:.0f}px.",
             measured={"gapsPx": [round(g, 1) for g in gaps]},
             expected={"maxVariation": t["spacingVariation"]},
-            fix=f"Use one gap ({target}px) between all blocks; e.g. " + s.move_fix(b.id, dy=target - hi),
+            fix=f"Use one gap ({target}px) between all blocks; e.g. " + s.move_fix(b.id, dy=target - gap),
         )
 
 

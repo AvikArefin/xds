@@ -128,13 +128,21 @@ flowchart LR
   CLI["xds &lt;cmd&gt;"] --> check["check → project.load() + designs.check()"]
   CLI --> guide["guide → formats.derive(format)"]
   CLI --> render["render → browser.render()"]
+  CLI --> measure["measure → browser.measure_text() + text-only rules"]
   CLI --> audit["audit → browser.render() + audit.run()"]
   CLI --> export["export → audit gate + copy"]
   CLI --> migrate["migrate → steps + conform"]
-  CLI --> model["model add → models3d.inspect() + register"]
+  CLI --> model["model add → models3d.inspect() + normalize() + register"]
+  CLI --> grid["grid → an image copy with a % grid, in cache/grid/"]
 ```
 
 The CLI reads saved source only. `--json` makes every command machine-readable.
+
+`xds measure` is the fast path for text: one browser page visits
+`/render?slide=<id>&layers=type` for each slide, so only the type layer mounts (no WebGL, no
+models, screens, designs or images), waits for `window.xds.ready` (fonts loaded, stacks placed)
+and calls `window.xds.measure()`. `layout.py` turns each `SlideMeasure` into per-block lines,
+heights and stacks and runs the audit rules that need only text geometry. Nothing is cached.
 
 ---
 
@@ -176,17 +184,21 @@ sequenceDiagram
   PW->>D: measure/s1.json
 ```
 
-If a slide's PNG for the current hash already exists, it is reused, so `audit` followed by `export`
-renders once. A slide is also reused across hashes when its own key is unchanged (its JSON, its
+If a slide's PNG for the current hash already exists and its slide key (below) still points at this
+hash, it is reused, so `audit` followed by `export` renders once; after an xds update the key
+changes with the studio build, so the slide is drawn again. A slide is also reused across hashes when its own key is unchanged (its JSON, its
 position, the rest of `project.json` minus other slides and timestamps, every other source file,
 and the studio build): `cache/slide-keys/<key>.json` points at the dir that has it, and its files are
 hard-linked in. Editing one slide re-renders only that slide. After each render the cache is pruned to the
-5 most recently used hash dirs (`KEEP_HASHES`), and slide-keys pointing at a deleted dir are dropped. Headless Chromium draws WebGL on the GPU
+5 most recently used hash dirs (`KEEP_HASHES`), and slide-keys pointing at a deleted dir are dropped;
+other dirs in `cache/` (`slide-keys/`, `grid/`) are kept. Headless Chromium draws WebGL on the GPU
 (Metal on macOS), about 2.5 s per slide. `XDS_SOFTWARE_GL=1` switches to SwiftShader for machines
 without a GPU (CI); it is ~10x slower and differs slightly at anti-aliased edges. There, a hidden 3D
 layer on the render page stops drawing frames, because SwiftShader replays every frame drawn while
 hidden. The ground resolves after the render layer reports subject bounds, so a spotlight
-background lands behind the product in the same frame.
+background lands behind the product in the same frame. Stacked text (`data.stack`) is placed after
+the fonts load: the type layer measures each block's ink, resolves the stacks and moves the
+blocks before it reports ready, so a screenshot never shows a block in its unstacked place.
 
 ---
 

@@ -65,15 +65,27 @@ def default_scale(width: float) -> float:
 
 
 def device_for(screen: Screen) -> str:
-    return next((k for k, d in DEVICES.items()
-                 if d["width"] == screen.width and d["height"] == screen.height), "custom")
+    w, h = (screen.height, screen.width) if screen.landscape else (screen.width, screen.height)
+    return next((k for k, d in DEVICES.items() if d["width"] == w and d["height"] == h), "custom")
+
+
+def landscape_safe_area(portrait: dict[str, float]) -> dict[str, float]:
+    """A phone turned sideways: the notch side's inset on both the left and right (iOS keeps them
+    symmetric), a shorter home-indicator inset at the bottom, no status bar."""
+    side = max(portrait["top"], portrait["left"], portrait["right"])
+    return {"top": 0, "right": side, "bottom": 21 if portrait["bottom"] else 0, "left": side}
 
 
 # --- add -------------------------------------------------------------------------------------
 
 def add(root: Path, screen_id: str, *, device: str | None = None, width: float | None = None,
-        height: float | None = None, scale: float | None = None) -> dict[str, Any]:
-    """Create `screens/<id>/` from the starter and register the screen. Returns the Screen JSON."""
+        height: float | None = None, scale: float | None = None,
+        orientation: str | None = None) -> dict[str, Any]:
+    """Create `screens/<id>/` from the starter and register the screen. Returns the Screen JSON.
+
+    `orientation` "landscape-left"/"landscape-right" makes a landscape page (the preset's width
+    and height swapped) for a device turned on its side; its texture is turned onto the
+    portrait screen mesh at render time."""
     from .project import XdsError, read_raw, write_project
 
     root = Path(root).resolve()
@@ -92,15 +104,27 @@ def add(root: Path, screen_id: str, *, device: str | None = None, width: float |
     if target.exists():
         raise XdsError("SCREEN_EXISTS", f"screens/{screen_id}/ already exists.", status=409)
 
+    if orientation not in (None, "portrait", "landscape-left", "landscape-right"):
+        raise XdsError("USAGE", f"orientation '{orientation}' is not portrait, landscape-left or "
+                       "landscape-right", status=2)
+    landscape = orientation in ("landscape-left", "landscape-right")
     w = width if width is not None else preset["width"]
     h = height if height is not None else preset["height"]
+    safe = preset.get("safeArea")
+    if landscape and width is None and height is None:  # a preset turned on its side
+        w, h = h, w
+        safe = landscape_safe_area(safe) if safe else None
     screen = Screen(id=screen_id, path=f"screens/{screen_id}/index.html", width=w, height=h,
-                    scale=scale if scale is not None else preset.get("scale", default_scale(w)),
-                    safe_area=SafeArea(**preset["safeArea"]) if preset else None)
+                    scale=scale if scale is not None else preset.get("scale", default_scale(min(w, h))),
+                    safe_area=SafeArea(**safe) if safe else None,
+                    orientation=orientation if landscape else None)
     shutil.copytree(STARTER, target)
     page = target / "index.html"
-    page.write_text(page.read_text(encoding="utf-8").replace(
-        'data-device="iphone"', f'data-device="{device or "custom"}"', 1), encoding="utf-8")
+    html = page.read_text(encoding="utf-8").replace(
+        'data-device="iphone"', f'data-device="{device or "custom"}"', 1)
+    if landscape:  # iOS hides the status bar on a phone held sideways
+        html = html.replace('  <xds-include src="status-bar"></xds-include>\n', "", 1)
+    page.write_text(html, encoding="utf-8")
     project.screens.append(screen)
     write_project(root, project)
     return screen.model_dump(mode="json", by_alias=True, exclude_none=True)
@@ -196,16 +220,20 @@ def font_faces(project: Project) -> str:
 
 
 def _html_tag(text: str, screen: Screen) -> str:
-    """Set `data-device` (unless present) and the `--safe-*` variables on <html>."""
+    """Set `data-device` and `data-orientation` (unless present) and the `--safe-*` variables on
+    <html>."""
     safe = screen.safe_area or SafeArea()
     vars_ = (f"--safe-top:{safe.top:g}px;--safe-right:{safe.right:g}px;"
              f"--safe-bottom:{safe.bottom:g}px;--safe-left:{safe.left:g}px;")
     m = re.search(r"<html\b([^>]*)>", text, re.I)
+    orient = f' data-orientation="{"landscape" if screen.landscape else "portrait"}"'
     if not m:
-        return f'<html data-device="{device_for(screen)}" style="{vars_}">' + text + "</html>"
+        return f'<html data-device="{device_for(screen)}"{orient} style="{vars_}">' + text + "</html>"
     attrs = m.group(1)
     if "data-device" not in attrs:
         attrs += f' data-device="{device_for(screen)}"'
+    if "data-orientation" not in attrs:
+        attrs += orient
     sm = re.search(r'style="([^"]*)"', attrs)
     attrs = (attrs[:sm.start()] + f'style="{vars_}{sm.group(1)}"' + attrs[sm.end():]) if sm \
         else attrs + f' style="{vars_}"'

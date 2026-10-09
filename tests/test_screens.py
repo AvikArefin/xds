@@ -66,3 +66,17 @@ def test_render_and_ensure_rendered(blank, tmp_path):
     stamp = got["app-home"].stat().st_mtime_ns
     screens.ensure_rendered(blank, project, cache, ["app-home"])
     assert got["app-home"].stat().st_mtime_ns == stamp
+
+
+def test_landscape_screen(blank):
+    s = screens.add(blank, "porch-cam", device="iphone-17-pro", orientation="landscape-left")
+    assert (s["width"], s["height"]) == (874, 402) and s["orientation"] == "landscape-left"
+    assert s["safeArea"] == {"top": 0, "right": 62, "bottom": 21, "left": 62}
+    page = (blank / "screens" / "porch-cam" / "index.html").read_text()
+    assert 'src="status-bar"' not in page and 'src="home-indicator"' in page
+    p = proj.load(blank).project
+    screen = p.screen("porch-cam")
+    assert screens.device_for(screen) == "iphone-17-pro"
+    assert 'data-orientation="landscape"' in screens._html_tag("<html><body></body></html>", screen)
+    with pytest.raises(XdsError):
+        screens.add(blank, "x", device="iphone", orientation="upside-down")

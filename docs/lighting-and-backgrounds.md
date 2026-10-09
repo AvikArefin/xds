@@ -142,6 +142,19 @@ In the editor, orbiting changes `yaw`/`pitch`, scrolling changes `height`, and p
 **`free`.** An explicit `position` / `target` / `fov` for shots the frame mode can't express. The
 editor switches a slide to `free` only when you choose *Camera → Free* in the inspector.
 
+**Several subjects: `place`.** Frame mode places the subject as one group. For two products in
+two spots (a phone bottom left, a doorbell top right), give each render node a `place`
+(`{ x, y, height }` in canvas percent, like the frame camera). The camera is set first, from the
+nodes without `place` (or, when every node is placed, looking at the origin from `yaw`/`pitch` at
+the distance that shows the largest placed object about at its size). Then each placed object is
+scaled about its center and moved on the plane through the camera target that faces the camera,
+until its projected bounds are centered on (`x`, `y`) with `height`% of the canvas height
+(`@xds/editor-core` `placeObject`, a few fixed-point steps). All of them share one perspective, as
+products photographed side by side do. The placement lives in a wrapper group around the node's
+object, so `pose.rotation` (and `parts`) still apply while `pose.position` and `pose.scale` are
+replaced. Size-dependent things (the shadow plane, the soft-shadow light) follow the placed
+subject, as they follow any subject.
+
 ---
 
 ## 3. Backgrounds (ground designs)

@@ -42,7 +42,7 @@ STRUCTURAL_RULES = frozenset({
     "UNKNOWN_SCREEN", "NOT_A_MODEL", "UNKNOWN_RULE", "UNKNOWN_THRESHOLD", "NOT_WAIVABLE",
     "DESIGN_INVALID", "DESIGN_UNKNOWN_PARAM", "DESIGN_BAD_EXPRESSION", "DESIGN_VALUE_TYPE",
     "UNKNOWN_PART", "UNKNOWN_CLIP", "PART_OUT_OF_RANGE", "MODEL_INVALID",
-    "SCREEN_ASPECT_MISMATCH",
+    "SCREEN_ASPECT_MISMATCH", "STACK_ANCHOR", "STACK_CYCLE",
 })
 
 
@@ -351,6 +351,7 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
 
     for si, slide in enumerate(p.slides):
         sp = f"slides[{si}]"
+        out += _check_stacks(slide, sp)
         if slide.lighting:
             color(slide.lighting.tint, f"{sp}.lighting.tint", slide_id=slide.id)
         exceptions(slide.exceptions, f"{sp}.exceptions", slide_id=slide.id)
@@ -393,6 +394,41 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
 
         out += designs.check(root, p, designs_used)
         out += models3d.check_project(root, p)
+    return out
+
+
+def _check_stacks(slide: Any, sp: str) -> list[Finding]:
+    """`data.stack` anchors: a text or image node on the same slide, and no cycles."""
+    out: list[Finding] = []
+    by_id = {n.id: n for n in slide.nodes}
+    anchors: dict[str, str] = {}
+    for ni, node in enumerate(slide.nodes):
+        stack = node.data.stack if isinstance(node, TypeNode) else None
+        if stack is None:
+            continue
+        kw = {"nodes": [node.id], "slide_id": slide.id}
+        target = by_id.get(stack.anchor)
+        key = "below" if stack.below else "above"
+        candidates = ", ".join(n.id for n in slide.nodes
+                               if n.id != node.id and isinstance(n, (TypeNode, ImageNode))) or "(none)"
+        if target is None or target is node or not isinstance(target, (TypeNode, ImageNode)):
+            why = ("is itself" if target is node else f"is a {target.layer} node" if target is not None
+                   else "is not on this slide")
+            out.append(_f("STACK_ANCHOR", f"{sp}.nodes[{ni}].data.stack.{key}",
+                          f"'{node.id}' stacks {key} '{stack.anchor}', which {why}.",
+                          f"Anchor it to a text or image node on this slide: {candidates}.", **kw))
+            continue
+        anchors[node.id] = stack.anchor
+    for start in anchors:
+        seen, cur = [start], anchors[start]
+        while cur in anchors and cur not in seen:
+            seen.append(cur)
+            cur = anchors[cur]
+        if cur == start and start == min(seen):  # report each cycle once
+            out.append(_f("STACK_CYCLE", f"{sp}.nodes", "Stacked blocks anchor to each other in a "
+                          f"circle: {' → '.join(seen + [start])}.",
+                          "Give one of them a fixed position: remove its data.stack and set box.y.",
+                          nodes=seen, slide_id=slide.id))
     return out
 
 
@@ -440,8 +476,10 @@ def write_project(root: Path, project: Project) -> None:
 
 # --- scaffolding -----------------------------------------------------------------------------
 
-def init(path: str | Path, *, name: str | None = None, preset: str = "instagram-portrait") -> Path:
-    """Copy the content-neutral template and fill in the id, name and format."""
+def init(path: str | Path, *, name: str | None = None, preset: str = "instagram-portrait",
+         size: tuple[int, int] | None = None) -> Path:
+    """Copy the content-neutral template and fill in the id, name and format (`size`: a custom
+    width × height with no preset)."""
     from . import formats
 
     root = Path(path).expanduser().resolve()
@@ -468,8 +506,9 @@ def init(path: str | Path, *, name: str | None = None, preset: str = "instagram-
     doc = json.loads((template / PROJECT_FILE).read_text())
     slug = re.sub(r"[^a-z0-9]+", "-", (name or root.name).lower()).strip("-") or "project"
     prof = formats.CATALOG[preset]
-    doc.update(id=slug, name=name or root.name,
-               format={"preset": preset, "width": prof.width, "height": prof.height})
+    fmt = ({"width": size[0], "height": size[1]} if size else
+           {"preset": preset, "width": prof.width, "height": prof.height})
+    doc.update(id=slug, name=name or root.name, format=fmt)
     stamp = now()
     project = Project.model_validate(doc)
     project.created_at = project.updated_at = stamp

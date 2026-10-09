@@ -88,6 +88,7 @@ export function typeStyle(p: Project, n: TypeNode, guide: GuideJson | null) {
     color: n.data.color ?? role?.color,
     uppercase: n.data.uppercase ?? role?.uppercase ?? false,
     italic: n.data.italic ?? role?.italic ?? false,
+    wrap: n.data.wrap ?? role?.wrap ?? "normal",
   };
 }
 

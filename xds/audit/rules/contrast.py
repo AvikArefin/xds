@@ -6,6 +6,7 @@ composite), at the worst 10 % of them, so a gradient is judged at its weakest po
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any, Iterator
 
 import numpy as np
@@ -32,14 +33,14 @@ def _worst_line(s: MeasuredSlide, t: Thresholds, n: MeasuredNode) -> dict[str, A
     best = None
     if s.background is not None and n.style:
         displayed = n.style.size * s.guide.k
-        lc_min = t.lc_min(displayed, n.style.weight)
+        lc_min, band = t.lc_band(displayed, n.style.weight)
         for line in n.lines or []:
             patch = s.pixels(s.background, R.of(line.rect))
             if patch is None:
                 continue
             score = line_score(n.style.color, patch, t["contrast.worst"])
             if best is None or score["lc"] - lc_min < best["lc"] - best["lcMin"]:
-                best = {**score, "lcMin": lc_min, "displayedPx": round(displayed, 1),
+                best = {**score, "lcMin": lc_min, "band": band, "displayedPx": round(displayed, 1),
                         "rect": R.of(line.rect), "patch": patch}
     s.memo[key] = best
     return best
@@ -52,6 +53,22 @@ def _better_color(s: MeasuredSlide, t: Thresholds, patch: np.ndarray, current: s
     return max(scored, key=lambda x: x[1]) if scored else None
 
 
+def _larger_size(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, lc: float) -> str | None:
+    """The smallest data.size, within the level's band, at which `lc` already passes: the next
+    size band up has a lower minimum."""
+    small, large = t["contrast.sizes"]
+    k = s.guide.k or 1
+    band = t.band(n.level)
+    # medium starts at small (inclusive), large above large (exclusive)
+    for size in (math.ceil(small / k - 1e-9), math.floor(large / k + 1e-9) + 1):
+        if size <= n.style.size or (band and size > band.max):
+            continue
+        need, name = t.lc_band(size * k, n.style.weight)
+        if lc >= need + t["contrast.marginal"]:
+            return f"set data.size to {size} ({name}: Lc ≥ {need:g})"
+    return None
+
+
 def _contrast_hit(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, w: dict[str, Any],
                   severity: str) -> Hit:
     alt = _better_color(s, t, w["patch"], n.style.color)
@@ -61,12 +78,14 @@ def _contrast_hit(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, w: dict[str,
         fix = "Put a scrim behind the text, or move the block to a calmer, more contrasting part of the background"
         if alt:
             fix = f"Set data.color to '{alt[0]}' (Lc {alt[1]:.0f} here) and add a scrim, or move the block"
+    if bigger := _larger_size(s, t, n, w["lc"]):
+        fix += f", or {bigger}"
     return Hit(
         severity=severity, nodes=[n.id], region=w["rect"],
-        message=(f"'{s.name(n.id)}' reads at Lc {w['lc']:.0f} over its background; text displayed at "
-                 f"{w['displayedPx']:.0f}px needs Lc ≥ {w['lcMin']:.0f}."),
+        message=(f"'{s.name(n.id)}' reads at Lc {w['lc']:.0f} over its background; at {n.style.size:g} px "
+                 f"({w['band']}, {w['displayedPx']:g} px on screen) text needs Lc ≥ {w['lcMin']:.0f}."),
         measured={"lc": round(w["lc"], 1), "wcag": round(w["wcag"], 2), "displayedPx": w["displayedPx"]},
-        expected={"lcMin": w["lcMin"]},
+        expected={"lcMin": w["lcMin"], "sizeBand": w["band"]},
         fix=fix,
     )
 
@@ -75,7 +94,9 @@ def _contrast_hit(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, w: dict[str,
 def low_contrast(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """Text must stand out from the pixels behind it, at its weakest point.
 
-    APCA Lc minimum by displayed size: < 16 px: 75 (60 if bold); 16–24 px: 60; > 24 px: 45.
+    APCA Lc minimum by displayed size (data.size × k, the format's view scale; `xds guide` prints
+    the cutoffs in this format's px): < 16 px: 75 (60 if bold); 16–24 px: 60; > 24 px: 45.
+    Exactly 24 px is still medium.
     """
     for n in s.reading_text:
         w = _worst_line(s, t, n)

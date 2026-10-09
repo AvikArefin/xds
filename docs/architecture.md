@@ -60,13 +60,15 @@ xds/
 │   ├── project.py                 #   load, hash, save (atomic), file watching
 │   ├── designs.py                 #   design manifest parsing + expression checks
 │   ├── formats.py                 #   format profiles: sizes, view widths, safe zones, bands
-│   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, `xds model add`
+│   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, normalizing, `xds model add`
 │   ├── library.py                 #   the shipped models and logos (`xds:` asset paths)
 │   ├── library/models/<id>/       #   library models: model.glb + model.json
 │   ├── library/brands/<id>/       #   brand logos: SVGs + brand.json   
 │   ├── library/fonts/<Family>/    #   font library: Fontshare downloads + family.json (not committed)
 │   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
 │   ├── browser.py                 #   Playwright: render slides, collect measurements
+│   ├── layout.py                  #   `xds measure`: text-only layout report + text-only rules
+│   ├── grid.py                    #   `xds grid`: an image copy with a labeled % grid
 │   ├── export.py                  #   audit gate → slide PNGs (or one PDF) → export/<stamp>/
 │   ├── migrate/                   #   conform pass + explicit version steps
 │   ├── resources/                 #   files the CLI copies into projects (package data)
@@ -267,30 +269,33 @@ validation, and `404` missing.
 implementation. Every command accepts `--json`.
 
 ```text
-xds init PROJECT [--name NAME] [--format PRESET]
+xds init PROJECT [--name NAME] [--format PRESET | --size WxH]
 xds open [PROJECT] [--port N] [--no-open]
 xds check PROJECT                         # schema + references + designs (no browser)
 xds guide PROJECT [--slide ID]            # the design numbers for this format
 xds rules                                 # every audit rule with principle + thresholds
+xds measure PROJECT [--slide ID]…        # text only (no 3D): lines, heights, stacks, text rules
 xds render PROJECT [--slide ID]           # slide PNGs + contact sheet → cache/<hash>/
 xds audit PROJECT [--slide ID]            # render + measure + rules → audit.json + annotated PNGs
 xds export PROJECT [--out DIR] [--force] [--pdf]  # audit gate → export/<stamp>/
 xds migrate [PROJECT | --all] [--dry-run] [--conform]
 xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae
+              [--height M | --scale F] [--front back|left|right|up|down] [--ground]   # normalize
 xds model inspect FILE                    # parts, clips, screen meshes, convention warnings
 xds model library                         # the device models xds ships
 xds model add PROJECT --library ID [--slide ID] [--screen ID]   # reference one (not copied)
 xds model vendor PROJECT ASSET_ID         # copy a library model into the project
 xds logo library                          # the brand logos xds ships
 xds logo add PROJECT LOGO [--id ID]       # register one as an svg asset (not copied)
-xds screen add PROJECT ID [--device PRESET | --width W --height H --scale S]
+xds screen add PROJECT ID [--device PRESET | --width W --height H --scale S] [--landscape [left|right]]
 xds screen render PROJECT ID              # the screen page → PNG, to check it flat
 xds design add PROJECT STARTER
 xds fonts fetch PROJECT FAMILY           # downloaded once into the font library, referenced
 xds fonts library                         # the families already downloaded
 xds fonts vendor PROJECT [FAMILY]         # copy library fonts into the project
+xds grid PROJECT FILE [--step PCT]        # an image with a labeled % grid → cache/grid/
 xds formats
-xds schema --emit-types | --check
+xds schema --emit-types | --check        # xds development; --emit-types only inside the checkout
 xds clean PROJECT                         # delete cache/
 ```
 
@@ -350,6 +355,10 @@ The render page exposes `window.xds` (`apps/studio/src/render/`), which `browser
 
 Each layer mask is a screenshot of that layer alone, without background or shadows, so the
 render layer's mask is the product's silhouette.
+
+`/render?slide=<id>&layers=type` mounts only the listed layers (`SlideStage`'s `mountLayers`).
+`xds measure` uses it to lay out text without loading models, screens, designs or images; the
+type layer's readiness still covers fonts and stacked blocks.
 
 There is no separate per-layer capture, no compositing in Python, and no font embedding: the
 screenshot *is* the composite, made the same way the person sees it in the editor. Exporting

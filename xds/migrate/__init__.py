@@ -80,13 +80,19 @@ def run(root: Path, *, dry_run: bool = False, conform_only: bool = False) -> dic
         fromfile="project.json (before)", tofile="project.json (after)"))
     backup = None
     written = False
-    if result is not None and changed and not dry_run:
+    bdir: Path | None = None
+
+    def backup_dir() -> Path:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        bdir = root / BACKUP_DIR / stamp
+        d = root / BACKUP_DIR / stamp
         k = 2
-        while bdir.exists():
-            bdir, k = root / BACKUP_DIR / f"{stamp}-{k}", k + 1
-        bdir.mkdir(parents=True)
+        while d.exists():
+            d, k = root / BACKUP_DIR / f"{stamp}-{k}", k + 1
+        d.mkdir(parents=True)
+        return d
+
+    if result is not None and changed and not dry_run:
+        bdir = backup_dir()
         shutil.copy2(path, bdir / PROJECT_FILE)
         write_atomic(path, after_text)
         for rel in report.retire:
@@ -100,10 +106,15 @@ def run(root: Path, *, dry_run: bool = False, conform_only: bool = False) -> dic
                 (bdir / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(target, bdir / rel)
             write_atomic(target, text)
-        if report.steps:
-            _refresh_agents_md(root, bdir, report)
         backup, written = (bdir / PROJECT_FILE).relative_to(root).as_posix(), True
         _fetch_fonts(root, report)
+    # The guide a project's agent reads comes from the xds that made the project: bring it up to
+    # this version's whenever it differs (new commands, new fields), keeping the old one.
+    if result is not None and (report.steps or not agents_md_current(root)):
+        if dry_run:
+            report.notes.append("AGENTS.md would be updated to this version's guide")
+        else:
+            _refresh_agents_md(root, bdir or backup_dir(), report)
     return {"root": str(root), "ok": not report.unresolved, "fromVersion": from_version,
             "toVersion": SCHEMA_VERSION if result is not None else from_version,
             "dryRun": dry_run, "changed": changed, "written": written, "backup": backup,
@@ -128,9 +139,20 @@ def _with_side_files(root: Path, doc: dict[str, Any]) -> dict[str, Any]:
     return {**doc, **extra}
 
 
+def agents_md_current(root: Path) -> bool:
+    """The project's AGENTS.md is this xds version's template (a missing one counts as current)."""
+    from ..project import RESOURCES
+
+    target = Path(root) / "AGENTS.md"
+    if not target.is_file():
+        return True
+    return target.read_text(encoding="utf-8") == (RESOURCES / "template" / "AGENTS.md").read_text(encoding="utf-8")
+
+
 def _refresh_agents_md(root: Path, bdir: Path, report: Report) -> None:
-    """A schema change makes the project's AGENTS.md describe the old format: keep the old one
-    in the backup and write the current template (the only guide a project's agent reads)."""
+    """Write this version's AGENTS.md template (the only guide a project's agent reads), keeping
+    the old one in the backup: after a schema change the old guide describes the old format, and
+    after an xds update it misses new commands and fields."""
     from ..project import RESOURCES, write_atomic
 
     current = (RESOURCES / "template" / "AGENTS.md").read_text(encoding="utf-8")

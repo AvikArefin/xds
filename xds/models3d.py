@@ -507,12 +507,97 @@ def _gltf_dependencies(src: Path) -> list[Path]:
             if u and not u.startswith("data:") and (src.parent / unquote(u)).is_file()]
 
 
+# --- normalizing ----------------------------------------------------------------------------
+
+# Rotation (quaternion x, y, z, w) that turns a model whose front faces `key` to face +Z.
+_H = math.sqrt(0.5)
+FRONTS: dict[str, list[float]] = {
+    "+z": [0.0, 0.0, 0.0, 1.0],
+    "-z": [0.0, 1.0, 0.0, 0.0],  # 180° about Y
+    "+x": [0.0, -_H, 0.0, _H],   # −90° about Y
+    "-x": [0.0, _H, 0.0, _H],    # +90° about Y
+    "+y": [_H, 0.0, 0.0, _H],    # +90° about X: a model lying on its back
+    "-y": [-_H, 0.0, 0.0, _H],   # −90° about X: a model lying on its face
+}
+
+
+def _read_glb(data: bytes) -> tuple[dict[str, Any], bytes | None]:
+    if len(data) < 20 or data[:4] != b"glTF":
+        raise ModelError("not a GLB file (bad magic)")
+    json_len, json_type = struct.unpack_from("<I4s", data, 12)
+    if json_type != b"JSON":
+        raise ModelError("the first GLB chunk is not JSON")
+    doc = json.loads(data[20:20 + json_len])
+    off = 20 + json_len
+    binary = None
+    if off + 8 <= len(data):
+        bin_len, bin_type = struct.unpack_from("<I4s", data, off)
+        if bin_type == b"BIN\x00":
+            binary = data[off + 8:off + 8 + bin_len]
+    return doc, binary
+
+
+def _write_glb(doc: dict[str, Any], binary: bytes | None) -> bytes:
+    js = json.dumps(doc, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    chunks = struct.pack("<I4s", len(js), b"JSON") + js
+    if binary is not None:
+        b = binary + b"\x00" * (-len(binary) % 4)
+        chunks += struct.pack("<I4s", len(b), b"BIN\x00") + b
+    return struct.pack("<4sII", b"glTF", 2, 12 + len(chunks)) + chunks
+
+
+def normalize(src: Path, dst: Path, *, front: str | None = None, height: float | None = None,
+              scale: float | None = None) -> dict[str, Any]:
+    """Bring a GLB to the conventions without Blender: turn its front to +Z (`front` names the
+    axis it faces now), scale it to `height` meters (or by `scale`), and put its origin at the
+    bottom center, resting on the floor. The scene's roots are wrapped in one unnamed node that
+    carries the transform; meshes, materials, parts and clips are untouched."""
+    from .project import XdsError
+
+    if front is not None and front not in FRONTS:
+        raise XdsError("USAGE", f"--front must be one of {', '.join(FRONTS)}", status=2)
+    if height is not None and scale is not None:
+        raise XdsError("USAGE", "Give --height or --scale, not both.", status=2)
+    if (height is not None and height <= 0) or (scale is not None and scale <= 0):
+        raise XdsError("USAGE", "--height and --scale must be positive.", status=2)
+    try:
+        doc, binary = _read_glb(Path(src).read_bytes())
+    except (ModelError, ValueError) as e:
+        raise XdsError("MODEL_INVALID", f"can't normalize '{src}': {e}", status=422) from e
+    before = inspect_json(doc)["bounds"]
+
+    scenes = doc.setdefault("scenes", [{"nodes": []}])
+    si = doc.get("scene", 0) if doc.get("scene", 0) < len(scenes) else 0
+    nodes = doc.setdefault("nodes", [])
+    wrapper: dict[str, Any] = {"children": list(scenes[si].get("nodes", [])),
+                               "rotation": FRONTS[front or "+z"]}
+    nodes.append(wrapper)
+    scenes[si]["nodes"] = [len(nodes) - 1]
+
+    turned = inspect_json(doc)["bounds"]
+    if turned is None:
+        raise XdsError("MODEL_INVALID", f"'{src}' has no geometry to normalize", status=422)
+    k = scale if scale is not None else (height / turned["size"][1] if height is not None else 1.0)
+    cx, cz = turned["center"][0], turned["center"][2]
+    wrapper["translation"] = [-k * cx, -k * turned["min"][1], -k * cz]
+    if k != 1.0:
+        wrapper["scale"] = [k, k, k]
+    if wrapper["rotation"] == FRONTS["+z"]:
+        del wrapper["rotation"]
+    Path(dst).write_bytes(_write_glb(doc, binary))
+    after = inspect_json(doc)["bounds"]
+    return {"front": front or "+z", "scale": round(k, 6), "before": before, "after": after}
+
+
 # --- adding to a project ---------------------------------------------------------------------
 
 def add(root: Path, file: Path, *, id: str, name: str | None = None, slide: str | None = None,
-        replace: bool = False) -> dict[str, Any]:
+        replace: bool = False, front: str | None = None, height: float | None = None,
+        scale: float | None = None) -> dict[str, Any]:
     """`xds model add`: convert, inspect, copy to assets/models/<id>.glb, register asset and
-    object (identity pose) and, with `slide`, a render node. `replace` keeps poses and nodes."""
+    object (identity pose) and, with `slide`, a render node. `replace` keeps poses and nodes.
+    `front`/`height`/`scale` normalize the file on the way in (`normalize`)."""
     from .project import XdsError, read_raw, write_project
 
     root, file = Path(root).resolve(), Path(file).expanduser().resolve()
@@ -531,8 +616,11 @@ def add(root: Path, file: Path, *, id: str, name: str | None = None, slide: str 
 
     dest = root / "assets" / "models" / f"{id}.glb"
     dest.parent.mkdir(parents=True, exist_ok=True)
+    normalized = None
     with tempfile.TemporaryDirectory() as tmp:
         glb, notes = convert(file, Path(tmp) / f"{id}.glb")
+        if front is not None or height is not None or scale is not None:
+            normalized = normalize(glb, glb, front=front, height=height, scale=scale)
         info = inspect_glb(glb)
         if not info["ok"]:
             raise XdsError("MODEL_INVALID", "; ".join(info["errors"]), status=422,
@@ -557,7 +645,7 @@ def add(root: Path, file: Path, *, id: str, name: str | None = None, slide: str 
     node_id = _add_render_node(project, slide, id, name or id) if slide else None
     write_project(root, project)
     return {"id": id, "asset": rel, "object": id, "node": node_id, "replaced": bool(existing),
-            "source": source, "converted": file.suffix.lower() != ".glb",
+            "source": source, "converted": file.suffix.lower() != ".glb", "normalized": normalized,
             "warnings": notes + info["warnings"], "inspection": info}
 
 
@@ -754,13 +842,17 @@ def _check_node(node: RenderNode, info: dict[str, Any], np_: str, slide_id: str,
         target = meshes.get(mesh)
         if screen is None or target is None:
             continue
-        aspect = screen.width / screen.height
+        # a landscape page is turned onto the (portrait) mesh, so its height spans the mesh's width
+        w, h = (screen.height, screen.width) if screen.landscape else (screen.width, screen.height)
+        aspect = w / h
         if abs(aspect / target["aspect"] - 1) > ASPECT_TOLERANCE:
             rec = target["recommended"]
+            size = (f"{rec['height']}×{rec['width']} (landscape)" if screen.landscape
+                    else f"{rec['width']}×{rec['height']}")
             out.append(_finding(
                 "SCREEN_ASPECT_MISMATCH", path,
-                f"Screen '{screen_id}' is {screen.width:g}×{screen.height:g} "
-                f"(aspect {aspect:.3f}) but mesh '{mesh}' has aspect {target['aspect']:.3f}.",
-                f"Set the screen to {rec['width']}×{rec['height']} (or another size with aspect "
-                f"{target['aspect']:.3f}).", node, slide_id))
+                f"Screen '{screen_id}' is {screen.width:g}×{screen.height:g}"
+                f"{' (landscape)' if screen.landscape else ''}, aspect {aspect:.3f} on the mesh, "
+                f"but mesh '{mesh}' has aspect {target['aspect']:.3f}.",
+                f"Set the screen to {size} (or another size with that aspect).", node, slide_id))
     return out

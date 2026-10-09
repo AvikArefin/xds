@@ -79,6 +79,7 @@ export interface TypeRole {
   lineHeight?: number;
   letterSpacing?: number;
   uppercase?: boolean;
+  wrap?: "normal" | "balance" | "pretty";
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -112,6 +113,7 @@ export interface Screen {
   height: number;
   scale?: number;
   safeArea?: SafeArea;
+  orientation?: "portrait" | "landscape-left" | "landscape-right";
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -357,6 +359,22 @@ export interface TypeData {
   uppercase?: boolean;
   group?: string;
   decorative?: boolean;
+  wrap?: "normal" | "balance" | "pretty";
+  stack?: Stack;
+}
+/**
+ * Place a text block a set gap below (or above) another block, measured ink to ink.
+ *
+ * `gap` is in spacing units (u). The anchor is a text node (its ink) or an image node (its box)
+ * on the same slide. While a stack is set, the block's `box.y` is ignored: the layout decides it.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Stack".
+ */
+export interface Stack {
+  below?: string;
+  above?: string;
+  gap?: number;
 }
 /**
  * No 2D box: the 3D layer covers the slide; position comes from pose and camera.
@@ -379,6 +397,7 @@ export interface RenderNode {
 export interface RenderData {
   object: string;
   pose?: Pose;
+  place?: Place;
   parts?: {
     [k: string]: PartPose;
   };
@@ -386,6 +405,19 @@ export interface RenderData {
   screens?: {
     [k: string]: string;
   };
+}
+/**
+ * Put this object on the canvas by percentage, like a frame camera does for the whole subject:
+ * its center at (x, y) % and its height `height` % of the canvas height. The object is moved
+ * and scaled to land there; the camera's yaw, pitch and fov still set the view.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Place".
+ */
+export interface Place {
+  x?: number;
+  y?: number;
+  height?: number;
 }
 /**
  * Relative to the part's rest pose: degrees about its own pivot, meters in parent space.
@@ -475,6 +507,7 @@ export interface MeasuredNode {
   lines?: MeasuredLine[];
   style?: MeasuredStyle;
   overflow?: boolean;
+  contentHeight?: number;
   role?: string;
   level?: "display" | "headline" | "subhead" | "body" | "caption";
   align?: "left" | "center" | "right";

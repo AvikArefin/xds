@@ -97,7 +97,7 @@ lights and camera became `lighting` and `Slide.camera`).
 A preset brings the platform's **safe zones** (where the app's UI covers the image, e.g. story
 captions) and its **view width** (how wide the image appears on a phone screen). The audit
 needs both (see [design rules](./design-rules.md)). A custom size with no preset uses the
-`generic-screen` profile.
+`generic-screen` profile, shown 1:1 (`xds init --size 1440x1080` makes one).
 
 ### 2.2 `Brand`
 
@@ -117,6 +117,7 @@ TypeRole = {
   lineHeight?: number;     // unitless; when absent, the level's default
   letterSpacing?: number;  // em
   uppercase?: boolean;
+  wrap?: "normal" | "balance" | "pretty";  // CSS text-wrap; default "normal"
 }
 ```
 
@@ -203,6 +204,7 @@ RenderNode = { id; name; layer: "render"; hidden?: boolean; exceptions?: Excepti
 RenderData = {
   object: string;                           // → SceneObject.id
   pose?: Pose;                              // whole-object placement on this slide
+  place?: { x: number; y: number; height: number };  // canvas %: put this object there (§2.9); default 50, 55, 40
   parts?: Record<string, PartPose>;         // articulation, keyed by glTF node name (agent-only, see below)
   animation?: { clip: string; time: number };   // freeze a glTF animation clip at `time` seconds
   screens?: Record<string, string>;         // screen mesh name → Screen.id (§2.10)
@@ -236,8 +238,19 @@ TypeData = {
   lineHeight?: number; letterSpacing?: number; uppercase?: boolean;
   group?: string;          // blocks that belong together (e.g. headline + subhead); the spacing rules use it
   decorative?: boolean;    // graphic lettering: exempt from size/legibility/reading rules, not from collisions
+  wrap?: "normal" | "balance" | "pretty";  // overrides the role's; balance: even lines, pretty: no lone last word
+  stack?: { below?: string; above?: string; gap?: number };  // exactly one anchor; gap in u, default 2
 };
 ```
+
+**Stacked text** (`stack`): the block is placed `gap` spacing units (u) below the ink of the anchor
+node's last line (or, with `above`, its own last line sits `gap` u above the anchor's first line),
+measured ink to ink like the spacing rules. The anchor is a text node or an image node (its box) on
+the same slide. The type layer resolves stacks after laying out the text
+(`@xds/editor-core` `resolveStacks`), so a block moves when the text above it rewraps. While a
+stack is set, `box.y` is ignored; the editor keeps it equal to the resolved position, and turns a
+vertical move into a new `gap`. The gate reports an anchor that isn't a text or image node on the
+slide (`STACK_ANCHOR`) and anchors that loop (`STACK_CYCLE`).
 
 **Effective type style** (the editor and the audit use the same order, and the audit reads it from
 the browser rather than recomputing it): node override → `brand.typography[role]` → the
@@ -321,6 +334,11 @@ Camera =
 The camera is per slide. When absent, the slide uses `frame` with every default, which centers
 the product in the frame. See [lighting and backgrounds §2](./lighting-and-backgrounds.md#2-framing-the-auto-camera).
 
+A render node with `place` is left out of that framing: after the camera is set, the object is
+scaled and moved so its projected bounds are centered at (`x`, `y`)% with a height of `height`% of
+the canvas ([lighting and backgrounds §2](./lighting-and-backgrounds.md#2-framing-the-auto-camera)). Its pose's
+rotation still applies; its position and scale are replaced.
+
 ### 2.10 `Screen`: UI shown on a device
 
 ```ts
@@ -331,8 +349,15 @@ Screen = {
   height: number;            // e.g. 852
   scale?: number;            // device pixel ratio for the texture; default 3 (phones) / 2 (laptops)
   safeArea?: { top: number; right: number; bottom: number; left: number };  // CSS px, exposed as --safe-*
+  orientation?: "portrait" | "landscape-left" | "landscape-right";   // default portrait
 }
 ```
+
+A **landscape** screen (`xds screen add … --landscape [left|right]`) is a page designed sideways
+(874 × 402 for the iPhone 17 Pro) for a device turned on its side: `landscape-left` has the device's
+top on the left (pose rotation z = +90), `landscape-right` on the right (z = −90). The texture is
+turned 90° onto the portrait screen mesh, the aspect check compares the swapped size, and the page
+gets `data-orientation="landscape"` on `<html>`.
 
 A screen is a UI mockup that is applied as a texture to a device model's screen mesh. The page is
 rendered to PNG by the same headless browser at `width × height × scale`. In 3D it is drawn
@@ -462,6 +487,7 @@ folder.
     style?: { font: string; size: number; weight: number; lineHeight: number;
               letterSpacing: number; color: string; uppercase: boolean };
     overflow?: boolean;                           // text did not fit its box
+    contentHeight?: number;                       // the laid-out text's height, px (box.h must hold it)
   }[];
   subject: { bounds: Rect; coverage: number } | null;   // 3D silhouette, from the 3D layer's alpha
   layers: Record<Layer, string>;                  // per-layer alpha masks, PNG paths, for masking checks
@@ -471,7 +497,9 @@ Rect = { x: number; y: number; w: number; h: number };
 ```
 
 The browser lays out the text, so the browser measures it. The audit never estimates text
-geometry in Python.
+geometry in Python. `xds measure` asks the same page for a text-only `SlideMeasure`
+(`/render?slide=<id>&layers=type`: only the type layer is mounted, so no `subject`, `screens`,
+`layers` or `backgroundOnly`) and is not cached.
 
 ---
 
@@ -533,7 +561,11 @@ A zustand store with the `zundo` middleware for undo and redo, split into slices
 | `audit` | the latest `AuditReport`, `auditing` |
 | `jobs` | running/finished exports with their progress lines |
 
-Undo history covers `document.project` only. `dirty` is `project !== savedProject`. There is no
+Undo history covers `document.project` only. `dirty` is `project !== savedProject`.
+`stackLayout` holds where the active slide's stacked text blocks landed, as the type layer reports
+it; it is view state (never saved, not in undo). When it changes, the stacked nodes' `box.y` is
+updated in `project` and `savedProject` alike, without an undo step and without making the
+document dirty. There is no
 per-path pending-edit ledger and no three-way rebase (see [dataflow §2](./dataflow.md#2-input-an-agent-editing-files)): the file on disk is the
 truth, and an outside change simply reloads.
 

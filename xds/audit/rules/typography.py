@@ -250,7 +250,8 @@ def widow(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"'{s.name(n.id)}' ends with a widow: '{last.text.strip()}' alone on the last line.",
             measured={"lastLineWords": len(words), "lastLineRatio": round(ratio, 2)},
             expected={"lastLineWordsMin": 2, "lastLineRatioMin": t["widowRatio"]},
-            fix=f"Add a '\\n' in data.text {hint}, or change box.w slightly",
+            fix=(f"Set data.wrap to 'pretty' (or 'balance' for a headline), add a '\\n' in data.text {hint}, "
+                 "or change box.w slightly"),
         )
 
 

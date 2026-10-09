@@ -19,7 +19,6 @@ import {
   type Object3D,
 } from "three";
 import type {
-  MeasuredLine,
   MeasuredNode,
   MeasuredScreen,
   MeasuredStyle,
@@ -33,12 +32,12 @@ import { toHex } from "../design/color";
 import { findPart, meshesUnder } from "../scene/objects";
 import type { SceneApi } from "../scene/SceneRoot";
 import { projectToPx } from "../scene/studio/subject";
+import { measureLines, rect } from "../stage/ink";
 import type { StageHandle } from "../stage/SlideStage";
 
 const ALPHA_THRESHOLD = 12; // of 255: ignore the faintest antialiasing fringe
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const rect = (x: number, y: number, w: number, h: number): Rect => ({ x: r2(x), y: r2(y), w: r2(w), h: r2(h) });
 
 // --- 3D -------------------------------------------------------------------------------------
 
@@ -56,7 +55,12 @@ function renderSilhouette(api: SceneApi, only?: Object3D): MaskResult {
     o.visible = false;
   };
   for (const c of scene.children) if (c !== subject) hide(c);
-  if (only) for (const c of subject.children) if (c !== only) hide(c);
+  // render nodes sit in placement wrappers: keep the one that holds `only`
+  const holds = (c: Object3D) => {
+    for (let o: Object3D | null = only ?? null; o; o = o.parent) if (o === c) return true;
+    return false;
+  };
+  if (only) for (const c of subject.children) if (!holds(c)) hide(c);
   const background = scene.background;
   scene.background = null;
 
@@ -174,9 +178,12 @@ function measureScreens(project: Project, nodes: RenderNode[], api: SceneApi): M
       let meshAspect: number | undefined;
       if (fit) {
         const vm = (fit.v[0] + fit.v[1]) / 2;
+        const um = (fit.u[0] + fit.u[1]) / 2;
         const at = (u: number, v: number) => fit.p0.clone().addScaledVector(fit.pu, u).addScaledVector(fit.pv, v);
-        const a = projectToPx(at(fit.u[0], vm), api.camera, api.width, api.height);
-        const b = projectToPx(at(fit.u[1], vm), api.camera, api.width, api.height);
+        // the page's width runs along the mesh's u, or along v for a landscape page turned onto it
+        const landscape = project.screens?.find((x) => x.id === screenId)?.orientation?.startsWith("landscape");
+        const a = projectToPx(landscape ? at(um, fit.v[0]) : at(fit.u[0], vm), api.camera, api.width, api.height);
+        const b = projectToPx(landscape ? at(um, fit.v[1]) : at(fit.u[1], vm), api.camera, api.width, api.height);
         displayedWidth = Math.hypot(b[0] - a[0], b[1] - a[1]);
         const wWorld = fit.pu.length() * (fit.u[1] - fit.u[0]);
         const hWorld = fit.pv.length() * (fit.v[1] - fit.v[0]);
@@ -185,81 +192,10 @@ function measureScreens(project: Project, nodes: RenderNode[], api: SceneApi): M
       out.push({ screenId, objectId: node.data.object, mesh: meshName, rect: r, displayedWidth: r2(displayedWidth), meshAspect });
     }
   }
-  void project;
   return out;
 }
 
 // --- type -------------------------------------------------------------------------------------
-
-let ctx2d: CanvasRenderingContext2D | null = null;
-function textMetrics(font: string, letterSpacingPx: number, text: string): TextMetrics {
-  ctx2d ??= document.createElement("canvas").getContext("2d")!;
-  ctx2d.font = font;
-  (ctx2d as unknown as { letterSpacing: string }).letterSpacing = `${letterSpacingPx}px`;
-  return ctx2d.measureText(text);
-}
-
-function measureLines(textEl: HTMLElement, origin: DOMRect, cs: CSSStyleDeclaration, uppercase: boolean): MeasuredLine[] {
-  const size = parseFloat(cs.fontSize) || 16;
-  const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  const ls = cs.letterSpacing === "normal" ? 0 : parseFloat(cs.letterSpacing) || 0;
-  const fm = textMetrics(font, 0, "Hg");
-
-  type Acc = { text: string; x0: number; x1: number; top: number; bottom: number };
-  const lines: Acc[] = [];
-  const walker = document.createTreeWalker(textEl, NodeFilter.SHOW_TEXT);
-  const range = document.createRange();
-  for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
-    const s = node.data;
-    for (let i = 0; i < s.length; i++) {
-      const ch = s[i];
-      if (ch === "\n") {
-        lines.push({ text: "", x0: Infinity, x1: -Infinity, top: NaN, bottom: NaN }); // force a break
-        continue;
-      }
-      range.setStart(node, i);
-      range.setEnd(node, i + 1);
-      const rects = Array.from(range.getClientRects()).filter((r) => r.height > 0);
-      if (!rects.length) continue;
-      const r = rects[rects.length - 1];
-      let line = lines[lines.length - 1];
-      const mid = (r.top + r.bottom) / 2;
-      if (!line || (!Number.isNaN(line.top) && (mid > line.bottom || mid < line.top))) {
-        line = { text: "", x0: Infinity, x1: -Infinity, top: NaN, bottom: NaN };
-        lines.push(line);
-      }
-      if (Number.isNaN(line.top)) {
-        line.top = r.top;
-        line.bottom = r.bottom;
-      }
-      line.text += ch;
-      if (ch.trim()) {
-        line.x0 = Math.min(line.x0, r.left);
-        line.x1 = Math.max(line.x1, r.right);
-      }
-      line.top = Math.min(line.top, r.top);
-      line.bottom = Math.max(line.bottom, r.bottom);
-    }
-  }
-  const out: MeasuredLine[] = [];
-  for (const l of lines) {
-    const text = l.text.trim();
-    if (!text || !Number.isFinite(l.x0)) continue;
-    const baseline = l.bottom - fm.fontBoundingBoxDescent;
-    const ink = textMetrics(font, ls, uppercase ? text.toUpperCase() : text);
-    const asc = Math.max(0, ink.actualBoundingBoxAscent);
-    const desc = Math.max(0, ink.actualBoundingBoxDescent);
-    // trailing letter-spacing after the last glyph is not ink
-    const x1 = l.x1 - ls;
-    out.push({
-      text,
-      rect: rect(l.x0 - origin.left, baseline - asc - origin.top, Math.max(0, x1 - l.x0), asc + desc),
-      baseline: r2(baseline - origin.top),
-    });
-  }
-  void size;
-  return out;
-}
 
 function measureType(node: TypeNode, el: HTMLElement, origin: DOMRect, project: Project, canvas: { w: number; h: number }): Partial<MeasuredNode> {
   const textEl = (el.querySelector("[data-xds-text]") as HTMLElement) ?? el;
@@ -276,7 +212,7 @@ function measureType(node: TypeNode, el: HTMLElement, origin: DOMRect, project: 
     uppercase,
     italic: cs.fontStyle === "italic" || cs.fontStyle.startsWith("oblique"),
   };
-  const lines = measureLines(textEl, origin, cs, uppercase);
+  const lines = measureLines(textEl, origin);
   const boxOverflow = textEl.offsetHeight > el.clientHeight + 0.5 || textEl.scrollWidth > el.clientWidth + 0.5;
   const canvasOverflow = lines.some(
     (l) => l.rect.x < -0.5 || l.rect.y < -0.5 || l.rect.x + l.rect.w > canvas.w + 0.5 || l.rect.y + l.rect.h > canvas.h + 0.5,
@@ -286,6 +222,7 @@ function measureType(node: TypeNode, el: HTMLElement, origin: DOMRect, project: 
     lines,
     style,
     overflow: boxOverflow || canvasOverflow,
+    contentHeight: textEl.offsetHeight,
     role: node.data.role,
     align: node.data.align ?? "left",
     decorative: node.data.decorative ?? false,

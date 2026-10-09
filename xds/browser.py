@@ -133,6 +133,15 @@ def _reuse(root: Path, project: Project, key: str, slide_id: str, index: int, ca
     return True
 
 
+def _fresh(root: Path, key: str, source_hash: str) -> bool:
+    """The slide in cache/<source_hash>/ was drawn for this key (so by this studio build too)."""
+    entry = root / "cache" / "slide-keys" / f"{key}.json"
+    try:
+        return json.loads(entry.read_text()).get("hash") == source_hash
+    except (OSError, ValueError):
+        return False
+
+
 def _remember(root: Path, key: str, source_hash: str) -> None:
     d = root / "cache" / "slide-keys"
     d.mkdir(parents=True, exist_ok=True)
@@ -142,10 +151,15 @@ def _remember(root: Path, key: str, source_hash: str) -> None:
 KEEP_HASHES = 5
 
 
+def _is_hash_dir(d: Path) -> bool:
+    return d.is_dir() and len(d.name) == proj.HASH_LENGTH and all(c in "0123456789abcdef" for c in d.name)
+
+
 def prune_cache(root: Path, current: str, keep: int = KEEP_HASHES) -> list[str]:
-    """Delete all but the `keep` most recently used cache/<hash>/ dirs (always keeping `current`)."""
+    """Delete all but the `keep` most recently used cache/<hash>/ dirs (always keeping `current`).
+    Other dirs in cache/ (slide-keys/, grid/) are left alone."""
     base = root / "cache"
-    dirs = [d for d in base.iterdir() if d.is_dir() and d.name not in ("slide-keys", current)] if base.exists() else []
+    dirs = [d for d in base.iterdir() if _is_hash_dir(d) and d.name != current] if base.exists() else []
     dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
     stale = dirs[max(keep - 1, 0):]
     for d in stale:
@@ -273,6 +287,30 @@ def _render_slide(browser: Any, url: str, project: Project, slide_id: str, index
         page.close()
 
 
+def measure_text(root: Path, project: Project, slide_ids: list[str], *,
+                 progress: Progress = lambda s: None) -> dict[str, SlideMeasure]:
+    """Lay out only the type layer of each slide (`/render?slide=<id>&layers=type`: no 3D, no
+    backgrounds, no images) and measure it. Text geometry is the same as in a full render;
+    stacked blocks are placed against image boxes, which come from project.json."""
+    out: dict[str, SlideMeasure] = {}
+    w, h = project.format.width, project.format.height
+    with chromium() as browser, serve(root) as url:
+        page = browser.new_page(viewport={"width": w, "height": h}, device_scale_factor=1)
+        console: list[str] = []
+        page.on("console", lambda m: console.append(f"{m.type}: {m.text}"))
+        page.on("pageerror", lambda e: console.append(f"pageerror: {e}"))
+        try:
+            for sid in slide_ids:
+                progress(f"measure {sid}")
+                page.goto(f"{url}/render?slide={sid}&layers=type", wait_until="domcontentloaded")
+                _wait_ready(page, sid, console)
+                m = page.evaluate("() => window.xds.measure()")
+                out[sid] = SlideMeasure.model_validate(m)
+        finally:
+            page.close()
+    return out
+
+
 def contact_sheet(pngs: list[Path], out: Path, *, columns: int = 4, thumb_width: int = 360) -> Path:
     images = [Image.open(p).convert("RGB") for p in pngs]
     if not images:
@@ -316,7 +354,8 @@ def render(path: str | Path, *, slide_ids: list[str] | None = None, progress: Pr
     for sid in wanted:
         png = cache / "slides" / slide_png_name(positions[sid], sid)
         measure = cache / "measure" / f"{sid}.json"
-        reused = (png.exists() and measure.exists()) or _reuse(root, project, keys[sid], sid, positions[sid], cache)
+        reused = (_fresh(root, keys[sid], loaded.hash) and png.exists() and measure.exists()) \
+            or _reuse(root, project, keys[sid], sid, positions[sid], cache)
         if reused:
             progress(f"render {positions[sid]}/{len(project.slides)}: {sid} unchanged, reused")
         result.slides.append(RenderedSlide(sid, positions[sid], png, measure, reused))

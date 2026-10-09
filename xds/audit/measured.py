@@ -250,8 +250,13 @@ class MeasuredSlide:
         """A concrete edit that moves a node by (dx, dy) px: its box.x/box.y, or camera.x/y."""
         src = self.source(node_id)
         if src is not None and getattr(src, "box", None) is not None:
-            parts = [f"box.{axis} to {v + 100 * d / size:.1f}"
-                     for axis, v, d, size in (("x", src.box.x, dx, self.width), ("y", src.box.y, dy, self.height)) if d]
+            stack = getattr(src.data, "stack", None)
+            parts = [f"box.x to {src.box.x + 100 * dx / self.width:.1f}"] if dx else []
+            if dy and stack is not None:  # a stacked block's y comes from its gap
+                gap = stack.gap + (dy if stack.below else -dy) / self.guide.u
+                parts.append(f"data.stack.gap to {round(gap * 4) / 4:g} (u)")
+            elif dy:
+                parts.append(f"box.y to {src.box.y + 100 * dy / self.height:.1f}")
             return f"Set '{self.name(node_id)}' " + " and ".join(parts) if parts else "No move needed"
         cam = self.camera()
         if cam is None:

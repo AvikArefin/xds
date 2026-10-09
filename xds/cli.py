@@ -62,17 +62,42 @@ def findings_text(findings: list[dict[str, Any]]) -> str:
 # --- commands ----------------------------------------------------------------------------------
 
 def cmd_init(a: argparse.Namespace, out: Out) -> int:
-    root = proj.init(a.project, name=a.name, preset=a.format)
-    out.emit({"root": str(root)}, f"created {root}")
+    size = None
+    if a.size:
+        if a.format:
+            raise XdsError("USAGE", "Give --format or --size, not both.", status=2)
+        try:
+            size = formats.parse_size(a.size)
+        except ValueError as e:
+            raise XdsError("USAGE", str(e), status=2) from e
+    root = proj.init(a.project, name=a.name, preset=a.format or "instagram-portrait", size=size)
+    fmt = proj.read_raw(root)["format"]
+    out.emit({"root": str(root), "format": fmt},
+             f"created {root} ({fmt.get('preset') or 'custom'} {fmt['width']}×{fmt['height']}, "
+             f"{formats.aspect_label(fmt['width'], fmt['height'])})")
     return 0
+
+
+AGENTS_MD_NOTE = ("note: this project's AGENTS.md is from an older xds and misses newer commands; "
+                  "`xds migrate .` updates it (the old one goes to .migrate-backup/). Then read it again.")
+
+
+def agents_md_current(root: Path) -> bool:
+    from .migrate import agents_md_current as current
+
+    return current(root)
 
 
 def cmd_check(a: argparse.Namespace, out: Out) -> int:
     loaded = proj.load(a.project)
     findings = [dump(f) for f in loaded.findings]
-    text = f"ok: {loaded.root} ({loaded.hash})" if loaded.ok else (
+    text = (f"ok: {loaded.root} ({loaded.hash})" + (f", {len(findings)} warning(s)\n" + findings_text(findings)
+                                                      if findings else "")) if loaded.ok else (
         f"{len(findings)} problem(s) in {loaded.root}\n" + findings_text(findings))
-    out.emit({"valid": loaded.ok, "hash": loaded.hash, "findings": findings}, text)
+    current = agents_md_current(loaded.root)
+    if not current:
+        text += "\n" + AGENTS_MD_NOTE
+    out.emit({"valid": loaded.ok, "hash": loaded.hash, "findings": findings, "agentsMdCurrent": current}, text)
     return 0 if loaded.ok else 1
 
 
@@ -81,8 +106,12 @@ def cmd_guide(a: argparse.Namespace, out: Out) -> int:
     project = loaded.require()
     sets = project.rules.set if project.rules else None
     guide = formats.derive(project.format, sets)
-    data: dict[str, Any] = {"guide": guide.to_json()}
-    text = formats.format_guide_text(guide)
+    from .audit.thresholds import Thresholds
+
+    t = Thresholds(guide, sets)
+    data: dict[str, Any] = {"guide": {**guide.to_json(), "aspect": formats.aspect_label(guide.width, guide.height),
+                                      "contrast": t.contrast_bands()}}
+    text = formats.format_guide_text(guide, t.contrast_text())
     if a.slide:
         measured = slide_measured(loaded.root, project, a.slide, guide, out)
         data["slide"] = measured
@@ -91,6 +120,9 @@ def cmd_guide(a: argparse.Namespace, out: Out) -> int:
             f"{'  ← outside' if m['outside'] else ''}" for m in measured["type"])
         if measured.get("subjectHeight") is not None:
             text += f"\n  subject height {measured['subjectHeight']}% (target 30–75%)"
+    if not agents_md_current(loaded.root):
+        data["agentsMdCurrent"] = False
+        text += "\n\n" + AGENTS_MD_NOTE
     out.emit(data, text)
     return 0
 
@@ -114,6 +146,14 @@ def slide_measured(root: Path, project: Any, slide_id: str, guide: formats.Guide
                      "outside": bool(band and not band.min <= size <= band.max)})
     subject = round(100 * measure.subject.bounds.h / measure.height, 1) if measure.subject else None
     return {"type": rows, "subjectHeight": subject}
+
+
+def cmd_measure(a: argparse.Namespace, out: Out) -> int:
+    from . import layout
+
+    report = layout.measure(a.project, slide_ids=a.slide or None, progress=out.line)
+    out.emit(report, layout.text(report))
+    return 0
 
 
 def cmd_rules(a: argparse.Namespace, out: Out) -> int:
@@ -205,7 +245,7 @@ def cmd_model(a: argparse.Namespace, out: Out) -> int:
 
     if a.model_cmd == "inspect":
         info = models3d.inspect(Path(a.file))
-        out.emit({"model": info}, json.dumps(info, indent=2, default=str))
+        out.emit({"model": info}, model_size_text(info) + "\n" + json.dumps(info, indent=2, default=str))
         return 0
     if a.model_cmd == "library":
         from . import library
@@ -223,6 +263,9 @@ def cmd_model(a: argparse.Namespace, out: Out) -> int:
         return 0
     if bool(a.file) == bool(a.library):
         raise proj.XdsError("USAGE", "Give a FILE or --library ID (one of them).", status=2)
+    if a.library and (a.front or a.height or a.scale or a.ground):
+        raise proj.XdsError("USAGE", "Library models already follow the conventions; --front, "
+                            "--height, --scale and --ground are for your own files.", status=2)
     if a.library:
         result = models3d.add_library(root, a.library, id=a.id, name=a.name, slide=a.slide,
                                       screen=a.screen, replace=a.replace)
@@ -234,13 +277,41 @@ def cmd_model(a: argparse.Namespace, out: Out) -> int:
     if a.screen:
         raise proj.XdsError("USAGE", "--screen works with --library; for a file, set the node's "
                             "data.screens in project.json.", status=2)
-    result = models3d.add(root, Path(a.file), id=a.id, name=a.name, slide=a.slide, replace=a.replace)
+    front = a.front or ("+z" if a.ground else None)  # --ground alone: no turn, no scale
+    result = models3d.add(root, Path(a.file), id=a.id, name=a.name, slide=a.slide, replace=a.replace,
+                          front=front, height=a.height, scale=a.scale)
     warnings = result.get("warnings") or []
-    text = f"added model '{a.id}'" + "".join(
+    norm = result.get("normalized")
+    text = f"added model '{a.id}'" + (
+        f" (turned from {norm['front']} to face +Z, scaled ×{norm['scale']:g}, origin at the bottom center)"
+        if norm else "") + "\n  " + model_size_text(result["inspection"]) + "".join(
         f"\n  warn {w.get('code', '')}: {w.get('message', w)}" if isinstance(w, dict) else f"\n  warn {w}"
         for w in warnings)
     out.emit({"result": result}, text)
     return 0
+
+
+FRONT_WORDS = {"forward": "+z", "back": "-z", "backward": "-z", "right": "+x", "left": "-x",
+               "up": "+y", "down": "-y"}
+
+
+def front_axis(text: str) -> str:
+    v = text.strip().lower()
+    v = FRONT_WORDS.get(v, v if v[:1] in "+-" else "+" + v)
+    if v not in ("+z", "-z", "+x", "-x", "+y", "-y"):
+        raise argparse.ArgumentTypeError(f"'{text}': use back, left, right, up, down or forward "
+                                         "(or an axis: --front=-z)")
+    return v
+
+
+def model_size_text(info: dict[str, Any]) -> str:
+    b = info.get("bounds")
+    if not b:
+        return "size: no geometry"
+    w, h, d = b["size"]
+    return (f"size {w:.3g} × {h:.3g} × {d:.3g} m (w × h × d), lowest point y = {b['min'][1]:.3g}. "
+            "Is that the real product? If not, or if its front doesn't face +Z, re-add it with "
+            "--height <real height in m> and --front <where it faces now: back, left, right, up, down>.")
 
 
 def cmd_screen(a: argparse.Namespace, out: Out) -> int:
@@ -248,8 +319,12 @@ def cmd_screen(a: argparse.Namespace, out: Out) -> int:
 
     root = proj.find_root(a.project)
     if a.screen_cmd == "add":
-        result = screens.add(root, a.id, device=a.device, width=a.width, height=a.height, scale=a.scale)
-        out.emit({"screen": result}, f"created screens/{a.id}/index.html")
+        orientation = f"landscape-{a.landscape}" if a.landscape else None
+        result = screens.add(root, a.id, device=a.device, width=a.width, height=a.height, scale=a.scale,
+                             orientation=orientation)
+        out.emit({"screen": result}, f"created screens/{a.id}/index.html ({result['width']:g}×{result['height']:g}"
+                 + (f", {orientation}: turn the device with pose rotation z = "
+                    f"{90 if a.landscape == 'left' else -90}" if orientation else "") + ")")
         return 0
     loaded = proj.load(root, deep=False)
     dest = root / "cache" / loaded.hash / "screens" / f"{a.id}.png"
@@ -303,11 +378,20 @@ def cmd_logo(a: argparse.Namespace, out: Out) -> int:
     return 0
 
 
+def cmd_grid(a: argparse.Namespace, out: Out) -> int:
+    from . import grid
+
+    result = grid.grid(proj.find_root(a.project), a.file, step=a.step)
+    out.emit(result, f"{result['png']}  ({result['width']}×{result['height']} px, lines every {a.step:g} %)")
+    return 0
+
+
 def cmd_formats(a: argparse.Namespace, out: Out) -> int:
     cat = formats.catalog_json()
     out.emit({"formats": cat}, "\n".join(
-        f"{f['key']:<22} {f['width']}×{f['height']:<6} {f['group']:<7} {f['label']}" for f in cat)
-        + f"\n{formats.GENERIC:<22} any            Custom  shown 1:1")
+        f"{f['key']:<24} {f['width']}×{f['height']:<6} {f['aspect']:<17} {f['group']:<7} {f['label']}"
+        for f in cat)
+        + f"\n{'(no preset)':<24} any          {'':<17} Custom  `xds init --size WxH`: shown 1:1")
     return 0
 
 
@@ -319,6 +403,11 @@ def cmd_schema(a: argparse.Namespace, out: Out) -> int:
         out.emit({"current": current}, "types are current" if current else
                  f"{schema.GENERATED} is out of date; run `xds schema --emit-types`")
         return 0 if current else 1
+    cwd = Path.cwd().resolve()
+    if cwd != REPO and REPO not in cwd.parents:
+        raise XdsError("NOT_IN_XDS_SOURCE", "`xds schema --emit-types` rewrites xds's own TypeScript "
+                       f"types in {schema.GENERATED.relative_to(REPO)}. It's for developing xds and runs "
+                       f"only inside the xds checkout ({REPO}); a project never needs it.", status=2)
     path = schema.emit()
     out.emit({"path": str(path)}, f"wrote {path}")
     return 0
@@ -377,11 +466,15 @@ def cmd_open(a: argparse.Namespace, out: Out) -> int:
 # --- argument parsing ----------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
+    top = argparse.ArgumentParser(add_help=False)
+    top.add_argument("--json", action="store_true", help="machine-readable output")
+    # on subcommands the flag defaults to unset, so `xds --json check .` keeps the top-level one
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--json", action="store_true", help="machine-readable output")
+    common.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                        help="machine-readable output")
 
     p = argparse.ArgumentParser(prog="xds", description="XDS: design social-media graphics from files.",
-                                parents=[common])
+                                parents=[top])
     sub = p.add_subparsers(dest="cmd", required=True, metavar="COMMAND")
 
     def add(name: str, fn: Any, help: str) -> argparse.ArgumentParser:
@@ -392,7 +485,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("init", cmd_init, "create a new project from the blank template")
     sp.add_argument("project")
     sp.add_argument("--name")
-    sp.add_argument("--format", default="instagram-portrait", choices=sorted(formats.CATALOG))
+    sp.add_argument("--format", choices=sorted(formats.CATALOG),
+                    help="a preset from `xds formats` (default instagram-portrait)")
+    sp.add_argument("--size", metavar="WxH", help="a custom size with no platform preset, e.g. 1440x1080")
 
     sp = add("open", cmd_open, "open the studio editor")
     sp.add_argument("project", nargs="?")
@@ -406,6 +501,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("guide", cmd_guide, "the design numbers for this format")
     sp.add_argument("project")
     sp.add_argument("--slide", help="also show this slide's measured values")
+
+    sp = add("measure", cmd_measure, "text layout only (no 3D): lines, heights, stacks, text checks")
+    sp.add_argument("project")
+    sp.add_argument("--slide", action="append", help="only this slide (repeatable)")
 
     sp = add("rules", cmd_rules, "every audit rule with its principle and thresholds")
     sp.add_argument("--project", help="use this project's format and rule overrides")
@@ -442,6 +541,13 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--slide")
     m.add_argument("--screen", help="with --library and --slide: show this screen on the model")
     m.add_argument("--replace", action="store_true")
+    m.add_argument("--front", type=front_axis, metavar="DIR",
+                   help="where the model's front faces now: back (-Z), left (-X), right (+X), up (+Y), "
+                        "down (-Y) or forward (+Z); it is turned to face +Z")
+    m.add_argument("--height", type=float, metavar="M", help="scale the model to this real height in meters")
+    m.add_argument("--scale", type=float, metavar="F", help="scale the model by this factor")
+    m.add_argument("--ground", action="store_true",
+                   help="put the origin at the bottom center (implied by --front/--height/--scale)")
     m = msub.add_parser("library", parents=[common], help="the device models xds ships")
     m = msub.add_parser("vendor", parents=[common], help="copy a library model into the project")
     m.add_argument("project")
@@ -458,6 +564,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--width", type=float)
     s.add_argument("--height", type=float)
     s.add_argument("--scale", type=float)
+    s.add_argument("--landscape", nargs="?", const="left", choices=["left", "right"],
+                   help="a landscape page for the device on its side: its top on the left (default, "
+                        "pose rotation z = 90) or on the right (z = -90)")
     s = ssub.add_parser("render", parents=[common], help="render the screen page to PNG")
     s.add_argument("project")
     s.add_argument("id")
@@ -488,9 +597,14 @@ def build_parser() -> argparse.ArgumentParser:
     lg.add_argument("logo", help="a logo id from `xds logo library`, e.g. cortextech/full-logomark")
     lg.add_argument("--id", help="the asset id (default: <brand>-<logo>)")
 
+    sp = add("grid", cmd_grid, "a copy of an image with a labeled % grid, to read positions off it")
+    sp.add_argument("project")
+    sp.add_argument("file", help="an image in the project (assets/…, screens/…, or a rendered slide in cache/)")
+    sp.add_argument("--step", type=float, default=10, help="grid spacing in %% (default 10)")
+
     add("formats", cmd_formats, "the format catalog")
 
-    sp = add("schema", cmd_schema, "TypeScript types from the Pydantic models")
+    sp = add("schema", cmd_schema, "xds development: TypeScript types from the Pydantic models")
     g = sp.add_mutually_exclusive_group(required=True)
     g.add_argument("--emit-types", action="store_true")
     g.add_argument("--check", action="store_true")

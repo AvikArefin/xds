@@ -75,6 +75,9 @@ class ColorToken(Model):
     hex: Hex
 
 
+Wrap = Literal["normal", "balance", "pretty"]
+
+
 class TypeRole(Model):
     level: Level
     font: str = Field(min_length=1)
@@ -85,6 +88,7 @@ class TypeRole(Model):
     line_height: float | None = Field(default=None, gt=0)
     letter_spacing: float | None = None
     uppercase: bool | None = None
+    wrap: Wrap | None = None
 
 
 class Brand(Model):
@@ -133,6 +137,13 @@ class Screen(Model):
     height: float = Field(gt=0)
     scale: float | None = Field(default=None, gt=0, le=4)
     safe_area: SafeArea | None = None
+    # A landscape page on a portrait screen mesh: the device is turned so its top is on the
+    # left (`landscape-left`, pose rotation z = +90) or on the right (`landscape-right`, z = −90).
+    orientation: Literal["portrait", "landscape-left", "landscape-right"] | None = None
+
+    @property
+    def landscape(self) -> bool:
+        return self.orientation in ("landscape-left", "landscape-right")
 
 
 class Material(Model):
@@ -269,6 +280,28 @@ class ImageData(Model):
     fit: Literal["cover", "contain", "fill"] = "cover"
 
 
+class Stack(Model):
+    """Place a text block a set gap below (or above) another block, measured ink to ink.
+
+    `gap` is in spacing units (u). The anchor is a text node (its ink) or an image node (its box)
+    on the same slide. While a stack is set, the block's `box.y` is ignored: the layout decides it.
+    """
+
+    below: str | None = Field(default=None, min_length=1)
+    above: str | None = Field(default=None, min_length=1)
+    gap: float = Field(default=2, ge=-100, le=100)
+
+    @model_validator(mode="after")
+    def _one_anchor(self) -> Stack:
+        if (self.below is None) == (self.above is None):
+            raise ValueError("a stack names exactly one anchor: 'below' or 'above'")
+        return self
+
+    @property
+    def anchor(self) -> str:
+        return self.below or self.above or ""
+
+
 class TypeData(Model):
     text: str
     role: str = Field(min_length=1)
@@ -283,6 +316,8 @@ class TypeData(Model):
     uppercase: bool | None = None
     group: str | None = None
     decorative: bool | None = None
+    wrap: Wrap | None = None
+    stack: Stack | None = None
 
 
 class PartPose(Model):
@@ -298,9 +333,20 @@ class AnimationFrame(Model):
     time: float = Field(ge=0)
 
 
+class Place(Model):
+    """Put this object on the canvas by percentage, like a frame camera does for the whole subject:
+    its center at (x, y) % and its height `height` % of the canvas height. The object is moved
+    and scaled to land there; the camera's yaw, pitch and fov still set the view."""
+
+    x: float = 50
+    y: float = 55
+    height: float = Field(default=40, gt=0, le=200)
+
+
 class RenderData(Model):
     object: str = Field(min_length=1)
     pose: Pose | None = None
+    place: Place | None = None
     parts: dict[str, PartPose] | None = None
     animation: AnimationFrame | None = None
     screens: dict[str, str] | None = None
@@ -492,6 +538,7 @@ class MeasuredNode(Model):
     lines: list[MeasuredLine] | None = None
     style: MeasuredStyle | None = None
     overflow: bool | None = None
+    content_height: float | None = None  # type nodes: the laid-out text's height, px (box.h must hold it)
     # Type nodes: the declared role and its level, as the browser resolved them.
     role: str | None = None
     level: Level | None = None

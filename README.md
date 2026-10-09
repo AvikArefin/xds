@@ -40,6 +40,7 @@ Or work like an agent, through files and the CLI (the project's `AGENTS.md` expl
 uv run xds guide ~/xd-projects/launch    # margins, spacing unit, type sizes for this format
 # edit project.json, designs/, screens/
 uv run xds check ~/xd-projects/launch    # schema + references, no browser
+uv run xds measure ~/xd-projects/launch  # where the text lands (lines, heights, stacks), no 3D
 uv run xds audit ~/xd-projects/launch    # render + measure + design rules
 uv run xds export ~/xd-projects/launch   # audit gate → export/<stamp>/*.png (--pdf: one PDF)
 ```
@@ -51,28 +52,30 @@ status is 0 on success, 1 on failure or open audit errors.
 
 | Command | What it does |
 | --- | --- |
-| `xds init PROJECT [--name NAME] [--format PRESET]` | create a project from the blank template |
+| `xds init PROJECT [--name NAME] [--format PRESET \| --size WxH]` | create a project from the blank template (`--size`: a custom size, no platform preset) |
 | `xds open [PROJECT] [--port N] [--no-open] [--no-vite]` | start the editor; without a project it opens the project browser |
 | `xds check PROJECT` | schema, references and design manifests (no browser) |
 | `xds guide PROJECT [--slide ID]` | the design numbers for the format; `--slide` adds measured values |
 | `xds rules [--project PROJECT]` | every audit rule with its principle and thresholds |
+| `xds measure PROJECT [--slide ID]…` | text layout without the 3D: each block's lines, ink extent, needed box height, stacked position and contrast minimum, plus the text-only audit rules; seconds for a deck |
 | `xds render PROJECT [--slide ID]` | slide PNGs + contact sheet into `cache/<hash>/` |
 | `xds audit PROJECT [--slide ID]` | render + measure + rules → `audit.json` + annotated PNGs |
 | `xds export PROJECT [--out DIR] [--force] [--pdf]` | audit gate → slide PNGs, or with `--pdf` the deck as one PDF, in `export/<stamp>/` (`--force` is recorded) |
-| `xds migrate [PROJECT \| --all] [--dry-run] [--conform]` | upgrade project files to the current schema |
-| `xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]` | check, convert (`.gltf`, `.dae`) and register a model |
+| `xds migrate [PROJECT \| --all] [--dry-run] [--conform]` | upgrade project files to the current schema, and the project's `AGENTS.md` to this version's guide |
+| `xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace] [--height M \| --scale F] [--front DIR] [--ground]` | check, convert (`.gltf`, `.dae`) and register a model; `--height`/`--front` bring it to real size, facing +Z, standing on its bottom center |
 | `xds model inspect FILE` | parts, clips, screen meshes, convention warnings |
 | `xds model library` | the device models that ship with xds (iPhone 17 Pro, MacBook Pro 14″) |
 | `xds model add PROJECT --library ID [--slide ID] [--screen ID]` | use a library model by reference (not copied) |
 | `xds model vendor PROJECT ASSET_ID` | copy a library model into the project so it travels without xds |
 | `xds logo library` · `xds logo add PROJECT LOGO` | the cortextech logos that ship with xds · register one as an asset by reference |
-| `xds screen add PROJECT ID [--device PRESET \| --width W --height H --scale S]` | create a device-screen page |
+| `xds screen add PROJECT ID [--device PRESET \| --width W --height H --scale S] [--landscape [left\|right]]` | create a device-screen page (`--landscape`: for the device on its side) |
 | `xds screen render PROJECT ID` | render a screen page to PNG to check it flat |
 | `xds design add PROJECT STARTER` | copy a starter background (`sweep`, `spotlight`, `aurora`, `grain-solid`, `split-tone`, `vignette-dark`) |
 | `xds fonts fetch PROJECT FAMILY` | use a Fontshare family: downloaded once into the xds font library, referenced by the project |
 | `xds fonts library` · `xds fonts vendor PROJECT [FAMILY]` | the downloaded families · copy a project's fonts into its own `fonts/` |
-| `xds formats` | the format catalog |
-| `xds schema --emit-types \| --check` | regenerate or check `packages/protocol/src/generated/project.ts` |
+| `xds grid PROJECT FILE [--step PCT]` | a copy of an image with a labeled % grid (in `cache/grid/`), to read positions off it |
+| `xds formats` | the format catalog, with each preset's aspect |
+| `xds schema --emit-types \| --check` | regenerate or check `packages/protocol/src/generated/project.ts` (development; `--emit-types` runs only inside this checkout) |
 | `xds clean PROJECT` | delete `cache/` |
 
 The projects directory (for the editor's project browser and `migrate --all`) is

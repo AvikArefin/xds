@@ -100,7 +100,24 @@ function PosedRoot({ node, object, children }: { node: RenderNode; object: Scene
   );
 }
 
-function ScreenTexture({ root, mesh, url, onMissing }: { root: Object3D; mesh: string; url: string; onMissing: (m: string) => void }) {
+/** How a screen page is turned onto the (portrait) screen mesh: a landscape page is drawn sideways. */
+export function screenRotation(orientation: string | null | undefined): number {
+  return orientation === "landscape-left" ? Math.PI / 2 : orientation === "landscape-right" ? -Math.PI / 2 : 0;
+}
+
+function ScreenTexture({
+  root,
+  mesh,
+  url,
+  orientation,
+  onMissing,
+}: {
+  root: Object3D;
+  mesh: string;
+  url: string;
+  orientation?: string | null;
+  onMissing: (m: string) => void;
+}) {
   const tex = useTexture(url) as Texture;
   useLayoutEffect(() => {
     const target = findPart(root, mesh);
@@ -109,6 +126,8 @@ function ScreenTexture({ root, mesh, url, onMissing }: { root: Object3D; mesh: s
       return;
     }
     tex.flipY = false; // glTF UV convention
+    tex.center.set(0.5, 0.5);
+    tex.rotation = screenRotation(orientation);
     tex.colorSpace = SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
@@ -126,7 +145,7 @@ function ScreenTexture({ root, mesh, url, onMissing }: { root: Object3D; mesh: s
       });
       mat.dispose();
     };
-  }, [root, mesh, tex, onMissing]);
+  }, [root, mesh, tex, orientation, onMissing]);
   return null;
 }
 
@@ -210,7 +229,13 @@ function Model({ node, object, project, hash }: NodeProps) {
       {hash !== undefined &&
         screens.map(([mesh, screenId]) => (
           <Suspense key={mesh} fallback={<Pending k={`screen:${node.id}:${mesh}`} label={`screen: ${screenId}`} />}>
-            <ScreenTexture root={scene} mesh={mesh} url={screenUrl(screenId, hash)} onMissing={onMissing} />
+            <ScreenTexture
+              root={scene}
+              mesh={mesh}
+              url={screenUrl(screenId, hash)}
+              orientation={project.screens?.find((x) => x.id === screenId)?.orientation}
+              onMissing={onMissing}
+            />
           </Suspense>
         ))}
     </>

@@ -28,7 +28,7 @@ class Zone:
 class Profile:
     key: str
     label: str
-    group: str  # Social / Video / Print / Custom
+    group: str  # Social / Video / Screen / Print / Custom
     width: int
     height: int
     view_width: float | None  # how wide the image appears on a phone; None for print
@@ -48,14 +48,19 @@ CATALOG: dict[str, Profile] = {
     for p in [
         Profile("instagram-square", "Instagram square", "Social", 1080, 1080, 390),
         Profile("instagram-portrait", "Instagram portrait", "Social", 1080, 1350, 390),
+        Profile("instagram-portrait-3x4", "Instagram portrait 3:4", "Social", 1080, 1440, 390),
         Profile("instagram-story", "Instagram story", "Social", 1080, 1920, 390,
                 insets=(250, 0, 340, 0)),
         Profile("instagram-reel-cover", "Instagram reel cover", "Video", 1080, 1920, 390,
                 insets=(250, 120, 420, 0)),
         Profile("linkedin-landscape", "LinkedIn landscape", "Social", 1200, 627, 552),
+        Profile("linkedin-document-4x3", "LinkedIn document 4:3 (PDF carousel)", "Social", 1440, 1080,
+                552),
         Profile("x-landscape", "X landscape", "Social", 1600, 900, 390),
         Profile("youtube-thumbnail", "YouTube thumbnail", "Video", 1280, 720, 360,
                 corner_zones=(("duration badge", "bottom-right", 220, 90),)),
+        Profile("presentation-4x3", "Presentation 4:3", "Screen", 1440, 1080, 1440),
+        Profile("presentation-16x9", "Presentation 16:9", "Screen", 1920, 1080, 1440),
         Profile("print-a3", "A3 print (300 dpi)", "Print", 3508, 4961, None, dpi=300,
                 insets=(_mm(8, 300),) * 4),  # 3 mm bleed + 5 mm trim-safe
         Profile("print-a4", "A4 print (300 dpi)", "Print", 2480, 3508, None, dpi=300,
@@ -209,20 +214,46 @@ def derive(fmt: Format, overrides: dict[str, Any] | None = None) -> Guide:
     )
 
 
+def aspect_label(width: int, height: int) -> str:
+    """"4:3 landscape", "3:4 portrait", "1:1 square", or "1.91:1 landscape" when not a small ratio."""
+    from math import gcd
+
+    g = gcd(width, height)
+    a, b = width // g, height // g
+    ratio = f"{a}:{b}" if max(a, b) <= 21 else (f"{width / height:.2f}:1" if width >= height
+                                                  else f"1:{height / width:.2f}")
+    return f"{ratio} " + ("square" if width == height else "landscape" if width > height else "portrait")
+
+
 def catalog_json() -> list[dict[str, Any]]:
     return [
         {"key": p.key, "label": p.label, "group": p.group, "width": p.width, "height": p.height,
-         "viewWidth": p.view_width, "dpi": p.dpi}
+         "aspect": aspect_label(p.width, p.height), "viewWidth": p.view_width, "dpi": p.dpi}
         for p in CATALOG.values()
     ]
 
 
-def format_guide_text(g: Guide) -> str:
-    """The `xds guide` table (design-rules §1.3)."""
-    viewed = f"viewed ≈{g.view_width:.0f} px wide" if g.view_width else f"print, {round(96 / g.k)} dpi"
+def parse_size(text: str) -> tuple[int, int]:
+    """'1440x1080' (or ×) → (1440, 1080)."""
+    import re
+
+    m = re.fullmatch(r"\s*(\d+)\s*[x×X]\s*(\d+)\s*", text or "")
+    if not m or not (0 < int(m.group(1)) <= 20000 and 0 < int(m.group(2)) <= 20000):
+        raise ValueError(f"'{text}' is not a size like 1440x1080")
+    return int(m.group(1)), int(m.group(2))
+
+
+def format_guide_text(g: Guide, contrast: str | None = None) -> str:
+    """The `xds guide` table (design-rules §1.3). `contrast` is the Lc line from the thresholds."""
+    if g.preset == GENERIC:
+        viewed = "custom size, shown 1:1; for a platform, use its preset from `xds formats`"
+    elif g.view_width:
+        viewed = f"viewed ≈{g.view_width:.0f} px wide, so 1 px here shows as {g.k:g} px"
+    else:
+        viewed = f"print, {round(96 / g.k)} dpi"
     zones = ", ".join(f"{z.name} {z.w:.0f}×{z.h:.0f}" for z in g.safe_zones) or "none"
     lines = [
-        f"format       {g.preset} {g.width}×{g.height} ({viewed})",
+        f"format       {g.preset} {g.width}×{g.height}, {aspect_label(g.width, g.height)} ({viewed})",
         f"unit u       {g.u} px      spacing scale: {' '.join(map(str, g.spacing_scale))}",
         f"margin m     {g.m} px     content area: x {g.content['x0']}–{g.content['x1']}, "
         f"y {g.content['y0']}–{g.content['y1']}",
@@ -240,7 +271,7 @@ def format_guide_text(g: Guide) -> str:
     lines += [
         f"budget       ≤ {bd['wordsPerSlide']} words per slide · ≤ {bd['families']} font families · "
         f"≤ {bd['sizes']} distinct sizes · ≤ {bd['blocks']} blocks",
-        "contrast     body Lc ≥ 75 · subhead Lc ≥ 60 · headline/display Lc ≥ 45",
+        "contrast     " + (contrast or "Lc ≥ 45 for large text, 60 medium, 75 small (`xds rules`)"),
         f"subject      height {g.subject_height[0]:.0f}–{g.subject_height[1]:.0f}% of canvas · "
         "keep 1u clear of text",
     ]

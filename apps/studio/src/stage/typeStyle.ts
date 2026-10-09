@@ -18,6 +18,7 @@ export interface EffectiveTypeStyle {
   lineHeight: number; // unitless
   letterSpacing: number; // em
   uppercase: boolean;
+  wrap: "normal" | "balance" | "pretty";
   color: string; // #rrggbb
   level: Level;
 }
@@ -95,6 +96,7 @@ export function effectiveTypeStyle(
     lineHeight: data.lineHeight ?? role.lineHeight ?? (band.line_height[0] + band.line_height[1]) / 2,
     letterSpacing: data.letterSpacing ?? role.letterSpacing ?? 0,
     uppercase: data.uppercase ?? role.uppercase ?? false,
+    wrap: data.wrap ?? role.wrap ?? "normal",
     color,
     level,
   };

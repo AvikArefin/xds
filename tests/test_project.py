@@ -122,3 +122,42 @@ def test_project_agents_md_is_self_contained(blank):
                  "data-xds-repeat", "\"mode\": \"frame\""):
         assert must in text, must
     assert not (blank / "fonts").exists()  # fonts come from the xds font library
+
+
+def test_init_with_a_custom_size(tmp_path):
+    root = proj.init(tmp_path / "deck", name="Deck", size=(1440, 1080))
+    fmt = json.loads((root / "project.json").read_text())["format"]
+    assert fmt == {"width": 1440, "height": 1080} and proj.load(root).ok
+
+
+def _text(id, **data):
+    return {"id": id, "name": id, "layer": "type", "box": {"x": 5, "y": 0, "w": 50, "h": 10},
+            "data": {"text": id, "role": "body", **data}}
+
+
+def test_stack_anchors_and_cycles(blank):
+    def add(d, nodes):
+        d["brand"]["typography"]["body"] = {"level": "body", "font": "Satoshi"}
+        d["fonts"] = [{"family": "Satoshi", "path": "xds:fonts/Satoshi/x.woff2"}]
+        d["slides"][0]["nodes"] = d["slides"][0]["nodes"][:1] + nodes
+
+    edit(blank, lambda d: add(d, [_text("h1"), _text("sub", stack={"below": "h1", "gap": 3}),
+                                  _text("kicker", stack={"above": "h1"})]))
+    assert {"STACK_ANCHOR", "STACK_CYCLE"}.isdisjoint(codes(proj.load(blank)))
+
+    edit(blank, lambda d: add(d, [_text("a", stack={"below": "gone"}),
+                                  _text("b", stack={"below": "s1-background"}),
+                                  _text("c", stack={"below": "c"})]))
+    found = [f for f in proj.load(blank).findings if f.rule == "STACK_ANCHOR"]
+    assert sorted(f.nodes[0] for f in found) == ["a", "b", "c"]
+    assert "is not on this slide" in found[0].message and found[0].path.endswith("data.stack.below")
+
+    edit(blank, lambda d: add(d, [_text("p", stack={"below": "q"}), _text("q", stack={"below": "r"}),
+                                  _text("r", stack={"below": "p"})]))
+    cycles = [f for f in proj.load(blank).findings if f.rule == "STACK_CYCLE"]
+    assert len(cycles) == 1 and "p → q → r → p" in cycles[0].message
+
+
+def test_a_stack_names_exactly_one_anchor(blank):
+    edit(blank, lambda d: d["slides"][0]["nodes"].append(_text("x", stack={"below": "a", "above": "b"})))
+    assert "SCHEMA_INVALID" in codes(proj.load(blank))

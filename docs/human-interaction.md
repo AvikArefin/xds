@@ -30,7 +30,7 @@ editor.
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
-| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields. |
+| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields (Text adds **Wrap** and **Stack**). |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
 layer on the canvas only, so you can work on what's under it; it is never saved, and exports
@@ -88,7 +88,12 @@ reloads from disk. Undo has one step per drag or field change.
   backup in `.migrate-backup/`.
 - **Text**: declare a role in Present → Typography first (Font, Size range, Weight, Size, Color),
   then `2` → **+ New text…** → a role. Drag it, or type in the inspector; edges snap to the margin,
-  the grid and other blocks.
+  the grid and other blocks. **Wrap**: Balance evens out a headline's lines, Pretty avoids a lone
+  last word.
+- **Stack text**: Text inspector → **Stack** → *Below …* (or *Above …*) another block, and a
+  **Gap** in units. The block then follows that block's last line wherever it wraps. Dragging it
+  up or down, nudging it or typing its Y changes the gap instead (whole units while Snap is on).
+  **Free (box Y)** releases it where it is.
 - **Background**: there is no page color. Each slide's back Background node covers the canvas, and
   new slides copy the previous slide's. To change it: `5`, select it, change its design or knobs.
   **+ New background…** adds a project design or a starter on top. The audit reports
@@ -100,6 +105,8 @@ reloads from disk. Undo has one step per drag or field change.
   never copied) or **From file…** (`.glb`, `.gltf`, `.dae`, or drop on the canvas). It arrives
   framed and lit. Right-drag and scroll to place it; the gizmo or pose fields tilt it on this
   slide only.
+- **Two products in their own spots**: select each and tick **Place on canvas**, then set its X, Y
+  and Height in % of the canvas. The camera keeps the view direction; rotation still applies.
 - **Lighting**: usually nothing to do. 3D inspector → **Lighting**: Look (four thumbnails), Angle
   (dial), Elevation, Shadow, Brightness, Tint. **Use for all slides** makes it the project default.
 - **Fonts**: Present → Typography header → download button → a Fontshare family. It's fetched once

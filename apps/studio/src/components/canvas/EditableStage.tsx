@@ -51,6 +51,7 @@ export function EditableStage() {
   const highlight = useStudio((s) => s.hoverFinding);
   const focusRect = useStudio((s) => s.focusRect);
   const readOnly = useStudio((s) => s.readOnly);
+  const syncStackLayout = useStudio((s) => s.syncStackLayout);
   const [hoverFinding, setHoverFinding] = useState<Finding | null>(null);
   const [status, setStatus] = useState<{ waiting: string[]; error: string | null }>({ waiting: [], error: null });
   const [frozen, setFrozen] = useState(false);
@@ -276,6 +277,7 @@ export function EditableStage() {
               onObjectPointerDown={onObjectPointerDown}
               sceneChildren={<Scene3D onDragChange={setFrozen} />}
               onStatus={onStatus}
+              onLayout={syncStackLayout}
             />
           </div>
           {showGuides && guide && mode !== "present" && <GuidesOverlay guide={guide} W={W} H={H} zoom={zoom} />}

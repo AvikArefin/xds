@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { ThreeEvent } from "@react-three/fiber";
 import type { GroundNode, ImageNode, Layer, Project, RenderNode, TypeNode } from "@xds/protocol";
 import { DEFAULT_LAYER_ORDER } from "@xds/protocol";
+import type { StackPlacement } from "@xds/editor-core";
 import type { SubjectLayout } from "../design/resolve";
 import type { SceneApi } from "../scene/SceneRoot";
 import type { DesignInfo, Guide } from "../types";
@@ -47,6 +48,10 @@ export interface SlideStageProps {
   guide?: Guide | null;
   /** Layers to show (default: all). Hidden layers stay mounted (CSS visibility), so nothing reloads. */
   visibleLayers?: Layer[];
+  /** Layers to mount at all (default: all). `xds measure` mounts only "type": no 3D, no backgrounds. */
+  mountLayers?: Layer[];
+  /** The resolved stacked text blocks (`data.stack`), whenever they change. */
+  onLayout?: (placements: Map<string, StackPlacement>) => void;
   /** The slide's flat background fill (default true). */
   showBackground?: boolean;
   /** The contact/soft shadow in the 3D layer (default true). */
@@ -88,6 +93,7 @@ export function SlideStage(props: SlideStageProps) {
     return [...o, ...ALL_LAYERS.filter((l) => !o.includes(l))];
   }, [project.layerOrder]);
   const visible = new Set(props.visibleLayers ?? ALL_LAYERS);
+  const mounted = new Set(props.mountLayers ?? ALL_LAYERS);
 
   const byLayer = useMemo(() => {
     const nodes = (slide?.nodes ?? []).filter((n) => !n.hidden);
@@ -176,14 +182,22 @@ export function SlideStage(props: SlideStageProps) {
                   pointerEvents: interactive ? "auto" : "none",
                 }}
               >
-                {layer === "ground" && (
+                {!mounted.has(layer) ? null : layer === "ground" ? (
                   <GroundLayer nodes={byLayer.ground} project={project} designs={designs} subject={subject} width={width} height={height} />
-                )}
-                {layer === "image" && <ImageLayer nodes={byLayer.image} project={project} hash={props.hash} width={width} height={height} />}
-                {layer === "type" && (
-                  <TypeLayer nodes={byLayer.type} project={project} background={bg} guide={props.guide} width={width} height={height} />
-                )}
-                {layer === "render" && (
+                ) : layer === "image" ? (
+                  <ImageLayer nodes={byLayer.image} project={project} hash={props.hash} width={width} height={height} />
+                ) : layer === "type" ? (
+                  <TypeLayer
+                    nodes={byLayer.type}
+                    images={byLayer.image}
+                    project={project}
+                    background={bg}
+                    guide={props.guide}
+                    width={width}
+                    height={height}
+                    onLayout={props.onLayout}
+                  />
+                ) : (
                   <RenderLayer
                     project={project}
                     slide={slide}

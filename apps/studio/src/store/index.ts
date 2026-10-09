@@ -36,6 +36,7 @@ import {
   distributeRects,
   duplicateNodes,
   freshId,
+  gapForTop,
   moveSlide as moveSlideCore,
   nudgeNodes,
   nudgePose,
@@ -47,6 +48,7 @@ import {
   updateSlide,
   type AlignHow,
   type ReorderTo,
+  type StackPlacement,
 } from "@xds/editor-core";
 import type { LibraryLogo } from "../api";
 import { ServerError, server, subscribeEvents } from "./server";
@@ -97,6 +99,8 @@ export interface StudioState {
   transformSpace: "world" | "local";
   /** Editor-only locks (not saved: the schema has no lock field). */
   locked: Record<string, boolean>;
+  /** Where the active slide's stacked text blocks landed (from the type layer). Not saved, not in undo. */
+  stackLayout: Record<string, StackPlacement>;
 
   // --- view
   zoom: number | "fit";
@@ -150,6 +154,8 @@ export interface StudioActions {
   setTransformMode(m: StudioState["transformMode"]): void;
   setTransformSpace(s: StudioState["transformSpace"]): void;
   toggleLock(id: string): void;
+  /** The type layer laid out stacked blocks: keep their box.y in step (no undo step, not dirty). */
+  syncStackLayout(placements: Map<string, StackPlacement>): void;
 
   setZoom(z: number | "fit"): void;
   zoomBy(f: number): void;
@@ -231,6 +237,7 @@ const initial: StudioState = {
   transformMode: "translate",
   transformSpace: "world",
   locked: {},
+  stackLayout: {},
   zoom: "fit",
   fitZoom: 0.5,
   snap: true,
@@ -298,10 +305,44 @@ export const useStudio = create<Studio>()(
         return true;
       };
 
+      /**
+       * A stacked block's box.y follows its layout (see syncStackLayout), so an edit that moves it
+       * (drag, nudge, align, the Y field) is turned into a new stack gap. When its anchor moved
+       * in the same edit, only the difference counts: blocks moved together keep their gap.
+       * With snapping on, gaps are whole units.
+       */
+      const withStackGaps = (prev: Project | null, next: Project): Project => {
+        const s = get();
+        const before = getSlide(prev, s.activeSlideId);
+        const after = getSlide(next, s.activeSlideId);
+        if (!before || !after || before === after) return next;
+        const H = next.format.height;
+        const u = s.guide?.u ?? Math.max(4, Math.round(Math.min(next.format.width, H) / 135));
+        const old = new Map(nodesOf(before).map((n) => [n.id, n]));
+        const shift = (id: string): number => {
+          const a = old.get(id);
+          const b = nodesOf(after).find((n) => n.id === id);
+          return a && b && a.layer !== "render" && b.layer !== "render" ? ((b.box.y - a.box.y) / 100) * H : 0;
+        };
+        let changed = false;
+        const nodes = nodesOf(after).map((n) => {
+          const was = old.get(n.id);
+          const place = s.stackLayout[n.id];
+          if (n.layer !== "type" || !n.data.stack || !place || was?.layer !== "type" || !was.data.stack) return n;
+          if (n.box.y === was.box.y || JSON.stringify(n.data.stack) !== JSON.stringify(was.data.stack)) return n;
+          const top = (n.box.y / 100) * H - shift(place.anchor);
+          const gap = gapForTop(place, top, u, s.snap ? 1 : 0);
+          if (gap === n.data.stack.gap) return n;
+          changed = true;
+          return { ...n, data: { ...n.data, stack: { ...n.data.stack, gap } } } as Node;
+        });
+        return changed ? updateSlide(next, after.id, (sl) => ({ ...sl, nodes: nodes as Slide["nodes"] })) : next;
+      };
+
       /** Replace the project (one undo step unless inside a gesture). */
       const commit = (project: Project, extra: Partial<StudioState> = {}) => {
         if (project === get().project && !Object.keys(extra).length) return;
-        set({ project, ...extra });
+        set({ project: project ? withStackGaps(get().project, project) : project, ...extra });
       };
 
       const slideOf = () => getSlide(get().project, get().activeSlideId);
@@ -480,6 +521,34 @@ export const useStudio = create<Studio>()(
           if (!t.futureStates.length) return;
           t.redo();
           fixSelectionAfterHistory();
+        },
+        syncStackLayout: (placements) => {
+          const s = get();
+          set({ stackLayout: Object.fromEntries(placements) });
+          if (!s.project) return;
+          const H = s.project.format.height;
+          const sync = (p: Project | null): Project | null => {
+            const slide = getSlide(p, s.activeSlideId);
+            if (!p || !slide) return p;
+            let changed = false;
+            const nodes = nodesOf(slide).map((n) => {
+              const place = placements.get(n.id);
+              if (n.layer !== "type" || !n.data.stack || !place) return n;
+              const y = Math.round((place.top / H) * 100 * 1000) / 1000;
+              if (Math.abs(n.box.y - y) < 0.0005) return n;
+              changed = true;
+              return { ...n, box: { ...n.box, y } } as Node;
+            });
+            return changed ? updateSlide(p, slide.id, (sl) => ({ ...sl, nodes: nodes as Slide["nodes"] })) : p;
+          };
+          const project = sync(s.project);
+          if (project === s.project) return;
+          const saved = sync(s.savedProject);
+          const history = useStudio.temporal.getState();
+          const tracking = history.isTracking;
+          if (tracking) history.pause();
+          set({ project, savedProject: saved, savedJson: saved === s.savedProject ? s.savedJson : JSON.stringify(saved) });
+          if (tracking) history.resume();
         },
         beginGesture: () => {
           if (gestureBase) return;

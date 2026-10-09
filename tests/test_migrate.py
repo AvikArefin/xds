@@ -103,3 +103,21 @@ def test_run_all(tmp_path):
     edit(a, lambda d: d.update(junk=1))
     reports = migrate.run_all(tmp_path, dry_run=True)
     assert [r["changed"] for r in reports] == [True, False]
+
+
+def test_an_outdated_agents_md_is_refreshed(blank):
+    agents = blank / "AGENTS.md"
+    current = agents.read_text()
+    assert migrate.agents_md_current(blank)
+    agents.write_text("# an older guide\n")
+    assert not migrate.agents_md_current(blank)
+
+    dry = migrate.run(blank, dry_run=True)
+    assert "AGENTS.md would be updated to this version's guide" in dry["notes"]
+    assert agents.read_text() == "# an older guide\n"
+
+    r = migrate.run(blank)
+    assert agents.read_text() == current and not r["changed"]  # project.json itself is untouched
+    backups = list((blank / ".migrate-backup").glob("*/AGENTS.md"))
+    assert len(backups) == 1 and backups[0].read_text() == "# an older guide\n"
+    assert migrate.run(blank)["notes"] == []  # nothing more to do

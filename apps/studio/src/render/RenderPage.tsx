@@ -2,6 +2,7 @@
  * /render?slide=<id>: the headless render page that xds/browser.py drives (CONTRACTS.md).
  * Draws <SlideStage> bare at exactly format.width × format.height CSS px at the page origin, on
  * a transparent page, and exposes `window.xds` (ready, error, waiting, measure, showLayers).
+ * `&layers=type` mounts only those layers (`xds measure`: text layout without 3D or backgrounds).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -33,7 +34,12 @@ async function frames(n: number) {
 }
 
 export default function RenderPage() {
-  const slideId = new URLSearchParams(window.location.search).get("slide") ?? "";
+  const params = new URLSearchParams(window.location.search);
+  const slideId = params.get("slide") ?? "";
+  const [mountLayers] = useState<Layer[] | undefined>(() => {
+    const only = params.get("layers");
+    return only ? (only.split(",").filter((l) => (ALL as string[]).includes(l)) as Layer[]) : undefined;
+  });
   const [data, setData] = useState<ProjectResponse | null>(null);
   const [view, setView] = useState<{ layers: Layer[]; background: boolean; shadows: boolean }>({
     layers: ALL,
@@ -135,6 +141,7 @@ export default function RenderPage() {
       guide={data.guide}
       mode="render"
       visibleLayers={view.layers}
+      mountLayers={mountLayers}
       showBackground={view.background}
       showShadows={view.shadows}
       onStatus={onStatus}

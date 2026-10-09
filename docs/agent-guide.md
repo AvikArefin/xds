@@ -16,6 +16,7 @@ editor. Everything here goes through files and the `xds` CLI. Every command take
 xds guide PROJECT --json      know the numbers for this format before designing
 edit project.json             (and designs/*.svg, assets/)
 xds check PROJECT --json      fast: schema, references, design manifests; no browser
+xds measure PROJECT --json    seconds: real line breaks, heights and stacks, text-only rules; no 3D
 xds audit PROJECT --json      render + measure + rules → findings with fixes
   look at cache/<hash>/annotated/*.png and contact-sheet.png
   apply each finding's `fix`, or record a deliberate exception with a reason
@@ -25,10 +26,17 @@ xds export PROJECT --json     writes export/<stamp>/*.png (--pdf: one PDF)
 
 Rules of the road:
 
+- Settle the brief before the first render, in one message with a default for each question:
+  where it's shown and which way up (an aspect like "4:3" alone doesn't pick a preset), a sketch
+  or reference for any composition you can't picture, which lines of copy they love or hate, and
+  real photos (the product, and anything a screen shows).
 - Read [design rules](./design-rules.md) once. `xds guide` gives the numbers, and `xds rules`
   gives every rule's principle.
 - Pick type sizes from the band defaults first. Change them only for a reason.
-- Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin.
+- Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin. Stack text
+  blocks (`data.stack`, [data models §2.5](./data-models.md#25-node-the-editable-unit)) instead of
+  computing their y, and check wrapping with `xds measure` before rendering: a wide display face
+  wraps earlier than it looks.
 - One message per slide: one top-level text block, one subject.
 - A clean audit is not a realistic product. The product checks catch clipped highlights,
   crushed shadows and a lost silhouette; a flat, washed-out or plastic-looking product passes.
@@ -53,8 +61,16 @@ The full schema is in [data models](./data-models.md). The most common edits:
   "box": { "x": 5.93, "y": 4.74, "w": 60, "h": 18 },
   "data": { "text": "Light that\nfollows you", "role": "headline", "group": "intro" } }
 
+// the subhead, 3 units under the headline's last line, wherever that ends up
+{ "id": "sub", "name": "Subhead", "layer": "type",
+  "box": { "x": 5.93, "y": 0, "w": 60, "h": 10 },
+  "data": { "text": "…", "role": "subhead", "group": "intro", "stack": { "below": "h1", "gap": 3 } } }
+
 // the product, on the right third, a bit smaller
 "camera": { "mode": "frame", "x": 64, "y": 58, "height": 50 }
+
+// two products, each in its own spot (no free camera)
+"data": { "object": "iphone-17-pro", "place": { "x": 30, "y": 60, "height": 70 } }
 
 // darker, more dramatic light for this slide only
 "lighting": { "look": "rim", "angle": 210 }
@@ -192,21 +208,30 @@ This one command:
 1. **inspects** the GLB (`xds/models3d.py`, standard library only: it reads the GLB header and
    JSON chunk): glTF 2.0, required extensions supported, bounds from the `POSITION` accessors'
    `min`/`max`;
-2. **warns** about convention breaks: `MODEL_UNITS_SUSPECT` (bounds < 1 cm or > 10 m),
+2. **normalizes** it when asked: `--height M` (or `--scale F`) scales it to its real height,
+   `--front back|left|right|up|down` turns its front to +Z, and either one (or `--ground` alone)
+   puts the origin at the bottom center. The scene's roots are wrapped in one unnamed node with
+   that transform (`models3d.normalize`: the GLB's JSON chunk is rewritten, the binary chunk is
+   untouched), so parts, clips and compression survive. The command prints the model's size: check
+   it against the real product. A 6.6 m doorbell is within the 1 cm – 10 m that
+   `MODEL_UNITS_SUSPECT` accepts, but it makes every pose a calculation;
+3. **warns** about convention breaks: `MODEL_UNITS_SUSPECT` (bounds < 1 cm or > 10 m),
    `MODEL_NOT_GROUNDED` (min y not ≈ 0), `MODEL_OFF_CENTER` (x/z center far from the origin),
    `MODEL_HEAVY` (size or triangle count), `MODEL_UNSUPPORTED_EXTENSION`,
    `MODEL_DUPLICATE_PART_NAMES` (parts must have unique names to be addressable);
-3. **copies** it to `assets/models/bottle.glb` and registers
+4. **copies** it to `assets/models/bottle.glb` and registers
    `{ "id": "bottle", "path": "assets/models/bottle.glb", "kind": "model" }`;
-4. **adds** the catalog object `{ "id": "bottle", "kind": "model", "asset": "bottle", "pose": identity }`;
-5. with `--slide`, **adds** a render node to that slide. With the default auto-camera and
+5. **adds** the catalog object `{ "id": "bottle", "kind": "model", "asset": "bottle", "pose": identity }`;
+6. with `--slide`, **adds** a render node to that slide. With the default auto-camera and
    lighting, the product is already framed and lit.
 
-`xds model inspect FILE --json` runs steps 0–2 without changing the project. It also lists the
+`xds model inspect FILE --json` runs steps 0, 1 and 3 without changing the project. It also lists the
 model's **parts** (the node tree with names, pivots and limits), its **animation clips** with
 durations, and any **screen meshes** with their aspect ratio and a recommended screen size.
 To replace a model, re-run `add` with the same `--id` and `--replace`. Poses and render nodes are
-kept.
+kept. To fix a model already in the project in place:
+`xds model add PROJECT assets/models/doorbell.glb --id doorbell --replace --height 0.16 --front back`
+(then remove the scale and rotation the slides used to compensate).
 
 Doing the same by hand (copy the file, add the asset, object and render node to `project.json`)
 is equally valid. `xds check` will report anything missing.
@@ -286,6 +311,15 @@ The `--device` presets set the logical size, scale and safe area:
 Treat these as starting values and check them against the device model you were given.
 `xds model inspect` prints the screen mesh's aspect ratio, and `xds check` reports
 `SCREEN_ASPECT_MISMATCH` when the screen's size doesn't match it.
+
+`--landscape` (or `--landscape right`) makes a landscape page for a device on its side: the
+preset's size swapped (874 × 402), the safe area on both sides and the bottom, no status bar.
+Design it upright; the texture is turned onto the portrait screen mesh. Turn the device with pose
+rotation z = 90 (its top on the left) or, for `right`, z = −90.
+
+For pictures inside a screen (a camera frame with boxes around what it detected),
+`xds grid PROJECT screens/<id>/photo.jpg` writes a copy with a labeled % grid to read positions
+from.
 
 ### 4.2 Put it on a device
 

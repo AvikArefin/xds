@@ -1,9 +1,9 @@
 import type { FreeCamera, Pose, RenderNode, Vec3 } from "@xds/protocol";
-import { renderNodePose } from "@xds/editor-core";
+import { PLACE_DEFAULTS, renderNodePose, resolvePlace } from "@xds/editor-core";
 import { fileUrl } from "../../api";
 import { FRAME_DEFAULTS, effectiveCamera, effectiveLighting, getSlide, useStudio } from "../../store";
 import { Icon } from "../Icon";
-import { MIXED, NumberField, Row, Section, Segmented, shared } from "../ui";
+import { Checkbox, MIXED, NumberField, Row, Section, Segmented, shared } from "../ui";
 import { LightingControls } from "./LightingControls";
 
 const AXES = ["x", "y", "z"] as const;
@@ -47,6 +47,35 @@ function PoseFields({ nodes }: { nodes: RenderNode[] }) {
       {row("position", "Position", 0.01, "m")}
       {row("rotation", "Rotation", 1, "°")}
       {row("scale", "Scale", 0.01, "")}
+    </Section>
+  );
+}
+
+/** `data.place`: put this object on the canvas by percentage; the camera still sets the view. */
+function PlaceFields({ node }: { node: RenderNode }) {
+  const readOnly = useStudio((s) => s.readOnly);
+  const patchData = useStudio((s) => s.patchData);
+  const place = node.data.place ? resolvePlace(node.data.place) : null;
+  const set = (k: "x" | "y" | "height", v: number | undefined) =>
+    v !== undefined && place && patchData([node.id], { place: { ...place, [k]: v } });
+  return (
+    <Section title="Place on canvas">
+      <Checkbox
+        label="Place this object by canvas %"
+        checked={!!place}
+        disabled={readOnly}
+        onChange={(on) => patchData([node.id], { place: on ? { ...PLACE_DEFAULTS } : undefined })}
+      />
+      {place && (
+        <>
+          <div className="field-grid">
+            <NumberField label="X" value={place.x} step={0.5} unit="%" disabled={readOnly} onChange={(v) => set("x", v)} />
+            <NumberField label="Y" value={place.y} step={0.5} unit="%" disabled={readOnly} onChange={(v) => set("y", v)} />
+            <NumberField label="Height" value={place.height} step={0.5} min={1} max={200} unit="%" disabled={readOnly} onChange={(v) => set("height", v)} />
+          </div>
+          <div className="muted small">Position and scale follow the place; rotation still applies.</div>
+        </>
+      )}
     </Section>
   );
 }
@@ -205,6 +234,7 @@ export function SceneInspector({ nodes }: { nodes: RenderNode[] }) {
             </div>
           )}
           <PoseFields nodes={nodes} />
+          {nodes.length === 1 && <PlaceFields node={nodes[0]} />}
           {nodes.length === 1 && <Articulation node={nodes[0]} />}
         </>
       ) : (

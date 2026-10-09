@@ -4,7 +4,7 @@ import type { FormatProfile } from "../types";
 import { useStudio } from "../store";
 import { NumberField, Select, type SelectOption } from "./ui";
 
-const GROUPS = ["Social", "Video", "Print"];
+const GROUPS = ["Social", "Video", "Screen", "Print"];
 
 let catalogCache: FormatProfile[] | null = null;
 export function useFormatCatalog(): FormatProfile[] {
@@ -22,14 +22,14 @@ export function useFormatCatalog(): FormatProfile[] {
   return catalog;
 }
 
-/** The catalog as grouped select options, Social / Video / Print. */
+/** The catalog as grouped select options, Social / Video / Screen / Print. */
 export function formatOptions(catalog: FormatProfile[]): SelectOption<string>[] {
   return GROUPS.flatMap((g) =>
     catalog.filter((p) => p.group === g).map((p) => ({ value: p.key, label: `${p.label} · ${p.width}×${p.height}`, group: g })),
   );
 }
 
-/** Grouped presets (Social / Video / Print / Custom) plus a custom size. */
+/** Grouped presets (Social / Video / Screen / Print / Custom) plus a custom size. */
 export function FormatSelect() {
   const format = useStudio((s) => s.project?.format);
   const readOnly = useStudio((s) => s.readOnly);

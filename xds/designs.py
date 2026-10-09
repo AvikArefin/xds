@@ -608,6 +608,36 @@ def manifest_findings(d: Design, brand_tokens: set[str] | None) -> list[tuple[st
     return out
 
 
+def design_warnings(d: Design, width: int, height: int) -> list[tuple[str, str]]:
+    """Things that work but won't look as meant, as `(code, message)` pairs:
+
+    - DESIGN_STRETCHED: artwork drawn in a fixed viewBox and stretched to the canvas
+      (`preserveAspectRatio="none"`) distorts on a canvas of another shape: circles turn into
+      ellipses, squares into rectangles. Placeholders scale with any format;
+    - DESIGN_UNUSED_PARAM: a declared knob no expression reads, so setting it changes nothing.
+    """
+    if d.error or d.manifest is None or d.tree is None:
+        return []
+    out: list[tuple[str, str]] = []
+    vb = d.tree.get("viewBox") or ""
+    if (d.tree.get("preserveAspectRatio") or "").strip() == "none" and "{{" not in vb:
+        try:
+            _, _, vw, vh = (float(v) for v in vb.replace(",", " ").split())
+        except ValueError:
+            vw = vh = 0
+        if vw > 0 and vh > 0 and abs(math.log((width / height) / (vw / vh))) > 0.02:
+            k = (width / height) / (vw / vh)
+            out.append(("DESIGN_STRETCHED", f"is drawn in a fixed {vw:g} × {vh:g} viewBox stretched to "
+                        f"this {width} × {height} canvas, so its shapes are {k:.2f}× as wide as drawn"))
+    found, _ = placeholders(d.tree)
+    used = {n.split(".")[0] for ph in found for n in _safe_names(ph.expr)}
+    for prm in d.manifest.params:
+        if prm.name not in used:
+            out.append(("DESIGN_UNUSED_PARAM", f"declares '{prm.name}', but no {{{{ }}}} expression "
+                        "reads it, so setting it changes nothing"))
+    return out
+
+
 def _safe_names(expr: str) -> list[str]:
     try:
         return names_in(parse(expr))
@@ -618,8 +648,8 @@ def _safe_names(expr: str) -> list[str]:
 # --- the gate --------------------------------------------------------------------------------
 
 def _finding(rule: str, path: str, message: str, *, nodes: list[str], slide_id: str | None,
-             fix: str = "") -> Finding:
-    return Finding(rule=rule, family="check", severity="error", path=path, message=message,
+             fix: str = "", severity: str = "error") -> Finding:
+    return Finding(rule=rule, family="check", severity=severity, path=path, message=message,
                    fix=fix, nodes=nodes, slide_id=slide_id)
 
 
@@ -629,6 +659,11 @@ _FIXES = {
                             "(width, height, subject.*, brand.<token>).",
     "DESIGN_BAD_EXPRESSION": "Use the expression language of lighting-and-backgrounds §3.3.",
     "DESIGN_VALUE_TYPE": "Give a value of the param's type within its min/max.",
+    "DESIGN_STRETCHED": "Draw in canvas px: width=\"{{width}}\" height=\"{{height}}\" viewBox=\"0 0 "
+                        "{{width}} {{height}}\", with positions and sizes as expressions of width and "
+                        "height (a circle's r from min(width, height)).",
+    "DESIGN_UNUSED_PARAM": "Use the param in an expression (a loop count, a size, a color), or remove "
+                           "it from the manifest.",
 }
 
 
@@ -651,6 +686,9 @@ def check(root: Path, project: Project,
         for code, msg in manifest_findings(d, tokens):
             out.append(_finding(code, f"designs/{design_id}.svg", f"designs/{design_id}.svg {msg}",
                                 nodes=node_ids, slide_id=first_slide, fix=_FIXES[code]))
+        for code, msg in design_warnings(d, project.format.width, project.format.height):
+            out.append(_finding(code, f"designs/{design_id}.svg", f"designs/{design_id}.svg {msg}.",
+                                nodes=node_ids, slide_id=first_slide, fix=_FIXES[code], severity="warn"))
         if d.manifest is not None:
             for json_path, node, slide_id in uses:
                 out += _node_findings(d, node, json_path, slide_id, tokens)

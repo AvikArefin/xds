@@ -190,12 +190,52 @@ class Thresholds:
 
     def lc_min(self, displayed_px: float, weight: float) -> float:
         """Design-rules §4.4: the Lc minimum for a line at its displayed size."""
+        return self.lc_band(displayed_px, weight)[0]
+
+    def lc_band(self, displayed_px: float, weight: float) -> tuple[float, str]:
+        """The Lc minimum for a displayed size and weight, and the size band it comes from, named
+        in this format's own px (what `data.size` is written in), e.g. "16–24 px"."""
         small, large = self["contrast.sizes"]
+        k = self.guide.k or 1
         if displayed_px < small:
-            return self["contrast.smallBold"] if weight >= self["contrast.boldWeight"] else self["contrast.small"]
+            bold = weight >= self["contrast.boldWeight"]
+            return (self["contrast.smallBold"] if bold else self["contrast.small"],
+                    f"size < {_px(small / k)}" + (f", weight ≥ {self['contrast.boldWeight']:g}" if bold else ""))
         if displayed_px <= large:
-            return self["contrast.medium"]
-        return self["contrast.large"]
+            return self["contrast.medium"], f"size {_n(small / k)}–{_px(large / k)}"
+        return self["contrast.large"], f"size > {_px(large / k)}"
+
+    def contrast_bands(self) -> list[dict[str, Any]]:
+        """Every Lc minimum with the sizes it applies to, in this format's px and on screen."""
+        small, large = self["contrast.sizes"]
+        k = self.guide.k or 1
+        bw = self["contrast.boldWeight"]
+        return [
+            {"lcMin": self["contrast.large"], "sizeAbove": round(large / k, 1), "screenAbove": large},
+            {"lcMin": self["contrast.medium"], "sizeFrom": round(small / k, 1), "sizeTo": round(large / k, 1),
+             "screenFrom": small, "screenTo": large},
+            {"lcMin": self["contrast.small"], "sizeBelow": round(small / k, 1), "screenBelow": small},
+            {"lcMin": self["contrast.smallBold"], "sizeBelow": round(small / k, 1), "screenBelow": small,
+             "weightFrom": bw},
+        ]
+
+    def contrast_text(self) -> str:
+        """One line for `xds guide`: the Lc minimums by size, in this format's px."""
+        small, large = self["contrast.sizes"]
+        k = self.guide.k or 1
+        shown = "" if abs(k - 1) < 1e-6 else f" (= {small:g} and {large:g} px on screen)"
+        return (f"text size > {_px(large / k)}: Lc ≥ {self['contrast.large']:g} · "
+                f"{_n(small / k)}–{_px(large / k)}: Lc ≥ {self['contrast.medium']:g} · "
+                f"< {_px(small / k)}: Lc ≥ {self['contrast.small']:g} "
+                f"({self['contrast.smallBold']:g} at weight ≥ {self['contrast.boldWeight']:g}){shown}")
+
+
+def _n(v: float) -> str:
+    return f"{v:.1f}".rstrip("0").rstrip(".")
+
+
+def _px(v: float) -> str:
+    return _n(v) + " px"
 
 
 def build(project: Project) -> Thresholds:

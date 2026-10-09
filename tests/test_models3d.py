@@ -195,3 +195,75 @@ def test_cache_by_hash(tmp_path):
     assert models3d.inspect_glb(f)["parts"]  # callers get copies
     shutil.copyfile(f, tmp_path / "n.glb")
     assert models3d.inspect_glb(tmp_path / "n.glb") == models3d.inspect_glb(f)
+
+
+# --- normalizing -----------------------------------------------------------------------------
+
+def test_normalize_turns_scales_and_grounds(tmp_path):
+    # 6.6 m tall, centered on its origin, front facing −Z: the doorbell from the session report
+    src = tmp_path / "bell.glb"
+    make_glb(src, size=(2.2, 6.6, 1.0), offset=(0, -3.3, -0.3), screen=(1.0, 2.0), animation=1.0,
+             limits={"rotateX": [-110, 0]})
+    before = models3d.inspect(src)
+    out = tmp_path / "bell-fixed.glb"
+    res = models3d.normalize(src, out, front="-z", height=0.16)
+    b = models3d.inspect(out)
+    assert b["ok"] and b["warnings"] == []
+    assert b["bounds"]["min"][1] == pytest.approx(0, abs=1e-6)
+    assert b["bounds"]["size"][1] == pytest.approx(0.16)
+    assert b["bounds"]["center"][0] == pytest.approx(0, abs=1e-6) and b["bounds"]["center"][2] == pytest.approx(0, abs=1e-6)
+    assert res["scale"] == pytest.approx(0.16 / before["bounds"]["size"][1], rel=1e-4) and res["front"] == "-z"
+    # parts, limits, clips, the screen mesh and the binary chunk all survive
+    assert [p["name"] for p in b["parts"]] == [p["name"] for p in before["parts"]]
+    assert b["parts"][1]["limits"] == {"rotateX": [-110, 0]} and b["clips"] == before["clips"]
+    assert b["triangles"] == before["triangles"] and b["screens"][0]["aspect"] == before["screens"][0]["aspect"]
+    # one unnamed root carries the transform: half a turn about Y, the scale, the grounding
+    doc = json.loads(_json_chunk(out))
+    root = doc["nodes"][doc["scenes"][0]["nodes"][0]]
+    assert "name" not in root and root["rotation"] == models3d.FRONTS["-z"]
+    assert root["scale"] == pytest.approx([res["scale"]] * 3, rel=1e-4)
+
+
+def _json_chunk(path):
+    data = path.read_bytes()
+    n = struct.unpack_from("<I", data, 12)[0]
+    return data[20:20 + n]
+
+
+def test_normalize_front_axes(tmp_path):
+    src = tmp_path / "flat.glb"
+    make_glb(src, size=(0.2, 0.01, 0.1))  # lying on its back: its front faces +Y
+    sx, sy, sz = models3d.inspect(src)["bounds"]["size"]
+    out = tmp_path / "up.glb"
+    models3d.normalize(src, out, front="+y")
+    assert models3d.inspect(out)["bounds"]["size"] == pytest.approx([sx, sz, sy])
+    models3d.normalize(src, out, front="+x")
+    assert models3d.inspect(out)["bounds"]["size"] == pytest.approx([sz, sy, sx])
+    with pytest.raises(XdsError):
+        models3d.normalize(src, out, front="sideways")
+    with pytest.raises(XdsError):
+        models3d.normalize(src, out, height=1, scale=2)
+
+
+def test_add_normalizes_and_reports_it(blank, tmp_path):
+    src = tmp_path / "bell.glb"
+    make_glb(src, size=(2.2, 6.6, 1.0), offset=(0, -3.3, 0))
+    res = models3d.add(blank, src, id="bell", front="-z", height=0.16)
+    assert res["normalized"]["scale"] == pytest.approx(0.16 / res["normalized"]["before"]["size"][1], rel=1e-4)
+    assert res["inspection"]["bounds"]["size"][1] == pytest.approx(0.16)
+    assert models3d.add(blank, src, id="bell2")["normalized"] is None
+
+
+def test_check_landscape_screen_aspect(blank, tmp_path):
+    def add_screen(d, w, h, orientation):
+        d["screens"] = [{"id": "cam", "path": "screens/cam/index.html", "width": w, "height": h,
+                         "orientation": orientation}]
+    (blank / "screens" / "cam").mkdir(parents=True)
+    (blank / "screens" / "cam" / "index.html").write_text("<html></html>")
+    edit(blank, lambda d: add_screen(d, 852, 393, "landscape-left"))
+    found = _with_node(blank, tmp_path, {"screens": {"Screen": "cam"}},
+                       size=(0.075, 0.16, 0.008), screen=(0.069, 0.1495))
+    assert found == set()
+    edit(blank, lambda d: add_screen(d, 852, 393, "portrait"))
+    f = [f for f in proj.load(blank).findings if f.rule == "SCREEN_ASPECT_MISMATCH"]
+    assert len(f) == 1

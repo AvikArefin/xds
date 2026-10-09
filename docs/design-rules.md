@@ -39,15 +39,20 @@ Everything scales from the format, so the same rules work for a 1080 px post and
 | --- | --- | --- | --- |
 | `instagram-square` | 1080 × 1080 | 390 | none |
 | `instagram-portrait` | 1080 × 1350 | 390 | none |
+| `instagram-portrait-3x4` | 1080 × 1440 | 390 | none |
 | `instagram-story` | 1080 × 1920 | 390 | top 250, bottom 340 |
 | `instagram-reel-cover` | 1080 × 1920 | 390 | top 250, bottom 420, right 120 |
 | `linkedin-landscape` | 1200 × 627 | 552 | none |
+| `linkedin-document-4x3` | 1440 × 1080 | 552 | none (a PDF carousel page) |
 | `x-landscape` | 1600 × 900 | 390 | none |
 | `youtube-thumbnail` | 1280 × 720 | 360 | bottom-right 220 × 90 (duration badge) |
+| `presentation-4x3` / `presentation-16x9` | 1440 × 1080 / 1920 × 1080 | 1440 (a laptop screen) | none |
 | `print-a3` / `print-a4` | 300 dpi | n/a: print uses minimum point sizes | 3 mm bleed, 5 mm trim-safe |
 | `generic-screen` | any | = width (shown 1:1) | none |
 
 Platform UI dimensions change over time. This table is data, and updating it is a one-line change.
+`xds formats` lists the presets with their aspect ("4:3 landscape", "3:4 portrait"); a brief that
+gives only an aspect needs the orientation and the platform before a preset can be picked.
 
 ### 1.2 Type size bands
 
@@ -70,7 +75,7 @@ default hierarchy is always clear.
 
 ```text
 $ uv run xds guide ~/xd-projects/launch
-format       instagram-portrait 1080×1350 (viewed ≈390 px wide)
+format       instagram-portrait 1080×1350, 4:5 portrait (viewed ≈390 px wide, so 1 px here shows as 0.3611 px)
 unit u       8 px      spacing scale: 8 16 24 32 48 64 96 128
 margin m     64 px     content area: x 64–1016, y 64–1286
 safe zones   none
@@ -81,12 +86,24 @@ type         level     default  min  max   line-height  max lines  chars/line
              body      37       33   43    1.30–1.60    6          25–55
              caption   31       28   35    1.30–1.60    3          ≤ 60
 budget       ≤ 35 words per slide · ≤ 2 font families · ≤ 4 distinct sizes · ≤ 7 blocks
-contrast     body Lc ≥ 75 · subhead Lc ≥ 60 · headline/display Lc ≥ 45
+contrast     text size > 66.5 px: Lc ≥ 45 · 44.3–66.5 px: Lc ≥ 60 · < 44.3 px: Lc ≥ 75 (60 at weight ≥ 600) (= 16 and 24 px on screen)
 subject      height 30–75% of canvas · keep 1u clear of text
 ```
 
-`--json` gives the same data in machine-readable form. `--slide ID` adds that slide's current
-measured values next to the targets.
+`--json` gives the same data in machine-readable form (plus `aspect` and `contrast`, the Lc
+minimums with their size cutoffs). `--slide ID` adds that slide's current measured values next to
+the targets. The contrast line is in this format's own px, the unit `data.size` is written in: the
+cutoffs are displayed sizes (16 and 24 px on the phone) divided by the format's view scale `k`.
+
+### 1.4 `xds measure`
+
+Text layout without a render: headless Chromium mounts only the type layer of each slide
+(no 3D, backgrounds or images), which takes a few seconds for a whole deck. For each text block it
+reports the real lines, the ink extent, the height its box needs (`fitH`), widows, stacked
+positions and the Lc minimum for its size, then runs the rules that need only text geometry: the
+`type` family, `TEXT_OVERLAP`, `TEXT_CROWDED`, `TEXT_CLIPPED`, `IN_SAFE_ZONE`, `OUTSIDE_MARGIN`,
+`ALIGN_NEAR_MISS`, `MARGIN_NEAR_MISS`, `SPACING_INCONSISTENT` and `SPACING_OFF_SCALE` (between text
+blocks only). Contrast, images, the product and composition need `xds audit`.
 
 ---
 
@@ -198,7 +215,7 @@ The score is **APCA Lc** (perceptual, size-aware, the basis of WCAG 3), implemen
 
 | Rule | Severity | Fires when |
 | --- | --- | --- |
-| `LOW_CONTRAST` | error | Lc below the minimum for the line's **displayed** size: < 16 px displayed: 75 (60 if weight ≥ 600); 16–24 px: 60; > 24 px: 45 |
+| `LOW_CONTRAST` | error | Lc below the minimum for the line's **displayed** size: < 16 px displayed: 75 (60 if weight ≥ 600); 16–24 px (24 included): 60; > 24 px: 45. The message names the band in the format's px, and the fix offers the smallest `data.size` (within the level's band) at which the line's current Lc passes with a 10 Lc margin |
 | `LOW_CONTRAST_MARGINAL` | warn | within 10 Lc above the minimum |
 | `BUSY_BACKGROUND` | warn | under a text block, luminance std-dev > 0.12 or edge density (Sobel) > 0.15 |
 | `DECORATIVE_INVISIBLE` | info | decorative text with Lc < 30 (probably meant to be seen) |
@@ -232,9 +249,13 @@ The score is **APCA Lc** (perceptual, size-aware, the basis of WCAG 3), implemen
 ### 4.7 Structural (`check`)
 
 Schema errors, unknown references (`UNKNOWN_ROLE`, `UNKNOWN_ASSET`, `UNKNOWN_DESIGN`,
-`UNKNOWN_OBJECT`, `UNKNOWN_COLOR`), missing files, path escapes, and the design checks from
-[data models §4](./data-models.md#4-designs-designsidsvg). These are always errors and can't
-be waived.
+`UNKNOWN_OBJECT`, `UNKNOWN_COLOR`), stack anchors (`STACK_ANCHOR`, `STACK_CYCLE`), missing files,
+path escapes, and the design checks from [data models §4](./data-models.md#4-designs-designsidsvg).
+These are always errors and can't be waived.
+
+Two design checks are warnings, which `xds check` lists without blocking anything:
+`DESIGN_STRETCHED` (artwork in a fixed viewBox with `preserveAspectRatio="none"`, so it distorts on a
+canvas of another shape) and `DESIGN_UNUSED_PARAM` (a declared knob that no expression reads).
 
 ---
 

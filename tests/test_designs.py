@@ -156,3 +156,28 @@ def test_load_all(blank):
 def test_unknown_starter(blank):
     with pytest.raises(proj.XdsError):
         designs.add_starter(blank, "nope")
+
+
+def test_stretched_designs_and_unused_params_are_warnings(blank):
+    stretched = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+  <metadata id="xds-design">{"params": [{"name": "line", "type": "color", "default": "paper"},
+    {"name": "cells", "type": "number", "default": 11}]}</metadata>
+  <circle cx="50" cy="50" r="30" fill="{{line}}"/></svg>"""
+    (blank / "designs" / "lattice.svg").write_text(stretched)
+    edit(blank, lambda d: d["slides"][0]["nodes"][0]["data"].update(design="lattice", values={}))
+    loaded = proj.load(blank)
+    assert loaded.ok  # warnings don't block
+    found = {f.rule: f for f in loaded.findings}
+    assert found["DESIGN_STRETCHED"].severity == "warn" and "0.80×" in found["DESIGN_STRETCHED"].message
+    assert found["DESIGN_UNUSED_PARAM"].severity == "warn" and "'cells'" in found["DESIGN_UNUSED_PARAM"].message
+    assert "line" not in found["DESIGN_UNUSED_PARAM"].message.split("'cells'")[0]
+    edit(blank, lambda d: d["format"].update(preset="instagram-square", width=1080, height=1080))
+    assert "DESIGN_STRETCHED" not in {f.rule for f in proj.load(blank).findings}
+
+
+@pytest.mark.parametrize("name", designs.starters())
+def test_starters_have_no_warnings(name):
+    text = (designs.STARTERS_DIR / f"{name}.svg").read_text()
+    d = designs.parse_design(name, text)
+    for w, h in ((1080, 1350), (1440, 1080), (1080, 1920)):
+        assert designs.design_warnings(d, w, h) == []
