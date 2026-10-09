@@ -94,6 +94,25 @@ Because the 3D layer is rendered to its own alpha mask, the audit can judge the 
 crushed shadows, and whether the product separates from the background behind it. Each
 diagnostic names the knob to change (`brightness −0.3`, `look: "rim"`).
 
+### 1.7 What the light does and doesn't do
+
+So a change can be predicted instead of guessed:
+
+- **No self-shadowing.** The product is lit only by the environment; there is no direct light, so
+  parts don't shadow each other and recesses don't darken. `shadow` only draws on the floor.
+  Detailed assemblies look flatter than in a photo: pick a look and angle that light the faces
+  differently, and keep any shading the model itself carries.
+- **Reflections show the studio, not the slide.** The ground design is never reflected. Each
+  look's backdrop is a fixed gray (`looks.ts`): `rim` 0.24, `contrast` 0.30, `softbox` 0.42,
+  `bright` 0.62. On a dark set, metal under `bright` reflects a light-gray room and looks pasted
+  in; prefer `contrast` (crisp edge highlights from its strip lights) or `rim`.
+- **`angle` is world space**, the same convention as the camera's `yaw`, and doesn't follow the
+  camera. `angle` equal to `yaw` puts the key at the camera; with `yaw: -55` the default `angle: 35`
+  lights the product from 90° to the side.
+- **`brightness` is exposure** (×2^brightness on the whole image). It lifts highlights and
+  shadows together and never adds shape, so it can't rescue a flat or dark product; fix the
+  material, the look or the angle.
+
 ---
 
 ## 2. Framing: the auto-camera

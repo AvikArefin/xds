@@ -30,6 +30,12 @@ Rules of the road:
 - Pick type sizes from the band defaults first. Change them only for a reason.
 - Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin.
 - One message per slide: one top-level text block, one subject.
+- A clean audit is not a realistic product. The product checks catch clipped highlights,
+  crushed shadows and a lost silhouette; a flat, washed-out or plastic-looking product passes.
+  Judge the 3D by eye against a photo of the real one, and when tuning its look render one slide
+  at a time (`xds render PROJECT --slide s2 --json`), one knob per render.
+- Ask what the product is made of (metal, plastic, 3D print, rubber, glass, and their colors)
+  before setting materials, ideally with a photo. A marketing render may show a different product.
 - Don't write exceptions to make the audit pass. An exception needs a real artistic reason,
   in words a person would agree with.
 - If the editor is open, it reloads your edits immediately. The file is the truth, and unsaved
@@ -122,6 +128,30 @@ moving parts, and compresses it. New library models go through the same script.
 | **Moving parts are separate, named objects, parented in a hierarchy, with each origin on its joint** (a lid's origin on its hinge line) | `parts` rotates a node about its own origin; a wrong origin swings the part around the wrong point |
 | **Optional joint limits** as custom properties on the part, exported with `export_extras=True`: `xds.limits = {"rotateX": [-110, 0]}` | the gate rejects poses outside the limits (`PART_OUT_OF_RANGE`) |
 | **A device screen is its own mesh named `Screen`** (or `Screen.*`), with UVs filling 0–1 the right way up and the display's aspect ratio | a [screen](#4-device-screens) is mapped onto it as a texture |
+
+**Materials render exactly as exported.** xds only strips lights and cameras from the GLB, so
+the realism has to be in the file:
+
+- `metallic` is **1 for metal, 0 for everything else** (plastic, 3D prints, rubber, silicone).
+  In-between values look like neither.
+- **Metal shows only what it reflects**, and it reflects the studio, not the slide
+  ([lighting §1.7](./lighting-and-backgrounds.md#17-what-the-light-does-and-doesnt-do)). Very dark
+  metal reads as a flat hole: give black anodized metal a charcoal base color (around linear 0.2)
+  with roughness around 0.5.
+- **Black plastic** stays near black (linear around 0.02); a gray base color reads as gray. Its
+  shape comes from a low-ish roughness (around 0.3), so faces toward the light pick up a sheen.
+
+**CAD exports** (STEP/URDF/STL turned into GLB) are built for manufacturing, not rendering.
+Prepare them in Blender first:
+
+- **Merge by distance first.** CAD meshes often come unwelded, and nothing else (bevels, smooth
+  shading, separating parts) works until they're welded.
+- **Split parts that need different materials** (a servo fused into its bracket), or assign
+  materials per face.
+- **Round the hard edges** (Bevel modifier, about 0.5 mm at real scale, limited by angle, with
+  harden normals) and add **surface detail** (UVs plus a fine normal or roughness texture).
+  Razor-sharp, perfectly smooth surfaces look "rendered", dark parts most. Export with
+  `export_apply=True` so the bevel is baked in.
 
 ### 3.2 Exporting headlessly from Blender
 
