@@ -100,6 +100,9 @@ One component for every pick-one-of-many, including brand colors (`ColorTokenSel
 
 - **Drag** anywhere on the field to scrub (one undo step per drag). A **click** without dragging
   focuses it for typing. `Enter` or blur commits, `Escape` reverts, empty clears the override.
+- **A typed value goes to what the field was editing when it took focus.** The field captures
+  `value`/`onChange` on focus, so changing the selection before the commit doesn't write the
+  value to the newly selected node. `TextField` does the same.
 - **Bounded fields** (`min` and `max` both set) draw a **fill bar** along the bottom edge, and a
   drag across the field's width sweeps the whole range, so the fill follows the pointer (`Alt`
   for fine). Values snap to `step`. The bar is grey when the value is inherited (a placeholder).
@@ -115,7 +118,7 @@ One component for every pick-one-of-many, including brand colors (`ColorTokenSel
 
 | Component | Use |
 | --- | --- |
-| `TextField` | text, single line or `multiline`; commits on blur (`Cmd/Ctrl + Enter` in multiline) |
+| `TextField` | text, single line or `multiline`; commits on blur (`Cmd/Ctrl + Enter` in multiline), `Escape` cancels; commits to the node it started on |
 | `Checkbox` | booleans; shows an indeterminate state for mixed selections |
 | `MIXED` + `shared()` | a field shown for several selected items: `shared(items, get)` returns the common value or `MIXED` |
 
