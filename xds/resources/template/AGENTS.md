@@ -484,16 +484,31 @@ The page gets the CSS variables `--safe-top/right/bottom/left` and `data-device`
 `<xds-include src="status-bar"></xds-include>` (and `home-indicator`) includes
 `screens/<id>/partials/<name>.html`. Network requests are blocked, so use only local files.
 
-**Rules for convincing UI**:
+**Rules for convincing UI**: the screen is the product in use, not a second slide.
 
+- **Two voices.** The slide's text is the brand talking to the viewer: it makes the claim
+  ("Footage stays on the door."). The screen is the app talking to its owner: labels, values,
+  states and actions about *their* things ("On this doorbell · 41 of 64 GB", "Keep clips for
+  14 days"). It shows the evidence, and the viewer connects the two. Never put the slide's
+  message, or a paraphrase of it, on the screen.
+- **Would the product team ship this string?** Every word on the screen must be one the app would
+  really show if marketing didn't exist. So no "we", "us" or "our" from the company; no taglines
+  or explainer cards; no rows about what the product doesn't do or doesn't charge ("Monthly fee:
+  None", "Account required: No"); no company entry in the owner's own data ("GateMan · That's
+  us").
+- **Show the point through state.** Pick the moment in the app where the claim is visibly true:
+  the clips stored on the doorbell, the people who can watch, the door that just locked. What
+  isn't there can carry it too: no cloud plan, no upgrade banner.
+- **Real content**: plausible names, numbers, dates and times for this product and this person.
+  Never lorem ipsum.
 - Design at the **logical size** (402 px wide for the iPhone 17 Pro), with the real type scale:
   body 15–17 px, titles 28–34 px, tap targets ≥ 44 px.
-- **Real content**: plausible names, numbers, dates and copy that tell the slide's story. Never
-  lorem ipsum.
 - Keep the **status bar and home indicator** from the starter, and respect the safe area.
-- **One clear state**: one primary action, a visible hierarchy, brand colors for accents only.
-- **Large and simple**: on the slide the screen is small, so prefer big numbers, big titles and
-  few rows. The audit warns `SCREEN_DETAIL_TOO_SMALL`.
+- **One clear state**: one screen of the app, one primary action, a visible hierarchy, brand colors
+  for accents only.
+- **Large and simple**: the screen is small on the slide, so pick a screen whose own content is
+  big (a number the app really leads with, a title, few rows) rather than shrinking a dense one.
+  Big type is not a license for statement cards. The audit warns `SCREEN_DETAIL_TOO_SMALL`.
 
 ## 7. Backgrounds (ground designs)
 

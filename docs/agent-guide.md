@@ -356,14 +356,24 @@ A mesh counts as a screen when its name, before any `.suffix`, ends in "screen" 
 
 - **Design at the logical size** (393 px wide for a phone), not the texture size. Use the device's
   real type scale: phone body 15–17 px, titles 28–34 px, tap targets ≥ 44 px.
-- **Use real content.** Plausible names, numbers, dates and copy that tell the slide's story, never
-  lorem ipsum. The UI is part of the message.
+- **The screen is the product in use, not a second slide.** The slide's text is the brand talking
+  to the viewer and makes the claim; the screen is the app talking to its owner, with labels,
+  values, states and actions about their things, and shows the evidence. Never put the slide's
+  message, or a paraphrase of it, on the screen.
+- **Would the product team ship this string?** No "we/us/our" from the company, no taglines or
+  explainer cards, no rows about what the product doesn't do or doesn't charge ("Monthly fee:
+  None"), no company entry in the owner's data. Show the point through the moment in the app
+  where it's visibly true, or through what isn't there (no cloud plan, no upgrade banner).
+- **Use real content.** Plausible names, numbers, dates and times for this product and this
+  person, never lorem ipsum.
 - **Include the system chrome**: the starter has a status bar (time, signal, battery) and a home
   indicator partial. Respect `--safe-top`/`--safe-bottom`.
 - **One clear screen state**: one primary action, a visible hierarchy, and brand colors for the
   accents only.
 - **Large and simple beats dense.** On the slide, the phone screen is maybe 25 % of the canvas
-  width, so 13 px UI text becomes tiny. Prefer big numbers, big titles and few rows. `xds audit`
+  width, so 13 px UI text becomes tiny. Pick a screen whose own content is big (a number the app
+  really leads with, a title, few rows) rather than shrinking a dense one; big type is not a
+  license for statement cards. `xds audit`
   warns with `SCREEN_DETAIL_TOO_SMALL` when the screen's body text ends up below the readable size
   on the slide.
 - Check it flat first: `xds screen render PROJECT app-home` writes the PNG so you can look at it
