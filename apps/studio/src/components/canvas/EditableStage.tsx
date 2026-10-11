@@ -9,6 +9,8 @@ import type { Finding } from "@xds/protocol";
 import { SlideStage } from "../../stage";
 import { effectiveCamera, effectiveLighting, getSlide, nodesOf, useStudio } from "../../store";
 import { importModel } from "../commands";
+import { useLiveRules } from "../../hooks/useLiveRules";
+import { LiveFindings } from "./LiveFindings";
 import { AuditOverlay, GuidesOverlay, findingAt } from "./Overlays";
 import { Overlay2D } from "./Overlay2D";
 import { Scene3D, gizmoState } from "./Scene3D";
@@ -71,6 +73,8 @@ export function EditableStage() {
 
   const { width: W, height: H } = project.format;
   const zoom = zoomSetting === "fit" ? fitZoom : zoomSetting;
+  const liveFindings = useStudio((s) => s.liveFindings);
+  useLiveRules(frameRef, zoom);
 
   // fit zoom follows the viewport size
   useLayoutEffect(() => {
@@ -283,6 +287,7 @@ export function EditableStage() {
             />
           </div>
           {showGuides && guide && mode !== "present" && <GuidesOverlay guide={guide} W={W} H={H} zoom={zoom} />}
+          {showAudit && liveFindings.length > 0 && <LiveFindings findings={liveFindings} W={W} H={H} zoom={zoom} />}
           {findings.length > 0 && (
             <AuditOverlay findings={findings} W={W} H={H} zoom={zoom} hover={hoverFinding} highlight={highlight} />
           )}

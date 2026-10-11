@@ -137,6 +137,13 @@ export interface StudioState {
   report: AuditReport | null;
   auditing: boolean;
   hoverFinding: Finding | null;
+  /**
+   * The live rules' findings for the active slide (design-rules §2.1): the text-geometry rules run
+   * in the editor after every layout. A preview of the audit; view state, never saved, not in undo.
+   */
+  liveFindings: Finding[];
+  /** The Live section of the audit panel is expanded. */
+  liveOpen: boolean;
 
   // --- jobs
   jobs: Record<string, Job>;
@@ -243,6 +250,8 @@ export interface StudioActions {
   fixAll(): Promise<void>;
   focusFinding(f: Finding): void;
   setHoverFinding(f: Finding | null): void;
+  setLiveFindings(findings: Finding[]): void;
+  toggleLive(open?: boolean): void;
   markIntentional(f: Finding): Promise<void>;
   /** PNGs, one per slide, or the deck as one PDF. */
   exportSlides(format: "png" | "pdf", force?: boolean): Promise<void>;
@@ -291,6 +300,8 @@ const initial: StudioState = {
   report: null,
   auditing: false,
   hoverFinding: null,
+  liveFindings: [],
+  liveOpen: true,
   jobs: {},
   exportBlocked: null,
   exportFormat: "png",
@@ -299,6 +310,18 @@ const initial: StudioState = {
 };
 
 let noticeSeq = 1;
+
+/** Two live findings are the same when nothing a person would see differs. */
+function sameFinding(a: Finding, b: Finding): boolean {
+  return (
+    a.rule === b.rule &&
+    a.severity === b.severity &&
+    a.message === b.message &&
+    (a.nodes ?? []).join() === (b.nodes ?? []).join() &&
+    JSON.stringify(a.region ?? null) === JSON.stringify(b.region ?? null) &&
+    JSON.stringify(a.edits ?? null) === JSON.stringify(b.edits ?? null)
+  );
+}
 let gestureBase: Tracked | null = null;
 const HISTORY_LIMIT = 200;
 
@@ -1212,6 +1235,12 @@ export const useStudio = create<Studio>()(
           set(patch);
         },
         setHoverFinding: (hoverFinding) => set({ hoverFinding }),
+        setLiveFindings: (liveFindings) => {
+          const prev = get().liveFindings;
+          if (prev.length === liveFindings.length && prev.every((f, i) => sameFinding(f, liveFindings[i]))) return;
+          set({ liveFindings });
+        },
+        toggleLive: (open) => set((s) => ({ liveOpen: open ?? !s.liveOpen })),
         markIntentional: async (f) => {
           const s = get();
           if (!canEditDoc() || !s.project) return;

@@ -10,3 +10,4 @@ export * from "./place";
 export * from "./typeSize";
 export * from "./edits";
 export * from "./treatments";
+export * from "./rules";

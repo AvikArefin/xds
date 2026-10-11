@@ -111,8 +111,10 @@ export function StatusBar() {
   const readOnly = useStudio((s) => s.readOnly);
   const saving = useStudio((s) => s.saving);
   const root = useStudio((s) => s.root);
+  const live = useStudio((s) => s.liveFindings);
   const dirty = useDirty();
   const last = notices[notices.length - 1];
+  const liveSev = live.some((f) => f.severity === "error") ? "error" : live.some((f) => f.severity === "warn") ? "warn" : "info";
   return (
     <footer className="statusbar">
       <div className="status-notice">
@@ -127,6 +129,16 @@ export function StatusBar() {
         )}
       </div>
       <div className="status-right">
+        {!readOnly && live.length > 0 && (
+          <button
+            type="button"
+            className={`status-pill live sev-${liveSev}`}
+            onClick={() => useStudio.getState().toggleLive(true)}
+            title="Live findings on this slide (the audit panel's Live section)"
+          >
+            {live.length} live
+          </button>
+        )}
         {readOnly ? (
           <span className="status-pill sev-error">Read-only</span>
         ) : (

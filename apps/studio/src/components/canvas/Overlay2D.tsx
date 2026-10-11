@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import type { Box, Layer, Node } from "@xds/protocol";
 import { pxRectToBox, rectsBounds, snapMove, snapResize, snapTargets, type PxRect, type SnapLine } from "@xds/editor-core";
 import { boxBoundsPx, boxPx, nodesOf, pointInBox, useActiveSlide, useStudio } from "../../store";
+import { GapReadouts } from "./GapReadouts";
 import { SnapLinesOverlay } from "./Overlays";
 import { RelationsOverlay } from "./RelationsOverlay";
 
@@ -33,6 +34,8 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
   const drag = useRef<Drag | null>(null);
   const [marquee, setMarquee] = useState<PxRect | null>(null);
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
+  /** The block being moved or resized, for the gap readouts. */
+  const [dragRect, setDragRect] = useState<{ rect: PxRect; others: PxRect[] } | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const all = nodesOf(slide).filter((n): n is BoxNode => n.layer !== "render");
@@ -53,15 +56,15 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
     }
     return null;
   };
+  const othersFor = (exclude: Set<string>): PxRect[] =>
+    all.filter((n) => !exclude.has(n.id) && !n.hidden && n.layer !== "ground").map((n) => boxBoundsPx(n.box, W, H));
   const targetsFor = (exclude: Set<string>) =>
     snapTargets({
       width: W,
       height: H,
       margins: guide?.margins,
       u: guide?.u,
-      others: all
-        .filter((n) => !exclude.has(n.id) && !n.hidden && n.layer !== "ground")
-        .map((n) => boxBoundsPx(n.box, W, H)),
+      others: othersFor(exclude),
     });
   const threshold = 6 / zoom;
 
@@ -136,6 +139,7 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
         lines = res.guides;
       }
       setSnapLines(lines);
+      setDragRect({ rect: { ...group, x: group.x + dx, y: group.y + dy }, others: othersFor(new Set(ids)) });
       const boxes: Record<string, Box> = {};
       ids.forEach((id, i) => {
         boxes[id] = pxRectToBox({ ...rects[i], x: rects[i].x + dx, y: rects[i].y + dy }, W, H, d.boxes[id]);
@@ -207,6 +211,7 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
         rect = { x: cx - w / 2, y: cy - hh / 2, w, h: hh };
       }
       setSnapLines(lines);
+      setDragRect({ rect, others: othersFor(new Set([d.id])) });
       st.setBoxes({ [d.id]: pxRectToBox(rect, W, H, d.box) });
     } else if (d.kind === "rotate") {
       let a = (Math.atan2(p.y - d.cy, p.x - d.cx) * 180) / Math.PI + 90;
@@ -241,6 +246,7 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
     const d = drag.current;
     drag.current = null;
     setSnapLines([]);
+    setDragRect(null);
     setMarquee(null);
     if (!d) return;
     const st = useStudio.getState();
@@ -296,6 +302,7 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
       onPointerLeave={() => setHoverId(null)}
     >
       <SnapLinesOverlay lines={snapLines} W={W} H={H} zoom={z} />
+      {dragRect && <GapReadouts rect={dragRect.rect} others={dragRect.others} u={guide?.u ?? 8} W={W} H={H} zoom={z} />}
       {selected.length > 0 && <RelationsOverlay ids={selected.map((n) => n.id)} W={W} H={H} zoom={z} />}
       {hover && outline(hover, "hover-box", false)}
       {selected.map((n) =>

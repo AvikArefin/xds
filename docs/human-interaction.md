@@ -27,7 +27,7 @@ editor.
 
 | Area | Contents |
 | --- | --- |
-| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
+| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (**Live**: the text and spacing rules run on the active slide after every edit, a preview with its own counts and findings; then the audit's counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos, the project's images, or **Shape…**: a drawn ornament). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (pins, align to, stack, fit to text) and its layer's fields (Text adds **Wrap** and **Treatments**). |
@@ -69,6 +69,7 @@ Shortcuts are ignored while typing in a field.
 | arrows | nudge: 2D 1 px (`Shift`: `u`); 3D 1 cm (`Shift`: 10 cm) |
 | `Escape` | close the palette or a list; clear the selection |
 | drag a related block | edits its relation instead of its box: a stack's gap, a pin's or align's offset (whole units while Snap is on); a side the layout sizes snaps back |
+| drag or resize a block | **gap readouts**: the gap to the nearest block above, below, left and right, in `u`, with `=` when two sides match; with Snap on, a gap snaps to the `u` scale when no edge, margin or third is closer (`Alt` inverts snapping) |
 
 3D viewport: **left-drag** orbits (`yaw`/`pitch`), **right-drag** moves the product on the canvas
 (`x`/`y`), **scroll** resizes it (`height`), **`L` + drag** swings the light (`angle`/`elevation`),
@@ -179,9 +180,9 @@ reloads from disk. Undo has one step per drag or field change.
 
 | Where | Shows |
 | --- | --- |
-| status bar | notices; Saved / Unsaved changes; the format and its unit `u` and margin `m` |
-| rail | audit counts and findings; per-slide error/warning badges |
-| canvas | audit regions, with the message and fix on hover |
+| status bar | notices; an *n live* chip (click: the Live section); Saved / Unsaved changes; the format and its unit `u` and margin `m` |
+| rail | live findings for this slide (the Live section); audit counts and findings; per-slide error/warning badges |
+| canvas | live findings as thin dashed outlines; audit regions, with the message and fix on hover (both follow the eye toggle, `Shift + A`) |
 | inspectors | amber fields outside their guide range, fill bars on bounded fields |
 | whole window | the migrate screen for an older project |
 | Present panel | export progress and finished files |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { snapAxis, snapMove, snapResize, snapTargets, snapValue } from "./snap";
+import { neighbors, snapAxis, snapGap, snapMove, snapResize, snapTargets, snapValue } from "./snap";
 
 const ctx = {
   width: 1080,
@@ -107,5 +107,44 @@ describe("snapValue", () => {
   it("snaps within the threshold", () => {
     expect(snapValue(44, 45, 3)).toBe(45);
     expect(snapValue(40, 45, 3)).toBe(40);
+  });
+});
+
+describe("gap snapping", () => {
+  const others = [{ x: 64, y: 100, w: 400, h: 50 }];
+
+  it("finds the nearest neighbor on each side, overlapping on the other axis only", () => {
+    const n = neighbors({ x: 64, y: 170, w: 300, h: 40 }, others, "y");
+    expect(n.before).toMatchObject({ edge: 150, side: "before", gap: 20 });
+    expect(n.after).toBeNull();
+    expect(neighbors({ x: 600, y: 170, w: 300, h: 40 }, others, "y").before).toBeNull();
+  });
+
+  it("snaps the gap to the nearest multiple of u, never to 0", () => {
+    const s = snapGap({ x: 64, y: 170, w: 300, h: 40 }, others, "y", 8, 4);
+    expect(s.delta).toBe(4); // gap 20 → 24
+    expect(s.line).toEqual({ axis: "y", value: 174, kind: "gap" });
+    expect(snapGap({ x: 64, y: 153, w: 300, h: 40 }, others, "y", 8, 5).delta).toBe(5); // gap 3 → 8
+    expect(snapGap({ x: 64, y: 190, w: 300, h: 40 }, others, "y", 8, 2)).toEqual({ delta: 0, line: { axis: "y", value: 190, kind: "gap" } }); // gap 40 is on the scale already
+  });
+
+  it("snapMove prefers named lines, then gaps, then the grid", () => {
+    const t = snapTargets({ ...ctx, others });
+    // y 170: no line within 4 px; gap 20 → 24 (within u/2)
+    const r = snapMove({ x: 200, y: 170, w: 300, h: 40 }, t, 4);
+    expect(r.rect.y).toBe(174);
+    expect(r.guides.map((g) => g.kind)).toContain("gap");
+    // an edge on the margin wins over the gap
+    const m = snapMove({ x: 200, y: 66, w: 300, h: 40 }, t, 4);
+    expect(m.rect.y).toBe(64);
+    expect(m.guides.map((g) => g.kind)).toContain("margin");
+  });
+
+  it("snapResize snaps a dragged edge to the gap on its side", () => {
+    const t = snapTargets({ ...ctx, others });
+    const r = snapResize({ x: 200, y: 170, w: 300, h: 40 }, { top: true }, t, 4);
+    expect(r.rect.y).toBe(174);
+    expect(r.rect.h).toBe(36);
+    expect(r.guides[0].kind).toBe("gap");
   });
 });

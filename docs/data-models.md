@@ -677,7 +677,7 @@ A zustand store with the `zundo` middleware for undo and redo, split into slices
 | `document` | `project`, `designs`, `baseHash` (hash of the last loaded/saved file), `dirty` |
 | `selection` | `mode`, `activeSlideId`, `selectedIds: string[]` (multi-select, within one layer), `transformMode`, `transformSpace`, `clipboard` (copied nodes of one layer, or a copied slide; editor-only, cleared when another project opens) |
 | `view` | `zoom`, `snap`, `showGuides`, `hiddenLayers` (layers switched off on the canvas while editing; never saved), `inspectorTab`, `commandPaletteOpen` |
-| `audit` | the latest `AuditReport`, `auditing` |
+| `audit` | the latest `AuditReport`, `auditing`, `liveFindings` (the live rules' preview for the active slide, design-rules §2.1; never saved, not in undo) |
 | `jobs` | running/finished exports with their progress lines |
 
 Undo history covers `document.project` only. `dirty` is `project !== savedProject`.

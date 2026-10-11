@@ -164,6 +164,26 @@ def text_overlap(slide: MeasuredSlide, t: Thresholds) -> Iterator[Finding]:
 `xds rules` lists every rule with its family, severity, principle and current thresholds.
 That list is generated from these decorators and docstrings, so it can't drift from the code.
 
+### 2.1 Rules in the editor
+
+The rules that need only text geometry run **live in the Studio** too (`@xds/editor-core`
+`rules.ts`, [human interaction §1](./human-interaction.md#1-screen-layout)): after every edit
+the editor measures the active slide's text lines from the DOM it just laid out, runs them and
+lists the findings in the audit panel's **Live** section, outlines them on the canvas and counts
+them in the status bar. Their **Fix** links work without an audit. The live set covers
+`TEXT_OVERLAP`, `TEXT_CROWDED`, `TEXT_CLIPPED`, `IN_SAFE_ZONE`, `OUTSIDE_MARGIN`, `EDGES_KISSING`,
+`ALIGN_NEAR_MISS`, `MARGIN_NEAR_MISS`, `GROUPING_AMBIGUOUS`, `SPACING_INCONSISTENT`,
+`SPACING_OFF_SCALE`, `POSITION_NEAR_MISS`, `TOO_MANY_ELEMENTS`, `TEXT_TOO_SMALL`, `TEXT_TOO_LARGE`,
+`HIERARCHY_WEAK`, `SIZE_NEAR_MISS`, `TOO_MANY_SIZES`, `TOO_MANY_LINES`, `WIDOW` and `LINE_LENGTH`,
+with the same ids, severities, thresholds (including `project.rules`) and fixes as the audit.
+
+The live findings are a **preview**; `xds audit` remains the judge. Where the two differ, the
+audit is right: the editor has no pixels, so `EDGES_KISSING` and `POSITION_NEAR_MISS` skip the 3D
+subject and use an image's box rather than its opaque ink; `GROUPING_AMBIGUOUS` and
+`SPACING_INCONSISTENT` look at declared groups only (the audit also clusters ungrouped blocks by
+gap); and nodes on a layer hidden on the canvas are left out. Contrast, the subject, images'
+ink and composition need a render.
+
 ---
 
 ## 3. Severity

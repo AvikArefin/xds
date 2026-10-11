@@ -251,6 +251,19 @@ code {
   color: var(--error);
   background: rgba(255, 92, 92, 0.12);
 }
+.status-pill.live {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.status-pill.live.sev-warn {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+.status-pill.live.sev-info {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+}
 
 /* splash / errors */
 .splash {

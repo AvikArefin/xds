@@ -67,6 +67,9 @@ export function AuditPanel() {
   const showAudit = useStudio((s) => s.showAudit);
   const toggleAudit = useStudio((s) => s.toggleAudit);
   const fixAll = useStudio((s) => s.fixAll);
+  const live = useStudio((s) => s.liveFindings);
+  const liveOpen = useStudio((s) => s.liveOpen);
+  const toggleLive = useStudio((s) => s.toggleLive);
   const [scope, setScope] = useState<"slide" | "all">("all");
   const [showWaived, setShowWaived] = useState(false);
 
@@ -101,6 +104,37 @@ export function AuditPanel() {
         </button>
       </div>
       {auditing && lines?.length ? <div className="progress-line">{lines[lines.length - 1]}</div> : null}
+      {!readOnly && (
+        <div className="audit-live">
+          <button
+            type="button"
+            className="audit-live-head"
+            onClick={() => toggleLive()}
+            title="The text and spacing rules, run in the editor after every edit on this slide. A preview: the audit is the judge."
+          >
+            <Icon name={liveOpen ? "chevronDown" : "chevronRight"} size={12} />
+            <span className="rail-title">Live</span>
+            <span className="audit-counts">
+              {(["error", "warn", "info"] as const).map((sev) => {
+                const n = live.filter((f) => f.severity === sev).length;
+                return n ? (
+                  <span key={sev} className={`count sev-${sev}`} title={sev}>
+                    {n}
+                  </span>
+                ) : null;
+              })}
+              {!live.length && <span className="muted small">clean</span>}
+            </span>
+          </button>
+          {liveOpen && live.length > 0 && (
+            <ul className="findings live">
+              {live.map((f, i) => (
+                <FindingItem key={`${f.rule}-${i}`} f={f} onClick={() => focusFinding(f)} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {readOnly && check.findings.length > 0 && (
         <ul className="findings">
           {check.findings.map((f, i) => (
