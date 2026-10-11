@@ -304,6 +304,7 @@ The score is **APCA Lc** (perceptual, size-aware, the basis of WCAG 3), implemen
 | `LOPSIDED` | info | the visual-mass centroid (alpha × contrast) is > 0.2 s from center and no element counterweights it | balance |
 | `CROWDED` | warn | content (text ink ∪ subject ∪ images) covers > 65 % of the content area | negative space is what makes a layout breathe |
 | `TOO_MANY_ELEMENTS` | warn | > 7 visible blocks | |
+| `UNCOVERED_CANVAS` | error | no full-canvas background node (the slide's or a master's) at the back | every pixel of the slide is painted on purpose |
 
 ### 4.6 Subject and lighting (`subject`)
 
@@ -321,13 +322,17 @@ The score is **APCA Lc** (perceptual, size-aware, the basis of WCAG 3), implemen
 ### 4.7 Structural (`check`)
 
 Schema errors, unknown references (`UNKNOWN_ROLE`, `UNKNOWN_ASSET`, `UNKNOWN_DESIGN`,
-`UNKNOWN_OBJECT`, `UNKNOWN_COLOR`), stack anchors (`STACK_ANCHOR`, `STACK_CYCLE`), missing files,
-path escapes, and the design checks from [data models §4](./data-models.md#4-designs-designsidsvg).
-These are always errors and can't be waived.
+`UNKNOWN_OBJECT`, `UNKNOWN_COLOR`), layout relations (`STACK_ANCHOR`, `ALIGN_TARGET`,
+`STACK_CYCLE`, `LAYOUT_CONFLICT`, `GROUP_UNKNOWN`: [data models §2.5a](./data-models.md#25a-layout-relations-that-resolve-to-a-box)),
+variants (`VARIANT_INVALID`), missing files, path escapes, and the design checks from
+[data models §4](./data-models.md#4-designs-designsidsvg). These are always errors and can't be
+waived.
 
-Two design checks are warnings, which `xds check` lists without blocking anything:
-`DESIGN_STRETCHED` (artwork in a fixed viewBox with `preserveAspectRatio="none"`, so it distorts on a
-canvas of another shape) and `DESIGN_UNUSED_PARAM` (a declared knob that no expression reads).
+Some checks are warnings, which `xds check` lists without blocking anything: `DESIGN_STRETCHED`
+(artwork in a fixed viewBox with `preserveAspectRatio="none"`, so it distorts on a canvas of
+another shape), `DESIGN_UNUSED_PARAM` (a declared knob that no expression reads),
+`SHAPE_INVISIBLE` (an ornament with `fill: "none"` and no stroke) and `SHAPE_PARAM_UNKNOWN` (a
+knob the shape doesn't have).
 
 ---
 

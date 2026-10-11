@@ -1,8 +1,10 @@
 # Working in this XDS project
 
 This folder is an XDS project: social-media slides made of four layers (a 2D background, a 3D
-product scene, images and text), rendered to PNG. You edit the files; the `xds` command renders,
-checks, audits and exports them.
+product scene, 2D images and drawn ornaments, and text), rendered to PNG. You edit the files; the
+`xds` command renders, checks, audits and exports them. A layout is said with **relations** (a
+block pinned to the margin, stacked a gap under another, a column that flows), not coordinates,
+so the same slide is right in every format (§4.4).
 
 **Everything you need is in this file and in `xds` output.** Stay inside this project folder. Run
 `xds` commands (all take `--json`), but never read or edit files outside the project. Device
@@ -71,8 +73,11 @@ xds restore . ID --json     # put one back; the state before is snapshotted firs
 - **Don't guess where text wraps.** Fonts differ in width (a wide display face wraps much earlier
   than you'd think). `xds measure` lays out the text alone, without the 3D or backgrounds, and
   reports each block's real lines, its ink top and bottom, the `box.h` it needs (`fitH`), widows,
-  and the text-only audit findings. Get the text right with it, then render. Stack blocks
-  (§4.4) instead of computing y positions.
+  and the text-only audit findings. Get the text right with it, then render. Pin, stack and
+  align blocks (§4.4) instead of computing positions.
+- **Before a big rewrite**, `xds snapshot . --label "…"`. A save that changes the format, adds or
+  removes a slide or changes many nodes snapshots on its own; `xds snapshot . --list` shows them
+  and `xds restore . ID` puts one back (the state before is snapshotted first).
 - `xds grid . FILE` writes a copy of an image (a photo, a rendered slide) with a labeled % grid, so
   you can read positions off it: where the cat is in a camera frame, where the product's edge is.
 - `xds rules` explains every rule and its principle; `xds formats` lists the formats.
@@ -92,12 +97,23 @@ A finding looks like this. Apply its `fix` and audit again:
 
 - **One message and one subject per slide.** One top-level text block; supporting text is
   clearly smaller.
-- **Type sizes come from levels.** Every role belongs to a level: `display`, `headline`,
-  `subhead`, `body` or `caption`. Each level has a size range for this format, and `xds guide`
-  prints them. Start at the level's default and change it only for a reason. Two sizes on one
-  slide should differ by at least 1.25×.
+- **Type sizes come from levels.** Every role belongs to a level: `expressive`, `display`,
+  `headline`, `subhead`, `body` or `caption`. Each level has a size range for this format, and
+  `xds guide` prints them. Start at the level's default and change it only for a reason, as a
+  `scale` of the default (1.2 = a fifth larger) rather than a px `size`, so it holds in every
+  format. Two sizes on one slide should differ by at least 1.25×.
 - **Spacing on the unit scale** (`u`, `2u`, `3u`, … from `xds guide`), and **content inside the
-  margin `m`** and outside the platform's safe zones (also in `xds guide`).
+  margin `m`** and outside the platform's safe zones (also in `xds guide`). Say it with relations
+  (§4.4): a block pinned to the margin can't miss it by a pixel, a stacked block's gap is in `u`.
+- **Start from a layout** (`xds layout list`, `xds layout apply . ID --mode new`): a slide written
+  in relations, with slots for your text by level. Then change words, not coordinates.
+- **One source, several formats.** `xds export . --format PRESET` ships the deck in another preset
+  without touching it; `xds reflow . --check` shows what would break per orientation class
+  (portrait, square, landscape, story), and a node's `variants.<class>` fixes that class alone
+  (§4.4). Change the project's own format only with `xds reflow . --format PRESET`.
+- **Expressive type is declared, never baked.** A skewed, outlined, extruded or repeated word is
+  treatments on a text node (§4.6), drawn by the renderer and checked for coherence: one angle,
+  one slant, one stroke, one light, one family of ornaments per project.
 - **Contrast**: text must stand out from whatever is behind it, at its weakest point. The minimum
   (APCA Lc) depends on the text's **size**, not its role: `xds guide` prints the size cutoffs in
   this format's px (on a 1440 × 1080 custom size: above 24 px Lc 45, 16–24 px Lc 60, below 16 px
@@ -146,10 +162,10 @@ A role is a named text style. Name roles for what they do (`kicker`, `headline`,
 
 ```jsonc
 "kicker": {
-  "level": "caption",       // display | headline | subhead | body | caption: which size range applies
+  "level": "caption",       // expressive | display | headline | subhead | body | caption: which size range applies
   "font": "Satoshi",        // a family in `fonts` (fetch it first, §8)
   "weight": 600,            // 100..900, default 400
-  "size": 30,               // px; omit to use the level's default for this format
+  "scale": 1.1,             // × the level's default for this format (holds in every format); or "size": 30 in px
   "color": "accent",        // brand color token
   "lineHeight": 1.2, "letterSpacing": 0.08, "uppercase": true, "italic": false,  // all optional
   "wrap": "pretty"          // normal | balance (even line lengths: headlines) | pretty (no lone last word)
@@ -165,6 +181,8 @@ without hand-placed `\n`.
 { "id": "s1", "name": "Hero",
   "lighting": { "angle": 210 },   // optional, overrides project.lighting field by field
   "camera": { "mode": "frame", "x": 50, "y": 58, "height": 50 },   // optional (§5.4)
+  "groups": { "intro": { "direction": "column", "gap": 3 } },      // optional flow groups (§4.4)
+  "master": false,                 // optional: leave the project's master nodes off this slide (§4.4)
   "nodes": [ … ],
   "exceptions": [] }
 ```
@@ -196,16 +214,27 @@ gives the margin and unit as percentages too, so you don't need to convert.
             "lineHeight": 1.05, "letterSpacing": 0, "uppercase": false, "wrap": "balance",
             "decorative": false } }               // true: graphic lettering, exempt from legibility rules
 
-// text stacked under another block: no y to calculate
+// the same headline said with relations: pinned to the margin, the box as tall as its text
+{ "id": "h1", "name": "Headline", "layer": "type",
+  "box": { "x": 5.93, "y": 4.74, "w": 60, "h": 18 },   // x/y/h are then written by the layout
+  "layout": { "pin": { "left": { "to": "margin" }, "top": { "to": "margin" } }, "fit": "text" },
+  "data": { "text": "Light that\nfollows you", "role": "headline" } }
+
+// the subhead 3u under h1's last line, left edges shared: nothing to calculate
 { "id": "sub", "name": "Subhead", "layer": "type",
-  "box": { "x": 5.93, "y": 0, "w": 60, "h": 12 },  // y is ignored while stacked
-  "data": { "text": "…", "role": "subhead", "group": "intro",
-            "stack": { "below": "h1", "gap": 3 } } }  // 3u under h1's ink; or "above": "h1"
+  "box": { "x": 0, "y": 0, "w": 60, "h": 12 },
+  "layout": { "stack": { "below": "h1", "gap": 3 }, "align": [{ "node": "h1", "edge": "left" }], "fit": "text" },
+  "data": { "text": "…", "role": "subhead" } }
 
 // image
 { "id": "photo", "name": "Photo", "layer": "image",
   "box": { "x": 0, "y": 50, "w": 100, "h": 50 },
   "data": { "asset": "hero", "fit": "cover" } }  // cover | contain | fill
+
+// a drawn ornament on the 2D layer (§4.6): no file, a stroke in u
+{ "id": "star", "name": "Star", "layer": "image",
+  "box": { "x": 70, "y": 10, "w": 5.93, "h": 4.74 },
+  "data": { "shape": "star-8", "stroke": { "width": 0.5 } } }
 
 // background (§7)
 { "id": "bg", "name": "Background", "layer": "ground",
@@ -221,15 +250,45 @@ gives the margin and unit as percentages too, so you don't need to convert.
             "screens": { "Screen": "dashboard" } } }
 ```
 
-Text style is resolved as: node override → its role → the level's default for this format.
+Text style is resolved as: node override → its role → the level's default for this format; the
+size as `data.size` → `data.scale` × the role's size → `role.size` → `role.scale` × the level's
+default → the default.
 
-**Stacking.** `"stack": { "below": "h1", "gap": 3 }` puts the block's first line `gap` units (u)
-under the last line of `h1`, measured ink to ink, the same way the audit measures spacing. The
-renderer places it after laying out the text, so when `h1` wraps to another line or its font
-changes, everything stacked under it moves with it. Chain them (kicker → headline → body), anchor
-to an image node (its box) or stack `"above"` a block (a kicker over a bottom-aligned headline).
-While stacked, `box.y` is ignored (the editor keeps it in step); `box.x`, `w` and `h` still apply.
-Keep stacked blocks unrotated, and `h` at least `fitH` from `xds measure`.
+**Relations (`layout`).** Any 2D node may carry a `layout` next to its `box`. Each relation
+decides a box field, and the renderer writes the numbers; `xds measure` and `xds check` report
+what they resolved to. The box fields a relation decides are ignored (the editor keeps them in
+step); the others still apply.
+
+| Relation | Writes | Meaning |
+| --- | --- | --- |
+| `"pin": { "left": { "to": "margin", "offset": 2 } }` | that edge | an edge or center (`left` `right` `top` `bottom` `cx` `cy`) on a line of the format: `edge`, `safe`, `margin`, `center`, `third`, `two-thirds`, plus an offset in `u`. Left and right (or top and bottom) together size the box; a center and an edge on one axis is an error |
+| `"stack": { "below": "h1", "gap": 3 }` | y (or x) | the block `gap` units below, `above`, `rightOf` or `leftOf` another block, **ink to ink**, the way the audit measures spacing; it follows that block wherever it wraps. Chain them (kicker → headline → body) |
+| `"align": [{ "node": "h1", "edge": "left" }]` | x (or y) | share an edge (`left` `center` `right`; `top` `middle` `bottom`) with another block on the slide, plus an offset in `u`; at most one per axis |
+| `"fit": "text"` | h | the box as tall as its laid-out text |
+| `"group": "intro"` | x and y | a member of the slide's flow group `groups.intro` |
+
+An anchor must be a 2D node on the same slide (`xds check`: `STACK_ANCHOR`, `ALIGN_TARGET`), no
+loops (`STACK_CYCLE`), and not both a stack and an align on one axis (`LAYOUT_CONFLICT`). A stack
+wins over an align on its axis, both over a pin. Keep related blocks unrotated. Older files write
+a stack as `data.stack`; it still works, but new ones go in `layout`.
+
+**Groups.** `"groups": { "intro": { "direction": "column", "gap": 3, "align": "start",
+"padding": 0, "pin": { "left": { "to": "margin" }, "top": { "to": "margin" } } } }` on the slide
+lays its members (nodes with `"layout": { "group": "intro" }`, in their z-order) out along the
+direction with `gap` units between their ink, cross-aligned by `align`, inside a box the pins
+place (`padding` insets it); unpinned, the group packs where its members are. A member's own
+stack or align is overridden; its `fit` still applies; nothing stretches.
+
+**Masters.** Nodes every slide shows (the logo, a footer, a background) go once into
+`"master": { "nodes": [ … ] }` at the top level, with project-unique ids; they draw behind each
+slide's own nodes of their layer. A slide leaves them off with `"master": false`, or lists the ids
+to leave off. Master nodes relate only to master nodes. 3D nodes stay per slide.
+
+**Variants.** `"variants": { "landscape": { "box": { "w": 45 }, "data": { "scale": 0.9 } } }` on a
+node overrides those fields when the format is in that orientation class (`portrait`, `square`,
+`landscape`, `story`; `xds formats` prints each preset's class). Objects merge key by key and a
+`null` drops a key (`"layout": null` frees the block there). Use it after `xds reflow . --check`
+shows what breaks in a class; the base keeps the other classes' values.
 
 ### 4.5 The logo (cortextech)
 
@@ -264,6 +323,46 @@ with the logo's aspect (4.5 : 1) and `"fit": "contain"`:
 Pick the variant by what is behind it: `full-logomark` on dark or saturated backgrounds,
 `full-logomark-white-bg` on white or light ones. Both are transparent. The logo's blue is `#4266AF`;
 add it to `brand.colors` only if the design uses it.
+
+### 4.6 Expressive type and ornaments
+
+A poster word (skewed, outlined, extruded, repeated, with stars around it) is **treatments on the
+node**, never an image, so the renderer draws it and the audit checks it. Declare the project's
+expression system once, then draw from it:
+
+```jsonc
+// brand.expression: the few values every treatment and ornament uses (xds guide prints it)
+"expression": { "angles": [12], "skews": [12], "strokeWidths": [0.5], "extrudeAngle": 135,
+                "radii": [1], "ornaments": ["star-4", "star-8", "sparkle"], "maxTreatments": 2 }
+
+// a role at the expressive level: size up to half the short edge, tight leading, no measure
+"shout": { "level": "expressive", "font": "Satoshi", "weight": 900, "lineHeight": 0.85 }
+
+// the word: rotated and skewed on the system's angle, outlined, with an extrusion behind it,
+// sized to fill its box width
+{ "id": "shift", "name": "Shift", "layer": "type",
+  "box": { "x": 5.93, "y": 8, "w": 88, "h": 22, "rotation": -12 },
+  "data": { "text": "SHIFT", "role": "shout", "fitWidth": true,
+            "skew": 12,                                    // degrees
+            "fill": "none", "stroke": { "width": 0.5, "color": "paper" },   // outline text; width in u
+            "extrude": { "depth": 2, "angle": 135 },       // u; degrees clockwise from the right, y down
+            "repeat": { "count": 3, "dx": 0, "dy": 1, "outline": true, "fade": true },  // copies behind, in u
+            "plate": { "padding": 2, "radius": 1, "fill": "ink" } } }   // a rounded plate behind the ink
+
+// an ornament: a shape node on the 2D layer (star-4, star-8, sparkle, ring, rings, lens, ellipse,
+// rect, line, plus, arc, grid), stroked at the system's width, sized on the u scale
+{ "id": "rings", "layer": "image", "box": { "x": 8, "y": 30, "w": 20, "h": 8 },
+  "data": { "shape": "rings", "stroke": { "width": 0.5 }, "params": { "count": 3, "spread": 1, "angle": 90 } } }
+```
+
+The `expression` rules check **coherence, not taste**: a second angle family, a second skew, a
+stroke off the system (or off the quarter-unit scale), extrusions in two directions, mixed
+ornament families, radii off the system or more than `maxTreatments` kinds on a slide are
+findings whose fix names the nearest system value. An `expressive` block that is meant to be
+read must stay clear of other text and keep its copies within a line height
+(`EXPRESSIVE_UNREADABLE`); mark it `"decorative": true` when the word is a graphic. The floors
+(collisions, contrast, safe zones, clipping) judge expressive work on its pixels like anything
+else, and a deliberate break still gets an exception with a reason.
 
 ## 5. 3D
 
@@ -580,8 +679,10 @@ yourself. `xds fonts library` lists the families already available offline.
 
 ## 9. Don'ts
 
-- Don't edit `cache/`, `export/` or `.migrate-backup/`, and don't hand-edit the `fonts` or
-  `screens` entries. Use the commands.
+- Don't edit `cache/`, `export/`, `.migrate-backup/` or `.snapshots/`, and don't hand-edit the
+  `fonts` or `screens` entries. Use the commands.
+- Don't move a related block by its box: change its gap, offset or pin, or remove the relation.
+  Don't compute coordinates a relation or a layout can say.
 - Don't copy device models, logos or fonts into the project, and don't leave this folder.
 - Don't move the product by editing the background, or the other way round: designs follow
   `subject.*`.

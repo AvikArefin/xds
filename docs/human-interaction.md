@@ -188,10 +188,9 @@ reloads from disk. Undo has one step per drag or field change.
 - **Fonts**: Present → Typography header → download button → a Fontshare family. It's fetched once
   into the xds font library and shared by every project.
 - **Format**: the rail's **Format** selector. Picking another preset (or typing a custom size)
-  asks to **Reflow**: every box is laid out again relative to the new margins (images keep their
-  aspect), px type sizes are rescaled to the new size bands, and scales, stack gaps, pins and the
-  camera are kept. One undo step. Audit afterwards. (Terminal: `xds reflow . --format PRESET`,
-  `--dry-run` to see what would move.)
+  asks to **Reflow** the project to it ([design rules §1.4](./design-rules.md#14-xds-reflow)):
+  one undo step, audit afterwards. To ship in another format without changing the project, use
+  **Also export as…** (Export, below). (Terminal: `xds reflow . --format PRESET`, `--dry-run`.)
 - **Text size that holds in every format**: give a role (Present → Typography) or a text block a
   **Scale** instead of a px **Size**: 1.2 means 1.2 × the level's band default for whatever format
   the project is in. A px size wins over a scale on the same role or block.

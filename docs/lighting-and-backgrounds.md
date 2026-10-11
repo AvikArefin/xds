@@ -90,7 +90,7 @@ A 3 cm earring and a 1.8 m lamp therefore get the same look.
 ### 1.6 The audit checks the light
 
 Because the 3D layer is rendered to its own alpha mask, the audit can judge the lit product
-([design rules §4.6](./design-rules.md#46-subject-and-lighting)): clipped highlights,
+([design rules §4.6](./design-rules.md#46-subject-and-lighting-subject)): clipped highlights,
 crushed shadows, and whether the product separates from the background behind it. Each
 diagnostic names the knob to change (`brightness −0.3`, `look: "rim"`).
 

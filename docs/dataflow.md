@@ -31,12 +31,14 @@ flowchart TB
 
   subgraph Disk["project.xds/"]
     SRC["project.json · designs/ · assets/ · fonts/"]
-    CACHE["cache/&lt;hash&gt;/"]
+    SNAP[".snapshots/"]
+    CACHE["cache/&lt;hash&gt;/ · cache/targets/&lt;preset&gt;/"]
     OUT["export/&lt;stamp&gt;/"]
   end
 
   H --> ACT --> DOC
   DOC -->|"Cmd/Ctrl+S: PUT /api/project"| SAVE --> SRC
+  SAVE -.->|"a big save: copy first"| SNAP
   A -->|"edit"| SRC
   SRC --> WATCH -->|"SSE changed"| DOC
   C --> BR & AUD & EXP
@@ -47,8 +49,10 @@ flowchart TB
   EXP --> OUT
 ```
 
-Only `project.save()` (and, on purpose, an agent) writes source. Everything else writes into
-`cache/<hash>/` or `export/`.
+Only `project.save()` (and, on purpose, an agent) writes source; `xds fix`, `xds reflow`,
+`xds layout apply` and `xds restore` go through the same validated write. Everything else writes
+into `cache/<hash>/` or `export/`. `.snapshots/` holds copies of the source as it was, never
+derived data.
 
 ---
 
@@ -68,14 +72,17 @@ No pointer move writes a file. An interaction calls a store action, which:
 ```text
 validate with Pydantic                    (422 with paths on failure)
   → hash the file on disk; ≠ baseHash?    (409 SAVE_CONFLICT)
+  → a big change? (the format, a slide added or removed, more than a quarter of the nodes)
+       → copy project.json, designs/, screens/ into .snapshots/<stamp>/ first
   → set updatedAt; serialize (stable key order, 2-space indent)
   → write project.json.tmp, fsync, os.replace
-  → return { hash }
+  → return { hash, fileHash, snapshot? }
 ```
 
 The editor stores the new hash as `baseHash`, and the document is clean again. One file means
 one atomic replace: there is no journal, lock or rollback, because there is nothing half-written
-to roll back.
+to roll back. What there is instead is the snapshot: `xds restore` (or the editor's Restore tab)
+puts a copy back, after snapshotting the current state, so a restore is itself reversible.
 
 ### 1.2 3D gestures
 
@@ -131,6 +138,11 @@ flowchart LR
   CLI --> measure["measure → browser.measure_text() + text-only rules"]
   CLI --> audit["audit → browser.render() + audit.run()"]
   CLI --> export["export → audit gate + copy"]
+  CLI --> fix["fix → the audit's edits applied to project.json (one validated write)"]
+  CLI --> reflow["reflow → reflow.reflow(doc, format); --check: a target per orientation + measure"]
+  CLI --> target["render/audit/export --format → targets.build(): cache/targets/&lt;preset&gt;/"]
+  CLI --> layout["layout apply → layouts.apply(doc, slide, id, mode)"]
+  CLI --> snap["snapshot / restore → .snapshots/"]
   CLI --> migrate["migrate → steps + conform"]
   CLI --> model["model add → models3d.inspect() + normalize() + register"]
   CLI --> grid["grid → an image copy with a % grid, in cache/grid/"]
@@ -224,12 +236,13 @@ See [design rules](./design-rules.md) for every rule.
 ## 7. Export: findings → deliverables
 
 ```text
-xds export [--pdf] / POST /api/export { format: png | pdf }
+xds export [--pdf] [--format PRESET] / POST /api/export { format: png | pdf, target? }
+  → a target? build cache/targets/<preset>/: the source reflowed to the preset, its files hard-linked
   → audit (reuses cache when current)
   → open errors?  → EXPORT_BLOCKED with the findings   (unless --force)
-  → copy cache/<hash>/slides/*.png → export/<stamp>/
+  → copy cache/<hash>/slides/*.png → export/<stamp>/   (a target: export/<stamp>-<preset>/ in the source)
     (pdf: join them into export/<stamp>/<projectId>.pdf instead, a page per slide)
-  → write export.json { sourceHash, format, files, audit summary, forced }
+  → write export.json { sourceHash, format, files, audit summary, forced, sourceFormat? }
 ```
 
 The editor refuses to export with unsaved edits and asks the person to save first, because the
@@ -262,8 +275,9 @@ format chosen (editor or xds init --format)
   → formats.derive(): s, k, u, m, size bands per level
 
 type node rendered
-  → size = data.size ?? brand.typography[role].size ?? band(level).default
-  → DOM text in TypeLayer
+  → size = data.size ?? data.scale × role size ?? role.size ?? role.scale × band(level).default ?? band(level).default
+  → DOM text in TypeLayer (treatments drawn as DOM clones and plates; fitWidth sets the size from the widest line)
+  → the stage resolves the slide's layout relations once the ink is measured (§5)
 
 xds guide
   → prints the band per level, so an agent picks a size inside it from the start

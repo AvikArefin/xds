@@ -48,7 +48,11 @@ flowchart TB
 
 **Key idea:** `project.json`, `designs/`, `screens/`, `assets/` and `fonts/` are source. Everything
 else is a cache keyed by the **source hash**, a SHA-256 over all of those files, and can be deleted at
-any time.
+any time. Two more folders hold copies of the source rather than derived data: `.snapshots/`
+(restorable copies of `project.json`, `designs/` and `screens/`, taken by hand and before a big
+save; `xds snapshot`, `xds restore`) and `cache/targets/<preset>/` (the source reflowed to another
+format, rebuilt on demand by `xds export --format`; see
+[design rules §1.4](./design-rules.md#14-xds-reflow)).
 
 A project directory may also contain a `sources/` folder (`.blend` files, original `.dae`/`.gltf`
 exports, reference images). The app ignores it: it is not validated, not hashed and never read.
@@ -77,6 +81,7 @@ were dropped or renamed (see §6).
 | `layerOrder` | `Layer[]` | the composition stack, back → front, a permutation of the four layers; default `["ground","render","image","type"]` |
 | `lighting` | `Lighting?` | project default; each slide may override fields |
 | `rules` | `RuleOverrides?` | per-project changes to audit thresholds (see [design rules](./design-rules.md)) |
+| `master` | `Master?` | nodes every slide shows (§2.11) |
 | `slides` | `Slide[]` | min 1; **array order is slide order** |
 
 Removed in v2: `canvas` (merged into `format`), `publishTarget` (now `format`), `layout` tokens
@@ -111,7 +116,7 @@ size (§2.5c), which picks the nodes' variants; the guide reports it as `orienta
 }
 
 TypeRole = {
-  level: "display" | "headline" | "subhead" | "body" | "caption";  // which size band it uses
+  level: "expressive" | "display" | "headline" | "subhead" | "body" | "caption";  // which size band it uses
   font: string;            // a family in `fonts`
   weight?: number;         // 100..900, default 400
   italic?: boolean;
@@ -245,22 +250,21 @@ TypeData = {
   group?: string;          // blocks that belong together (e.g. headline + subhead); the spacing rules use it
   decorative?: boolean;    // graphic lettering: exempt from size/legibility/reading rules, not from collisions
   wrap?: "normal" | "balance" | "pretty";  // overrides the role's; balance: even lines, pretty: no lone last word
-  stack?: { below?: string; above?: string; gap?: number };  // exactly one anchor; gap in u, default 2
+  stack?: Stack;           // older files: the same as `layout.stack` (§2.5a), still read
+  // scale, skew, fill, stroke, extrude, repeat, plate, fitWidth: §2.5d
 };
 ```
 
-**Stacked text** (`stack`): the block is placed `gap` spacing units (u) below the ink of the anchor
-node's last line (or, with `above`, its own last line sits `gap` u above the anchor's first line),
-measured ink to ink like the spacing rules. The anchor is a text node or an image node (its box) on
-the same slide. The type layer resolves stacks after laying out the text
-(`@xds/editor-core` `resolveStacks`), so a block moves when the text above it rewraps. While a
-stack is set, `box.y` is ignored; the editor keeps it equal to the resolved position, and turns a
-vertical move into a new `gap`. The gate reports an anchor that isn't a text or image node on the
-slide (`STACK_ANCHOR`) and anchors that loop (`STACK_CYCLE`).
+**Stacked text** is one of the layout relations (§2.5a): `layout.stack` places the block a gap
+in `u` below, above, right of or left of another block, ink to ink, and the block follows that
+block wherever it wraps. Older files carry the stack as `data.stack`; it is read the same way and
+the editor edits it in place.
 
 **Effective type style** (the editor and the audit use the same order, and the audit reads it from
 the browser rather than recomputing it): node override → `brand.typography[role]` → the
-level's band default for this format (`xds/formats.py`).
+level's band default for this format (`xds/formats.py`). The size has one more step, a factor:
+`data.size` → `data.scale` × the role's size → `role.size` → `role.scale` × the band default →
+the band default (`effectiveSize` in `@xds/editor-core`).
 
 **Render data**: `object` names a `SceneObject`; `pose` overrides the catalog pose on this slide
 only. To hide an object on one slide, set `hidden` on its render node. To leave it out of a
@@ -285,8 +289,9 @@ limits and the clips, so an agent knows what can move.
 Every 2D node may carry a `layout` next to its `box`. A relation never replaces the box: the
 layout resolves to numbers, the editor keeps `box` equal to them (as it does for stacks), and
 the renderer, the audit and the handles read plain boxes. Dragging a related node edits the
-relation's offset or gap; dragging past the snap tolerance detaches it. Pins and stacks are what
-make a layout survive a format change: a margin line re-resolves in every format.
+relation's offset or gap; **Free** in the inspector (`detachLayout`) drops the relation and leaves
+the box where it is. Pins and stacks are what make a layout survive a format change: a margin
+line re-resolves in every format.
 
 ```ts
 Layout = {
@@ -301,11 +306,17 @@ AlignTo = { node: string; edge: "left" | "center" | "right" | "top" | "middle" |
 Stack   = { below?: string; above?: string; rightOf?: string; leftOf?: string; gap?: number /* u, default 2 */ };
 ```
 
-Resolution order on a slide: pins (format lines), then stacks and aligns in dependency order
-(an anchor must be resolved first; cycles and missing anchors fall back to the box), then fit,
-then groups. `third` means the first third line on that axis and `two-thirds` the second; `edge`
-the canvas edge; `safe` the platform safe zone; `margin` the margin `m`. Left and right (or top and
-bottom) pinned together size the box; a center pin with an edge pin on the same axis is rejected.
+Resolution order on a slide (`resolveLayout` in `@xds/editor-core`, run by the stage once the
+text's ink is measured, in the editor and on the render page alike): pins (format lines), then
+stacks and aligns in dependency order (an anchor must be resolved first; cycles and missing
+anchors fall back to the box; a stack overrides an align on its axis, both override a pin), then
+fit, then groups (§2.5b). `third` means the first third line on that axis and `two-thirds` the
+second; `edge` the canvas edge; `safe` the platform safe zone; `margin` the margin `m`. Left and
+right (or top and bottom) pinned together size the box; a center pin with an edge pin on the same
+axis is rejected. The gate checks the relations: an anchor must be a 2D node on the same slide
+(`STACK_ANCHOR`, `ALIGN_TARGET`), relations must not loop (`STACK_CYCLE`), a node may not both
+stack and align on one axis (`LAYOUT_CONFLICT`), and `group` must name one of the slide's groups
+(`GROUP_UNKNOWN`).
 
 ### 2.5b `Group`: flow
 
@@ -448,21 +459,6 @@ The complete description of a slide's light is these six fields. There are no li
 and no stored derived rig. [Lighting and backgrounds](./lighting-and-backgrounds.md) explains how
 the rig is built from them.
 
-### 2.11 `Master`: nodes on every slide
-
-```ts
-project.master?: { nodes: Node[] }
-```
-
-Master nodes (a background, the logo, a footer) render on every slide, behind the slide's own
-nodes of the same layer, and are edited once: the editor selects them on any slide and writes the
-change to the master. A slide leaves them off with `master: false` or lists the ids to leave off.
-Their ids are project-unique like any node's; `effective_nodes(slide)` (Python) and
-`effectiveNodes(project, slide)` (editor-core) give what a slide draws, and the gate, the audit
-and the measurement read that. A master node's relations may only name other master nodes;
-a slide node's only slide nodes. A master full-canvas background counts for `UNCOVERED_CANVAS`,
-and a new slide copies no background while one exists. 3D nodes stay per slide.
-
 ### 2.9 `Camera`
 
 ```ts
@@ -513,6 +509,21 @@ A render node connects them: `"screens": { "Screen": "app-home" }` puts screen `
 model's mesh named `Screen`. One model can have several screens (`"Screen"`, `"CoverScreen"`), and
 two slides can show different screens on the same device. See the
 [agent guide §4](./agent-guide.md#4-device-screens) for building one.
+
+### 2.11 `Master`: nodes on every slide
+
+```ts
+project.master?: { nodes: Node[] }
+```
+
+Master nodes (a background, the logo, a footer) render on every slide, behind the slide's own
+nodes of the same layer, and are edited once: the editor selects them on any slide and writes the
+change to the master. A slide leaves them off with `master: false` or lists the ids to leave off.
+Their ids are project-unique like any node's; `effective_nodes(slide)` (Python) and
+`effectiveNodes(project, slide)` (editor-core) give what a slide draws, and the gate, the audit
+and the measurement read that. A master node's relations may only name other master nodes;
+a slide node's only slide nodes. A master full-canvas background counts for `UNCOVERED_CANVAS`,
+and a new slide copies no background while one exists. 3D nodes stay per slide.
 
 ---
 
@@ -614,9 +625,13 @@ folder.
 | `cache/<hash>/annotated/<n>-<slideId>.png` | `xds audit` | the slide with every diagnostic drawn on it |
 | `export/<YYYYMMDD-HHMMSS>/<n>-<slideId>.png` | `xds export` | the deliverables |
 | `export/<stamp>/<projectId>.pdf` | `xds export --pdf` | instead of the PNGs: every slide in order, one page each at the slide's pixel size (a LinkedIn carousel document) |
-| `export/<stamp>/export.json` | `xds export` | `{ sourceHash, format, files[] (the PNGs, or the PDF), audit: {errors, warnings}, forced }` |
+| `export/<stamp>/export.json` | `xds export` | `{ sourceHash, format, files[] (the PNGs, or the PDF), audit: {errors, warnings}, forced, sourceFormat? }` |
+| `export/<stamp>-<preset>/` | `xds export --format PRESET` | the deck exported as a target: the source reflowed to that preset; `sourceFormat` names the source's format |
+| `cache/targets/<preset>/` | `xds render` / `audit` / `export` `--format` | a target project: the reflowed `project.json`, `target.json`, and the source's `designs/`, `screens/`, `assets/` and `fonts/` mirrored by hard link; rebuilt when the source changes |
+| `.snapshots/<stamp>[-label]/` | `xds snapshot`, a big save, `xds restore` | a copy of `project.json`, `designs/` and `screens/` with a `snapshot.json` record (not derived: the source as it was) |
 
-`xds clean PROJECT` deletes `cache/`.
+`xds clean PROJECT` deletes `cache/`. Snapshots are kept until deleted (the twenty newest
+automatic ones; labelled ones for good).
 
 ### 5.1 `SlideMeasure`: what the render page reports
 

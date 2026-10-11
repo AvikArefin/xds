@@ -1,8 +1,10 @@
 # XDS architecture
 
 XDS is a local design editor for social-media graphics. Each slide stacks four layers: a 2D
-**Ground** (background), a live **3D** scene, 2D **images** and **type**. The result is exported
-as PNG.
+**Ground** (background), a live **3D** scene, 2D **images** (and drawn ornaments) and **type**. A
+layout is written as relations (pins, stacks, aligns, groups) that resolve to boxes, so one source
+renders in every format; design rules run live in the editor and in the audit, and their fixes
+apply as field writes. The result is exported as PNG or PDF.
 
 Everything runs on one machine: no cloud service, no database, and no LLM calls inside the
 product. The persistent state is an ordinary project directory (`project.xds/`) that people and
@@ -36,8 +38,11 @@ xds/
 ├── packages/
 │   ├── protocol/                  # @xds/protocol: only the TypeScript types generated
 │   │   └── src/generated/         #   from xds/models.py (`xds schema --emit-types`)
-│   └── editor-core/               # @xds/editor-core: pure functions (node edits, box ↔ px,
-│                                  #   pose math, framing math); no React, no Three
+│   └── editor-core/               # @xds/editor-core: pure functions, no React, no Three:
+│       └── src/                   #   nodes (edits, copy, masters), layout (pins, aligns, stacks,
+│                                  #   fit, groups), rules (the live text rules), snap (edges,
+│                                  #   gaps), treatments, variants, typeSize, edits (fix writes),
+│                                  #   box ↔ px, pose and framing math
 │
 ├── apps/
 │   └── studio/                    # @xds/studio: React + Vite + R3F
@@ -45,19 +50,26 @@ xds/
 │           ├── App.tsx            #   editor shell
 │           ├── store/             #   zustand store, one file per slice
 │           ├── api.ts             #   typed fetch client + SSE subscription
-│           ├── stage/             #   the slide: <SlideStage> renders the layers in layerOrder
-│           │   ├── GroundLayer.tsx  ImageLayer.tsx  TypeLayer.tsx
+│           ├── stage/             #   the slide: <SlideStage> resolves the layout and renders the layers
+│           │   ├── GroundLayer.tsx  ImageLayer.tsx (+ shapes.tsx: ornaments)  TypeLayer.tsx (+ treatments)
 │           │   └── RenderLayer.tsx  #  the R3F <Canvas>
 │           ├── scene/studio/      #   lighting looks, shadows, subject bounds, auto-framing
 │           ├── design/            #   ground design resolution (expressions, loops, colors)
 │           ├── render/            #   /render route: chrome-less <SlideStage> + measure()
-│           └── components/        #   panels, inspectors, command palette
+│           ├── hooks/             #   shortcuts, document sync, the live rules (useLiveRules)
+│           └── components/        #   panels (Master), inspectors (Layout, Treatments, Group,
+│                                  #   Master, Variant, Shape), canvas overlays (relations, groups,
+│                                  #   gap readouts, live findings), audit panel, palette, Restore tab
 │
 ├── xds/                           # Python package
 │   ├── cli.py                     #   `xds` entry point (argparse)
 │   ├── api.py                     #   FastAPI app: routes only, no logic
 │   ├── models.py                  #   Pydantic models = the schema
-│   ├── project.py                 #   load, hash, save (atomic), file watching
+│   ├── project.py                 #   load, gate (references, layout relations, variants), hash, save (atomic), watching
+│   ├── snapshots.py               #   .snapshots/: take, list, restore, prune; the big-save snapshot
+│   ├── fix.py                     #   `xds fix`: apply findings' edits to project.json
+│   ├── reflow.py                  #   `xds reflow`: retarget a document to another format
+│   ├── targets.py                 #   cache/targets/<preset>/: a reflowed target project; the fluidity check
 │   ├── designs.py                 #   design manifest parsing + expression checks
 │   ├── formats.py                 #   format profiles: sizes, view widths, safe zones, bands
 │   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, normalizing, `xds model add`
@@ -81,7 +93,7 @@ xds/
 │   └── audit/                     #   the design-rule engine (see design-rules.md)
 │       ├── engine.py  thresholds.py  contrast.py  saliency.py  annotate.py
 │       └── rules/  collision.py  spacing.py  typography.py  contrast.py
-│                   composition.py  subject.py
+│                   composition.py  subject.py  expression.py
 │
 └── tests/                         # pytest (Python) + vitest (TS) + one Playwright smoke test
     └── fixtures/
@@ -169,14 +181,24 @@ React 18, Vite, TypeScript, React Three Fiber and drei.
   enabled). See [lighting and backgrounds](./lighting-and-backgrounds.md).
 - **GroundLayer.** Resolves a design SVG (`design/resolve.ts`: `expr-eval` for expressions,
   `culori` for OKLCH color functions, `subject.*` context from the render layer) and inlines it.
-- **TypeLayer.** Plain DOM text with `@font-face` rules for the project's `fonts/`. Font loading
-  is awaited with `document.fonts.load` before a slide reports ready.
+- **TypeLayer.** Plain DOM text with `@font-face` rules for the project's fonts. Font loading
+  is awaited with `document.fonts.load` before a slide reports ready. Treatments (skew, stroke,
+  extrude, repeat, plate, fit width) are drawn as DOM clones and plates, so they are real ink for
+  the audit; the layer measures each block's ink and reports it to the stage.
+- **Layout.** Once the ink is known, `SlideStage` resolves every 2D node's relations
+  (`resolveLayout`: pins, aligns, stacks, fit, groups) and the layers draw at the resolved
+  rects. The editor's store keeps `box` in step (`syncLayout`), so handles, snapping and the audit
+  read plain boxes ([data models §2.5a](./data-models.md#25a-layout-relations-that-resolve-to-a-box)).
+- **Live rules.** `hooks/useLiveRules.ts` measures the active slide's text lines after each edit
+  and runs the text-geometry rules from `@xds/editor-core` (`rules.ts`), a preview of the audit
+  ([design rules §2.1](./design-rules.md#21-rules-in-the-editor)).
 - **API client.** `api.ts` wraps `fetch` with the generated types, and subscribes to
   `/api/events` (server-sent events) for file changes. It checks `apiVersion` once on load and
   refuses to run against a mismatched backend.
 
-`packages/editor-core` holds the pure math (box ↔ px, pose conversion, framing, snapping) so it
-can be unit-tested without a browser.
+`packages/editor-core` holds the pure functions (node edits, the layout engine, the live rules,
+snapping, treatments, variants, size resolution, fix edits, box ↔ px, pose and framing math) so
+they can be unit-tested without a browser.
 
 ### 2.2 Python: `xds/`
 
@@ -204,6 +226,12 @@ Module responsibilities:
   ([design rules](./design-rules.md)).
 - **`export.py`** runs the audit, blocks on errors (unless `--force`), and copies the rendered
   slides into `export/<stamp>/` (or, with `--pdf`, joins them into one PDF) with an `export.json` record.
+- **`snapshots.py`** keeps restorable copies of the source under `.snapshots/`: by hand, before a
+  big save (`project.save` calls it) and before a restore.
+- **`fix.py`**, **`reflow.py`**, **`layouts.py`** and **`targets.py`** are the other writers:
+  structured fixes from the audit, retargeting to another format, applying a layout, and
+  building a target project under `cache/targets/` for `--format`. All of them write
+  `project.json` through the same validated path as a save.
 - **`migrate/`** upgrades old project files ([data models §6](./data-models.md#6-migration)).
 - **`models3d.py`** inspects and registers GLB files ([agent guide §3](./agent-guide.md#3-bringing-in-a-3d-model)).
 - **`formats.py`** holds the format catalog and the numbers derived from a format.
@@ -222,8 +250,10 @@ project.xds/
 ├── assets/             # source: images, SVGs, GLB models
 ├── fonts/              # source: font files
 ├── sources/            # optional, ignored by the app: .blend files, references, scripts
+├── .snapshots/<stamp>/ # copies of project.json, designs/, screens/ to restore from (xds snapshot / restore)
 ├── cache/<hash>/       # derived: slide PNGs, measurements, audit.json, annotated PNGs
-└── export/<stamp>/     # derived: deliverable PNGs (or <projectId>.pdf) + export.json
+├── cache/targets/<preset>/   # derived: the source reflowed to another format (xds export --format)
+└── export/<stamp>/     # derived: deliverable PNGs (or <projectId>.pdf) + export.json; a target: export/<stamp>-<preset>/
 ```
 
 The source hash covers `project.json`, `designs/`, `screens/`, `assets/` and `fonts/`, plus every `xds:`
@@ -258,6 +288,7 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | POST | `/api/models/import` | multipart upload; runs `xds model add` |
 | GET | `/api/library` · POST `/api/models/library` | the shipped models and logos, and adding a model by reference (`xds model add --library`) |
 | POST | `/api/fonts/fetch` | runs `xds fonts fetch` |
+| POST | `/api/migrate` | `xds migrate` on the active project (backs up project.json first) |
 | POST | `/api/reflow` | reflow a document `{ project, format }` to another format; returns `{ project, report }`, writes nothing |
 | GET | `/api/layouts` | the shipped layouts with their intent |
 | POST | `/api/layouts/apply` | `xds layout apply` on the active project `{ id, slide?, mode?, addRoles? }` (needs a saved document) |
@@ -265,8 +296,9 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | POST | `/api/snapshots/restore` | put one back `{ id }`, after snapshotting the current state |
 | DELETE | `/api/snapshots/{id}` | delete one (never a migrate backup) |
 
-Commands that change `project.json` on the server (`designs/add`, `models/import`, `fonts/fetch`)
-need a saved document. The editor saves first, and the resulting file change reloads it.
+Commands that change `project.json` on the server (`designs/add`, `models/import`, `fonts/fetch`,
+`layouts/apply`, `snapshots/restore`, `migrate`) need a saved document. The editor saves first,
+and the resulting file change reloads it.
 
 Errors are `{ ok: false, error: { code, message, path?, details? } }` with `409` conflict, `422`
 validation, and `404` missing.
@@ -277,16 +309,25 @@ validation, and `404` missing.
 implementation. Every command accepts `--json`.
 
 ```text
-xds init PROJECT [--name NAME] [--format PRESET | --size WxH]
-xds open [PROJECT] [--port N] [--no-open]
+xds init PROJECT [--name NAME] [--format PRESET | --size WxH] [--layout ID]
+xds open [PROJECT] [--port N] [--no-open] [--no-vite]
 xds check PROJECT                         # schema + references + designs (no browser)
-xds guide PROJECT [--slide ID]            # the design numbers for this format
-xds rules                                 # every audit rule with principle + thresholds
+xds guide PROJECT [--slide ID]            # the design numbers for this format (and its expression system)
+xds rules [--project PROJECT]             # every audit rule with principle + thresholds
+xds formats                               # the presets, with aspect and orientation class
+xds layout list | show ID                 # the shipped slide layouts (docs/layouts.md)
+xds layout apply PROJECT ID [--slide ID] [--mode fill|replace|new] [--add-roles] [--dry-run]
 xds measure PROJECT [--slide ID]…        # text only (no 3D): lines, heights, stacks, text rules
-xds render PROJECT [--slide ID] [--format PRESET]   # slide PNGs + contact sheet → cache/<hash>/ (--format: a target, cache/targets/<preset>/)
+xds render PROJECT [--slide ID] [--format PRESET]   # slide PNGs + contact sheet → cache/<hash>/
 xds audit PROJECT [--slide ID] [--format PRESET]    # render + measure + rules → audit.json + annotated PNGs
-xds fix PROJECT [--slide ID]… [--rule R]… [--severity S] [--dry-run]   # apply the findings' edits
-xds export PROJECT [--out DIR] [--force] [--pdf] [--format PRESET]  # audit gate → export/<stamp>/ (a target: export/<stamp>-<preset>/)
+xds fix PROJECT [--slide ID]… [--rule R]… [--severity error|warn|info] [--dry-run]   # apply the findings' edits
+xds export PROJECT [--out DIR] [--force] [--pdf] [--format PRESET]  # audit gate → export/<stamp>/
+                                          # --format on render/audit/export: a target (cache/targets/<preset>/), export/<stamp>-<preset>/
+xds reflow PROJECT (--format PRESET | --size WxH) [--dry-run]   # retarget the source: boxes relative to the margins, sizes to the bands
+xds reflow PROJECT --check [--format PRESET]   # the fluidity check: a target per orientation class, text-only rules, a table
+xds snapshot PROJECT [--label TEXT]       # copy project.json, designs/, screens/ → .snapshots/
+xds snapshot PROJECT --list | --delete ID
+xds restore PROJECT ID                    # put a snapshot back (the current state is snapshotted first)
 xds migrate [PROJECT | --all] [--dry-run] [--conform]
 xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae
               [--height M | --scale F] [--front back|left|right|up|down] [--ground]   # normalize
@@ -303,16 +344,7 @@ xds fonts fetch PROJECT FAMILY           # downloaded once into the font library
 xds fonts library                         # the families already downloaded
 xds fonts vendor PROJECT [FAMILY]         # copy library fonts into the project
 xds grid PROJECT FILE [--step PCT]        # an image with a labeled % grid → cache/grid/
-xds formats
 xds schema --emit-types | --check        # xds development; --emit-types only inside the checkout
-xds reflow PROJECT (--format PRESET | --size WxH) [--dry-run]   # retarget: boxes relative to the margins, sizes to the bands
-xds reflow PROJECT --check [--format PRESET]   # the fluidity check: a target per orientation class, text-only rules, a table
-xds layout list | show ID                 # the shipped slide layouts (docs/layouts.md)
-xds layout apply PROJECT ID [--slide ID] [--mode fill|replace|new] [--add-roles] [--dry-run]
-xds init PROJECT --layout ID              # seed the first slide from a layout
-xds snapshot PROJECT [--label TEXT]       # copy project.json, designs/, screens/ → .snapshots/
-xds snapshot PROJECT --list | --delete ID
-xds restore PROJECT ID                    # put a snapshot back (the current state is snapshotted first)
 xds clean PROJECT                         # delete cache/
 ```
 
@@ -354,7 +386,8 @@ saved project.json + designs + screens + assets + fonts
   → screens/<id>/index.html → cache/<hash>/screens/<id>.png   (only the screens the slides use)
   → /render?slide=<id>  at exactly format.width × format.height
   → SlideStage draws every layer in layerOrder, the same component as the editor
-  → window.xds.ready   (fonts, GLBs, environment, shadows)
+  → the type layer measures its ink; the stage resolves pins, aligns, stacks, fit and groups
+  → window.xds.ready   (fonts, GLBs, environment, shadows, the resolved layout)
   → page screenshot     → cache/<hash>/slides/<n>-<id>.png     (the final composite)
   → window.xds.measure()→ cache/<hash>/measure/<id>.json        (geometry for the audit)
   → layer passes        → per-layer alpha masks + background-only composite (for masking/contrast rules)
@@ -397,7 +430,11 @@ names what it was still waiting for (`fonts: Satoshi 700`, `model: bottle`).
 - **Freshness.** Every derived artifact lives under its source hash, so a changed source can
   never be served stale results.
 - **Saves.** One file, written atomically, guarded by `baseHash`. A save either replaces the
-  whole file or leaves it untouched.
+  whole file or leaves it untouched. A big save (the format, a slide, a quarter of the nodes)
+  copies the file it replaces into `.snapshots/` first, and `xds fix`, `xds reflow`, `xds layout
+  apply` and `xds restore` write through the same path.
+- **Nothing migrates on its own.** Every field added since schema version 3 is optional, so an
+  older project opens and audits unchanged; `xds migrate` runs only when asked.
 - **Paths.** Every path in `project.json` is project-relative and checked to stay inside the
   project. `/api/files` serves nothing outside it.
 
@@ -421,5 +458,6 @@ describes the export conventions and `xds model add`, which checks and registers
   product-showcase grounds.
 - [Design rules](./design-rules.md): the numbers, the audit, and every rule.
 - [Agent guide](./agent-guide.md): the file-and-CLI workflow, and bringing in models.
+- [Layouts](./layouts.md): slides written in relations, and how one is applied.
 - [Human interaction](./human-interaction.md): the editor, and where a person clicks.
 - [Dataflow](./dataflow.md): every input, transformation and destination.
