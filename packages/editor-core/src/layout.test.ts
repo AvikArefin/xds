@@ -178,12 +178,22 @@ describe("flow groups", () => {
   it("packs a column from where it is, ink to ink, and overrides a member's own stack", () => {
     const items = [text("a", 300, 100), item("b", { x: 100, y: 900, w: 300, h: 50 }, { group: "col", stack: { below: "a", gap: 9 } })];
     const r = resolveLayout(items, g, { col: { direction: "column", gap: 2 } });
-    expect(r.get("a")!.rect.y).toBe(300 - 4); // its ink top sits at the group's top
+    expect(r.get("a")!.rect.y).toBe(300); // the first member stays where it is
     expect(r.get("a")!.decided).toEqual({ x: "group", y: "group" });
-    // b's box top: a's ink bottom (296 + 96 = 392) + 2u, minus b's own ink top (0)
-    expect(r.get("b")!.rect.y).toBe(412);
+    // b's box top: a's ink bottom (300 + 96 = 396) + 2u, minus b's own ink top (0)
+    expect(r.get("b")!.rect.y).toBe(416);
     expect(r.get("b")!.group).toMatchObject({ name: "col", index: 1, axis: "y" });
     expect(r.get("b")!.decided.y).toBe("group");
+  });
+
+  it("an unpinned group is a fixed point: resolving the resolved rects changes nothing", () => {
+    const items = [text("a", 300, 100), text("b", 900, 60), text("c", 50, 80)];
+    const groups = { col: { direction: "column" as const, gap: 2 } };
+    const r1 = resolveLayout(items, g, groups);
+    const again = items.map((i) => ({ ...i, rect: r1.get(i.id)!.rect }));
+    const r2 = resolveLayout(again, g, groups);
+    for (const i of items) expect(r2.get(i.id)!.rect).toEqual(r1.get(i.id)!.rect);
+    expect(r1.get("a")!.rect.y).toBe(300);
   });
 
   it("lays a row out with the cross axis aligned, inside a pinned box with padding", () => {

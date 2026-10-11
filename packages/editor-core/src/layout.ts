@@ -363,7 +363,11 @@ export function resolveLayout(items: LayoutItem[], guide: LayoutGuide, groups: G
     }
     const pad = pinned ? (g.padding ?? 0) * u : 0;
     const gap = (g.gap ?? 2) * u;
-    let cursor = box[axis] + pad;
+    // A pinned group packs from its box; an unpinned one from the first member's ink, so the
+    // first member stays put and the result is a fixed point (packing from the box union would
+    // climb by the first member's ink offset on every resolution).
+    const firstInk = inkOf(members[0]);
+    let cursor = pinned ? box[axis] + pad : rects.get(members[0].id)![axis] + (axis === "x" ? firstInk.left : firstInk.top);
     members.forEach((m, index) => {
       const r = { ...rects.get(m.id)! };
       const ink = inkOf(m);
