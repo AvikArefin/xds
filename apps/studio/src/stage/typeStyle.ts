@@ -25,6 +25,7 @@ export interface EffectiveTypeStyle {
 
 /** Band fractions of the short edge (design-rules §1.2), used when no guide is available. */
 const FALLBACK_BANDS: Record<Level, { default: number; lh: [number, number] }> = {
+  expressive: { default: 0.16, lh: [0.7, 1.1] },
   display: { default: 0.11, lh: [0.9, 1.1] },
   headline: { default: 0.065, lh: [1.0, 1.2] },
   subhead: { default: 0.042, lh: [1.1, 1.35] },

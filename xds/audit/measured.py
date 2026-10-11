@@ -26,7 +26,7 @@ from .contrast import oklab_l
 from .geometry import R, union_all
 from .thresholds import Thresholds
 
-LEVEL_RANK = {"display": 0, "headline": 1, "subhead": 2, "body": 3, "caption": 4}
+LEVEL_RANK = {"expressive": -1, "display": 0, "headline": 1, "subhead": 2, "body": 3, "caption": 4}
 
 
 def dilate(mask: np.ndarray, r: int) -> np.ndarray:

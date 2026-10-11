@@ -28,8 +28,11 @@ SCHEMA_VERSION = 3
 
 Layer = Literal["ground", "render", "image", "type"]
 LAYERS: tuple[Layer, ...] = ("ground", "render", "image", "type")
-Level = Literal["display", "headline", "subhead", "body", "caption"]
-LEVELS: tuple[Level, ...] = ("display", "headline", "subhead", "body", "caption")
+Level = Literal["expressive", "display", "headline", "subhead", "body", "caption"]
+LEVELS: tuple[Level, ...] = ("expressive", "display", "headline", "subhead", "body", "caption")
+# The orientation classes a format falls in (variants and layouts are keyed by them).
+Orientation = Literal["portrait", "square", "landscape", "story"]
+ORIENTATIONS: tuple[Orientation, ...] = ("portrait", "square", "landscape", "story")
 
 Hex = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
 Id = Annotated[str, Field(min_length=1, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
@@ -84,6 +87,9 @@ class TypeRole(Model):
     weight: int = Field(default=400, ge=100, le=900)
     italic: bool | None = None
     size: float | None = Field(default=None, gt=0)
+    # A factor of the level's band default at this format (1 = the default), used when `size` is
+    # absent: the role keeps its place in the hierarchy in every format.
+    scale: float | None = Field(default=None, gt=0, le=10)
     color: str | None = None
     line_height: float | None = Field(default=None, gt=0)
     letter_spacing: float | None = None
@@ -91,9 +97,31 @@ class TypeRole(Model):
     wrap: Wrap | None = None
 
 
+class Stroke(Model):
+    """An outline: width in spacing units (u), color a brand token (default: the text color)."""
+
+    width: float = Field(gt=0, le=20)
+    color: str | None = None
+
+
+class Expression(Model):
+    """The project's expression system (design-rules §8): the few values its expressive
+    treatments and ornaments draw from. Declared, the coherence rules check against it; absent,
+    they infer it from each slide and flag a second angle, stroke or extrusion direction."""
+
+    angles: list[float] | None = Field(default=None, max_length=6)       # degrees (and their negatives)
+    skews: list[float] | None = Field(default=None, max_length=4)        # degrees
+    stroke_widths: list[float] | None = Field(default=None, max_length=4)  # u
+    extrude_angle: float | None = Field(default=None, ge=0, lt=360)      # the one extrusion direction
+    radii: list[float] | None = Field(default=None, max_length=4)        # plate corner radii, u
+    ornaments: list[str] | None = Field(default=None, max_length=8)      # shape names allowed
+    max_treatments: int | None = Field(default=None, ge=1, le=6)         # per slide
+
+
 class Brand(Model):
     colors: list[ColorToken] = Field(min_length=1)
     typography: dict[str, TypeRole] = Field(default_factory=dict)
+    expression: Expression | None = None
 
     @field_validator("colors")
     @classmethod
@@ -280,26 +308,161 @@ class ImageData(Model):
     fit: Literal["cover", "contain", "fill"] = "cover"
 
 
-class Stack(Model):
-    """Place a text block a set gap below (or above) another block, measured ink to ink.
+Shape = Literal["star-4", "star-8", "sparkle", "ring", "rings", "lens", "ellipse", "rect", "line", "plus",
+                "arc", "grid"]
+SHAPES: tuple[str, ...] = ("star-4", "star-8", "sparkle", "ring", "rings", "lens", "ellipse", "rect", "line",
+                           "plus", "arc", "grid")
 
-    `gap` is in spacing units (u). The anchor is a text node (its ink) or an image node (its box)
-    on the same slide. While a stack is set, the block's `box.y` is ignored: the layout decides it.
+
+class ShapeData(Model):
+    """An ornament on the 2D layer, drawn by the renderer (no file): a parameterized vector shape
+    with a stroke in u and a fill token. `params` are the shape's own knobs (e.g. `count` for
+    rings, `points` for a star, `radius` for a rect's corners, in u)."""
+
+    shape: Shape
+    stroke: Stroke | None = None
+    fill: str | None = None          # a brand color token, or "none"
+    params: dict[str, float] | None = None
+
+
+class Stack(Model):
+    """Place a block a set gap below, above, right of or left of another block, measured ink to
+    ink (text) or box to box (images).
+
+    `gap` is in spacing units (u). The anchor is a text, image or shape node on the same slide.
+    While a stack is set, the block's `box.y` (or `box.x`, for a horizontal stack) is ignored:
+    the layout decides it.
     """
 
     below: str | None = Field(default=None, min_length=1)
     above: str | None = Field(default=None, min_length=1)
+    right_of: str | None = Field(default=None, min_length=1)
+    left_of: str | None = Field(default=None, min_length=1)
     gap: float = Field(default=2, ge=-100, le=100)
 
     @model_validator(mode="after")
     def _one_anchor(self) -> Stack:
-        if (self.below is None) == (self.above is None):
-            raise ValueError("a stack names exactly one anchor: 'below' or 'above'")
+        if sum(v is not None for v in (self.below, self.above, self.right_of, self.left_of)) != 1:
+            raise ValueError("a stack names exactly one anchor: 'below', 'above', 'rightOf' or 'leftOf'")
         return self
 
     @property
     def anchor(self) -> str:
-        return self.below or self.above or ""
+        return self.below or self.above or self.right_of or self.left_of or ""
+
+    @property
+    def axis(self) -> Literal["x", "y"]:
+        return "x" if (self.right_of or self.left_of) else "y"
+
+
+PinLine = Literal["edge", "safe", "margin", "center", "third", "two-thirds"]
+
+
+class Pin(Model):
+    """Pin a box edge (or center) to a line of the format, plus an offset in u. Lines re-resolve
+    in every format, so a pinned edge stays on the margin when the format changes."""
+
+    to: PinLine
+    offset: float = Field(default=0, ge=-100, le=100)
+
+
+class Pins(Model):
+    """Which edges are pinned. Opposite edges both pinned (left and right) size the box; an edge
+    and its center pinned together is an error."""
+
+    left: Pin | None = None
+    right: Pin | None = None
+    top: Pin | None = None
+    bottom: Pin | None = None
+    cx: Pin | None = None
+    cy: Pin | None = None
+
+    @model_validator(mode="after")
+    def _no_overconstraint(self) -> Pins:
+        if self.cx is not None and (self.left is not None or self.right is not None):
+            raise ValueError("pin either the center (cx) or the left/right edges, not both")
+        if self.cy is not None and (self.top is not None or self.bottom is not None):
+            raise ValueError("pin either the center (cy) or the top/bottom edges, not both")
+        return self
+
+
+AlignEdge = Literal["left", "center", "right", "top", "middle", "bottom"]
+
+
+class AlignTo(Model):
+    """Share an edge (or center line) with another node on the slide, plus an offset in u."""
+
+    node: str = Field(min_length=1)
+    edge: AlignEdge
+    offset: float = Field(default=0, ge=-100, le=100)
+
+
+class Layout(Model):
+    """How a 2D node's box is decided beyond its numbers (data-models §2.5a). Every relation
+    resolves to a plain box, which the editor keeps written in `box`; dragging a related node
+    edits the relation's offset or gap, or detaches it.
+
+    - `pin`: edges to lines of the format (margin, safe zone, center, thirds);
+    - `align`: edges shared with other nodes (at most one per axis);
+    - `stack`: a gap below/above/right of/left of another node (in u, ink to ink);
+    - `fit`: `"text"` makes a text box as tall as its laid-out text;
+    - `group`: a flow group on the slide (`Slide.groups`) that lays its members out.
+    """
+
+    pin: Pins | None = None
+    align: list[AlignTo] | None = Field(default=None, max_length=2)
+    stack: Stack | None = None
+    fit: Literal["text"] | None = None
+    group: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _one_per_axis(self) -> Layout:
+        if self.align:
+            axes = ["x" if a.edge in ("left", "center", "right") else "y" for a in self.align]
+            if len(set(axes)) != len(axes):
+                raise ValueError("align at most once per axis (one of left/center/right, one of top/middle/bottom)")
+        return self
+
+
+class Group(Model):
+    """A flow group (data-models §2.5b): its members (nodes whose `layout.group` names it, in
+    z-order) are laid out in a column or row with a gap in u, inside a box that `pin` places."""
+
+    direction: Literal["column", "row"] = "column"
+    gap: float = Field(default=2, ge=0, le=100)
+    align: Literal["start", "center", "end"] = "start"
+    padding: float = Field(default=0, ge=0, le=100)
+    pin: Pins | None = None
+
+
+class Extrude(Model):
+    """Stacked copies behind the text in one direction: depth and angle, like a cast shadow or a
+    3D block face."""
+
+    depth: float = Field(gt=0, le=40)          # u
+    angle: float = Field(default=135, ge=0, lt=360)
+    color: str | None = None                   # token; default: the text color at 40 %
+    steps: int | None = Field(default=None, ge=1, le=64)
+
+
+class Repeat(Model):
+    """The block drawn `count` times, each copy offset by (dx, dy) u from the last, behind the
+    original. `outline` alternates filled and outlined copies; `fade` dims them towards the back."""
+
+    count: int = Field(ge=2, le=12)
+    dx: float = Field(default=0, ge=-100, le=100)
+    dy: float = Field(default=0, ge=-100, le=100)
+    outline: bool | None = None
+    fade: bool | None = None
+
+
+class Plate(Model):
+    """A rounded plate behind the text: padding and corner radius in u, a fill token and/or stroke."""
+
+    padding: float = Field(default=2, ge=0, le=40)
+    radius: float = Field(default=0, ge=0, le=40)
+    fill: str | None = None
+    stroke: Stroke | None = None
 
 
 class TypeData(Model):
@@ -317,7 +480,17 @@ class TypeData(Model):
     group: str | None = None
     decorative: bool | None = None
     wrap: Wrap | None = None
-    stack: Stack | None = None
+    stack: Stack | None = None   # kept for existing files; new files put it in `layout.stack`
+    # A factor of the role's effective size (1 = the role's), used when `size` is absent.
+    scale: float | None = Field(default=None, gt=0, le=10)
+    # Expressive treatments (design-rules §8). Each is one renderer feature with checkable numbers.
+    skew: float | None = Field(default=None, ge=-45, le=45)        # degrees, a slant of the glyphs
+    fill: Literal["solid", "none"] | None = None                   # "none" + stroke = outline text
+    stroke: Stroke | None = None
+    extrude: Extrude | None = None
+    repeat: Repeat | None = None
+    plate: Plate | None = None
+    fit_width: bool | None = None   # size the text so its longest line fills the box width (display type)
 
 
 class PartPose(Model):
@@ -357,23 +530,29 @@ class _NodeBase(Model):
     name: str = ""
     hidden: bool | None = None
     exceptions: list[Exception_] | None = None
+    # Per-orientation overrides (data-models §2.5c): fields merged over the node when the format
+    # falls in that class, so one source serves a portrait post and a landscape banner.
+    variants: dict[Orientation, dict[str, Any]] | None = None
 
 
 class GroundNode(_NodeBase):
     layer: Literal["ground"]
     box: Box
+    layout: Layout | None = None
     data: GroundData
 
 
 class ImageNode(_NodeBase):
     layer: Literal["image"]
     box: Box
-    data: ImageData
+    layout: Layout | None = None
+    data: Union[ImageData, ShapeData]
 
 
 class TypeNode(_NodeBase):
     layer: Literal["type"]
     box: Box
+    layout: Layout | None = None
     data: TypeData
 
 
@@ -395,6 +574,9 @@ class Slide(Model):
     camera: Camera | None = None
     nodes: list[Node] = Field(default_factory=list)
     exceptions: list[Exception_] | None = None
+    groups: dict[str, Group] | None = None
+    # False: the project's master nodes are left off this slide; a list: those master ids are.
+    master: Union[bool, list[str]] | None = None
 
 
 class RuleOverrides(Model):
@@ -405,6 +587,14 @@ class RuleOverrides(Model):
 
 
 DEFAULT_LAYER_ORDER: list[Layer] = ["ground", "render", "image", "type"]
+
+
+class Master(Model):
+    """Nodes every slide shows (data-models §2.8): a background, the logo, a footer. They render
+    behind the slide's own nodes of the same layer and cannot be edited per slide, only excluded
+    (`Slide.master`). Ids must not collide with slide node ids."""
+
+    nodes: list[Node] = Field(default_factory=list)
 
 
 class Project(Model):
@@ -424,6 +614,7 @@ class Project(Model):
     layer_order: list[Layer] = Field(default_factory=lambda: list(DEFAULT_LAYER_ORDER))
     lighting: Lighting | None = None
     rules: RuleOverrides | None = None
+    master: Master | None = None
     slides: list[Slide] = Field(min_length=1)
 
     @field_validator("layer_order")
@@ -440,7 +631,8 @@ class Project(Model):
 
         checks = {
             "slide": [s.id for s in self.slides],
-            "node": [n.id for s in self.slides for n in s.nodes],
+            "node": [n.id for s in self.slides for n in s.nodes]
+                    + [n.id for n in (self.master.nodes if self.master else [])],
             "asset": [a.id for a in self.assets],
             "object": [o.id for o in self.objects],
             "material": [m.id for m in self.materials],
@@ -579,6 +771,17 @@ class SlideMeasure(Model):
 Severity = Literal["error", "warn", "info"]
 
 
+class Edit(Model):
+    """One field written by a fix: a dotted path on the node (`box.y`, `data.size`,
+    `layout.stack.gap`), on the slide when `node_id` is absent (`camera.height`), or on the
+    project when both are (`brand.typography.body.size`). `value` replaces; None deletes."""
+
+    slide_id: str | None = None
+    node_id: str | None = None
+    path: str = Field(min_length=1)
+    value: Any = None
+
+
 class Finding(Model):
     rule: str
     family: str
@@ -592,6 +795,8 @@ class Finding(Model):
     expected: dict[str, Any] = Field(default_factory=dict)
     fix: str = ""
     principle: str = ""
+    # The fix as edits (design-rules §6): `xds fix` and the editor's Fix button apply them.
+    edits: list[Edit] | None = None
     path: str | None = None  # JSON path, for structural findings
     waiver: dict[str, str] | None = None
 

@@ -1,4 +1,4 @@
-import type { Box, DesignParam, GroundNode, ImageNode, Node, TypeNode } from "@xds/protocol";
+import { isAsset, type Box, type DesignParam, type GroundNode, type ImageData, type ImageNode, type Node, type TypeNode } from "@xds/protocol";
 import { boxPx, nodeLabel, nodesOf, typeStyle, useActiveSlide, useStudio } from "../../store";
 import { Icon } from "../Icon";
 import {
@@ -318,11 +318,13 @@ function StackRow({ node }: { node: TypeNode }) {
   );
 }
 
-export function ImageInspector({ nodes }: { nodes: ImageNode[] }) {
+export function ImageInspector({ nodes: all }: { nodes: ImageNode[] }) {
   const project = useStudio((s) => s.project)!;
   const readOnly = useStudio((s) => s.readOnly);
   const patchData = useStudio((s) => s.patchData);
+  const nodes = all.filter((n): n is ImageNode & { data: ImageData } => isAsset(n.data));
   const ids = nodes.map((n) => n.id);
+  if (!nodes.length) return null;
   const assets = (project.assets ?? []).filter((a) => a.kind === "image" || a.kind === "svg");
   return (
     <Section title="Image">

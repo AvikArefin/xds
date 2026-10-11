@@ -1,19 +1,21 @@
 /** The 2D image layer: images and SVG assets placed by box, with fit, rotation and opacity. */
 import { useState } from "react";
-import type { ImageNode, Project } from "@xds/protocol";
+import { isAsset, type ImageNode, type Project } from "@xds/protocol";
 import { boxToPx } from "@xds/editor-core";
 import { fileUrl } from "../api";
 import { useFailure, usePending } from "./readiness";
 
 function ImageBox({ node, project, hash, width, height }: { node: ImageNode; project: Project; hash?: string; width: number; height: number }) {
-  const asset = project.assets?.find((a) => a.id === node.data.asset);
+  const data = isAsset(node.data) ? node.data : null;
+  const assetId = data?.asset ?? "";
+  const asset = project.assets?.find((a) => a.id === assetId);
   const src = asset ? fileUrl(asset.path) : null;
   const [state, setState] = useState<{ src: string | null; status: "loading" | "ok" | "error" }>({ src, status: "loading" });
   const status = state.src === src ? state.status : "loading";
-  usePending(`image:${node.id}`, `image: ${node.data.asset}`, !!src && status === "loading");
+  usePending(`image:${node.id}`, `image: ${assetId}`, !!src && status === "loading");
   useFailure(
     `image:${node.id}`,
-    !asset ? `image node '${node.id}': unknown asset '${node.data.asset}'` : status === "error" ? `image '${node.data.asset}' failed to load` : null,
+    data && !asset ? `image node '${node.id}': unknown asset '${assetId}'` : status === "error" ? `image '${assetId}' failed to load` : null,
   );
   const b = boxToPx(node.box, { width, height });
   return (
@@ -38,7 +40,7 @@ function ImageBox({ node, project, hash, width, height }: { node: ImageNode; pro
           draggable={false}
           onLoad={() => setState({ src, status: "ok" })}
           onError={() => setState({ src, status: "error" })}
-          style={{ width: "100%", height: "100%", objectFit: node.data.fit ?? "cover", display: "block" }}
+          style={{ width: "100%", height: "100%", objectFit: data?.fit ?? "cover", display: "block" }}
         />
       )}
     </div>

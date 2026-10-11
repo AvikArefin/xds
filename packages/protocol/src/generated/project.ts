@@ -28,6 +28,7 @@ export interface Project {
   layerOrder?: ("ground" | "render" | "image" | "type")[];
   lighting?: Lighting;
   rules?: RuleOverrides;
+  master?: Master;
   /**
    * @minItems 1
    */
@@ -56,6 +57,7 @@ export interface Brand {
   typography?: {
     [k: string]: TypeRole;
   };
+  expression?: Expression;
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -70,16 +72,65 @@ export interface ColorToken {
  * via the `definition` "TypeRole".
  */
 export interface TypeRole {
-  level: "display" | "headline" | "subhead" | "body" | "caption";
+  level: "expressive" | "display" | "headline" | "subhead" | "body" | "caption";
   font: string;
   weight?: number;
   italic?: boolean;
   size?: number;
+  scale?: number;
   color?: string;
   lineHeight?: number;
   letterSpacing?: number;
   uppercase?: boolean;
   wrap?: "normal" | "balance" | "pretty";
+}
+/**
+ * The project's expression system (design-rules §8): the few values its expressive
+ * treatments and ornaments draw from. Declared, the coherence rules check against it; absent,
+ * they infer it from each slide and flag a second angle, stroke or extrusion direction.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Expression".
+ */
+export interface Expression {
+  /**
+   * @maxItems 6
+   */
+  angles?:
+    | []
+    | [number]
+    | [number, number]
+    | [number, number, number]
+    | [number, number, number, number]
+    | [number, number, number, number, number]
+    | [number, number, number, number, number, number];
+  /**
+   * @maxItems 4
+   */
+  skews?: [] | [number] | [number, number] | [number, number, number] | [number, number, number, number];
+  /**
+   * @maxItems 4
+   */
+  strokeWidths?: [] | [number] | [number, number] | [number, number, number] | [number, number, number, number];
+  extrudeAngle?: number;
+  /**
+   * @maxItems 4
+   */
+  radii?: [] | [number] | [number, number] | [number, number, number] | [number, number, number, number];
+  /**
+   * @maxItems 8
+   */
+  ornaments?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+  maxTreatments?: number;
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -201,63 +252,15 @@ export interface RuleOverrides {
   off?: string[];
 }
 /**
+ * Nodes every slide shows (data-models §2.8): a background, the logo, a footer. They render
+ * behind the slide's own nodes of the same layer and cannot be edited per slide, only excluded
+ * (`Slide.master`). Ids must not collide with slide node ids.
+ *
  * This interface was referenced by `XdsSchema`'s JSON-Schema
- * via the `definition` "Slide".
+ * via the `definition` "Master".
  */
-export interface Slide {
-  id: string;
-  name?: string;
-  lighting?: LightingOverride;
-  camera?: FrameCamera | FreeCamera;
+export interface Master {
   nodes?: (GroundNode | ImageNode | TypeNode | RenderNode)[];
-  exceptions?: Exception[];
-}
-/**
- * `Slide.lighting`: overrides `project.lighting` field by field.
- *
- * This interface was referenced by `XdsSchema`'s JSON-Schema
- * via the `definition` "LightingOverride".
- */
-export interface LightingOverride {
-  look?: "softbox" | "contrast" | "rim" | "bright";
-  angle?: number;
-  elevation?: number;
-  shadow?: "contact" | "soft" | "none";
-  brightness?: number;
-  tint?: string;
-}
-/**
- * Place the subject by canvas percentage; the camera follows.
- *
- * This interface was referenced by `XdsSchema`'s JSON-Schema
- * via the `definition` "FrameCamera".
- */
-export interface FrameCamera {
-  mode?: "frame";
-  x?: number;
-  y?: number;
-  height?: number;
-  yaw?: number;
-  pitch?: number;
-  fov?: number;
-}
-/**
- * This interface was referenced by `XdsSchema`'s JSON-Schema
- * via the `definition` "FreeCamera".
- */
-export interface FreeCamera {
-  mode: "free";
-  /**
-   * @minItems 3
-   * @maxItems 3
-   */
-  position: [number, number, number];
-  /**
-   * @minItems 3
-   * @maxItems 3
-   */
-  target: [number, number, number];
-  fov: number;
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -268,8 +271,14 @@ export interface GroundNode {
   name?: string;
   hidden?: boolean;
   exceptions?: Exception[];
+  variants?: {
+    [k: string]: {
+      [k: string]: unknown;
+    };
+  };
   layer: "ground";
   box: Box;
+  layout?: Layout;
   data: GroundData;
 }
 /**
@@ -297,6 +306,85 @@ export interface Box {
   opacity?: number;
 }
 /**
+ * How a 2D node's box is decided beyond its numbers (data-models §2.5a). Every relation
+ * resolves to a plain box, which the editor keeps written in `box`; dragging a related node
+ * edits the relation's offset or gap, or detaches it.
+ *
+ * - `pin`: edges to lines of the format (margin, safe zone, center, thirds);
+ * - `align`: edges shared with other nodes (at most one per axis);
+ * - `stack`: a gap below/above/right of/left of another node (in u, ink to ink);
+ * - `fit`: `"text"` makes a text box as tall as its laid-out text;
+ * - `group`: a flow group on the slide (`Slide.groups`) that lays its members out.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Layout".
+ */
+export interface Layout {
+  pin?: Pins;
+  /**
+   * @maxItems 2
+   */
+  align?: [] | [AlignTo] | [AlignTo, AlignTo];
+  stack?: Stack;
+  fit?: "text";
+  group?: string;
+}
+/**
+ * Which edges are pinned. Opposite edges both pinned (left and right) size the box; an edge
+ * and its center pinned together is an error.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Pins".
+ */
+export interface Pins {
+  left?: Pin;
+  right?: Pin;
+  top?: Pin;
+  bottom?: Pin;
+  cx?: Pin;
+  cy?: Pin;
+}
+/**
+ * Pin a box edge (or center) to a line of the format, plus an offset in u. Lines re-resolve
+ * in every format, so a pinned edge stays on the margin when the format changes.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Pin".
+ */
+export interface Pin {
+  to: "edge" | "safe" | "margin" | "center" | "third" | "two-thirds";
+  offset?: number;
+}
+/**
+ * Share an edge (or center line) with another node on the slide, plus an offset in u.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "AlignTo".
+ */
+export interface AlignTo {
+  node: string;
+  edge: "left" | "center" | "right" | "top" | "middle" | "bottom";
+  offset?: number;
+}
+/**
+ * Place a block a set gap below, above, right of or left of another block, measured ink to
+ * ink (text) or box to box (images).
+ *
+ * `gap` is in spacing units (u). The anchor is a text, image or shape node on the same slide.
+ * While a stack is set, the block's `box.y` (or `box.x`, for a horizontal stack) is ignored:
+ * the layout decides it.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Stack".
+ */
+export interface Stack {
+  below?: string;
+  above?: string;
+  rightOf?: string;
+  leftOf?: string;
+  gap?: number;
+}
+/**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
  * via the `definition` "GroundData".
  */
@@ -316,9 +404,15 @@ export interface ImageNode {
   name?: string;
   hidden?: boolean;
   exceptions?: Exception[];
+  variants?: {
+    [k: string]: {
+      [k: string]: unknown;
+    };
+  };
   layer: "image";
   box: Box;
-  data: ImageData;
+  layout?: Layout;
+  data: ImageData | ShapeData;
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -329,6 +423,33 @@ export interface ImageData {
   fit?: "cover" | "contain" | "fill";
 }
 /**
+ * An ornament on the 2D layer, drawn by the renderer (no file): a parameterized vector shape
+ * with a stroke in u and a fill token. `params` are the shape's own knobs (e.g. `count` for
+ * rings, `points` for a star, `radius` for a rect's corners, in u).
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "ShapeData".
+ */
+export interface ShapeData {
+  shape:
+    "star-4" | "star-8" | "sparkle" | "ring" | "rings" | "lens" | "ellipse" | "rect" | "line" | "plus" | "arc" | "grid";
+  stroke?: Stroke;
+  fill?: string;
+  params?: {
+    [k: string]: number;
+  };
+}
+/**
+ * An outline: width in spacing units (u), color a brand token (default: the text color).
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Stroke".
+ */
+export interface Stroke {
+  width: number;
+  color?: string;
+}
+/**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
  * via the `definition` "TypeNode".
  */
@@ -337,8 +458,14 @@ export interface TypeNode {
   name?: string;
   hidden?: boolean;
   exceptions?: Exception[];
+  variants?: {
+    [k: string]: {
+      [k: string]: unknown;
+    };
+  };
   layer: "type";
   box: Box;
+  layout?: Layout;
   data: TypeData;
 }
 /**
@@ -361,20 +488,53 @@ export interface TypeData {
   decorative?: boolean;
   wrap?: "normal" | "balance" | "pretty";
   stack?: Stack;
+  scale?: number;
+  skew?: number;
+  fill?: "solid" | "none";
+  stroke?: Stroke;
+  extrude?: Extrude;
+  repeat?: Repeat;
+  plate?: Plate;
+  fitWidth?: boolean;
 }
 /**
- * Place a text block a set gap below (or above) another block, measured ink to ink.
- *
- * `gap` is in spacing units (u). The anchor is a text node (its ink) or an image node (its box)
- * on the same slide. While a stack is set, the block's `box.y` is ignored: the layout decides it.
+ * Stacked copies behind the text in one direction: depth and angle, like a cast shadow or a
+ * 3D block face.
  *
  * This interface was referenced by `XdsSchema`'s JSON-Schema
- * via the `definition` "Stack".
+ * via the `definition` "Extrude".
  */
-export interface Stack {
-  below?: string;
-  above?: string;
-  gap?: number;
+export interface Extrude {
+  depth: number;
+  angle?: number;
+  color?: string;
+  steps?: number;
+}
+/**
+ * The block drawn `count` times, each copy offset by (dx, dy) u from the last, behind the
+ * original. `outline` alternates filled and outlined copies; `fade` dims them towards the back.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Repeat".
+ */
+export interface Repeat {
+  count: number;
+  dx?: number;
+  dy?: number;
+  outline?: boolean;
+  fade?: boolean;
+}
+/**
+ * A rounded plate behind the text: padding and corner radius in u, a fill token and/or stroke.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Plate".
+ */
+export interface Plate {
+  padding?: number;
+  radius?: number;
+  fill?: string;
+  stroke?: Stroke;
 }
 /**
  * No 2D box: the 3D layer covers the slide; position comes from pose and camera.
@@ -387,6 +547,11 @@ export interface RenderNode {
   name?: string;
   hidden?: boolean;
   exceptions?: Exception[];
+  variants?: {
+    [k: string]: {
+      [k: string]: unknown;
+    };
+  };
   layer: "render";
   data: RenderData;
 }
@@ -445,6 +610,83 @@ export interface PartPose {
 export interface AnimationFrame {
   clip: string;
   time: number;
+}
+/**
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Slide".
+ */
+export interface Slide {
+  id: string;
+  name?: string;
+  lighting?: LightingOverride;
+  camera?: FrameCamera | FreeCamera;
+  nodes?: (GroundNode | ImageNode | TypeNode | RenderNode)[];
+  exceptions?: Exception[];
+  groups?: {
+    [k: string]: Group;
+  };
+  master?: boolean | string[];
+}
+/**
+ * `Slide.lighting`: overrides `project.lighting` field by field.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "LightingOverride".
+ */
+export interface LightingOverride {
+  look?: "softbox" | "contrast" | "rim" | "bright";
+  angle?: number;
+  elevation?: number;
+  shadow?: "contact" | "soft" | "none";
+  brightness?: number;
+  tint?: string;
+}
+/**
+ * Place the subject by canvas percentage; the camera follows.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "FrameCamera".
+ */
+export interface FrameCamera {
+  mode?: "frame";
+  x?: number;
+  y?: number;
+  height?: number;
+  yaw?: number;
+  pitch?: number;
+  fov?: number;
+}
+/**
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "FreeCamera".
+ */
+export interface FreeCamera {
+  mode: "free";
+  /**
+   * @minItems 3
+   * @maxItems 3
+   */
+  position: [number, number, number];
+  /**
+   * @minItems 3
+   * @maxItems 3
+   */
+  target: [number, number, number];
+  fov: number;
+}
+/**
+ * A flow group (data-models §2.5b): its members (nodes whose `layout.group` names it, in
+ * z-order) are laid out in a column or row with a gap in u, inside a box that `pin` places.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Group".
+ */
+export interface Group {
+  direction?: "column" | "row";
+  gap?: number;
+  align?: "start" | "center" | "end";
+  padding?: number;
+  pin?: Pins;
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema
@@ -509,7 +751,7 @@ export interface MeasuredNode {
   overflow?: boolean;
   contentHeight?: number;
   role?: string;
-  level?: "display" | "headline" | "subhead" | "body" | "caption";
+  level?: "expressive" | "display" | "headline" | "subhead" | "body" | "caption";
   align?: "left" | "center" | "right";
   group?: string;
   decorative?: boolean;
@@ -613,9 +855,26 @@ export interface Finding {
   };
   fix?: string;
   principle?: string;
+  edits?: Edit[];
   path?: string;
   waiver?: {
     [k: string]: string;
+  };
+}
+/**
+ * One field written by a fix: a dotted path on the node (`box.y`, `data.size`,
+ * `layout.stack.gap`), on the slide when `node_id` is absent (`camera.height`), or on the
+ * project when both are (`brand.typography.body.size`). `value` replaces; None deletes.
+ *
+ * This interface was referenced by `XdsSchema`'s JSON-Schema
+ * via the `definition` "Edit".
+ */
+export interface Edit {
+  slideId?: string;
+  nodeId?: string;
+  path: string;
+  value?: {
+    [k: string]: unknown;
   };
 }
 /**

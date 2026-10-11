@@ -4,7 +4,7 @@ import type { DesignInfo, ExportEntry, FormatProfile, Guide, GuideBand, Level, P
 export type Mode = "present" | Layer;
 export const MODES: Mode[] = ["present", "type", "image", "render", "ground"];
 
-export const LEVELS: Level[] = ["display", "headline", "subhead", "body", "caption"];
+export const LEVELS: Level[] = ["expressive", "display", "headline", "subhead", "body", "caption"];
 
 export type GuideJson = Guide;
 export type DesignInfoJson = DesignInfo;

@@ -105,6 +105,7 @@ needs both (see [design rules](./design-rules.md)). A custom size with no preset
 {
   colors: { name: string; hex: string }[];          // min 1, unique names, "#rrggbb"
   typography: Record<string, TypeRole>;              // keyed by role name; authored, not seeded
+  expression?: Expression;                           // the expression system (§2.5d, design-rules §8)
 }
 
 TypeRole = {
@@ -112,7 +113,8 @@ TypeRole = {
   font: string;            // a family in `fonts`
   weight?: number;         // 100..900, default 400
   italic?: boolean;
-  size?: number;           // px; when absent, the band default for `level` at this format
+  size?: number;           // px; when absent, scale × the band default for `level` at this format
+  scale?: number;          // a factor of the band default (1 = default); keeps the hierarchy in every format
   color?: string;          // brand color token
   lineHeight?: number;     // unitless; when absent, the level's default
   letterSpacing?: number;  // em
@@ -160,6 +162,8 @@ project's fonts into its own `fonts/` folder when it has to travel without xds. 
   camera?: Camera;                   // absent → auto-framed (see lighting doc)
   nodes: Node[];                     // this slide's content, all layers
   exceptions?: Exception[];          // waived slide-level (composition) rules, see design-rules §7
+  groups?: Record<string, Group>;    // flow groups its nodes can join (§2.5b)
+  master?: false | string[];         // leave the project's master nodes off (all, or these ids) (§2.11)
 }
 ```
 
@@ -274,6 +278,82 @@ model declares joint limits (glTF `extras.xds.limits` on a node, which Blender e
 properties), it also checks them (`PART_OUT_OF_RANGE`). `xds model inspect` lists the parts, their
 limits and the clips, so an agent knows what can move.
 
+### 2.5a `Layout`: relations that resolve to a box
+
+Every 2D node may carry a `layout` next to its `box`. A relation never replaces the box: the
+layout resolves to numbers, the editor keeps `box` equal to them (as it does for stacks), and
+the renderer, the audit and the handles read plain boxes. Dragging a related node edits the
+relation's offset or gap; dragging past the snap tolerance detaches it. Pins and stacks are what
+make a layout survive a format change: a margin line re-resolves in every format.
+
+```ts
+Layout = {
+  pin?: { left?: Pin; right?: Pin; top?: Pin; bottom?: Pin; cx?: Pin; cy?: Pin };
+  align?: AlignTo[];          // at most one per axis
+  stack?: Stack;              // the same as TypeData.stack (which stays valid), for every 2D node
+  fit?: "text";               // type: box.h follows the laid-out text
+  group?: string;             // a flow group on this slide (§2.5b)
+};
+Pin     = { to: "edge" | "safe" | "margin" | "center" | "third" | "two-thirds"; offset?: number /* u */ };
+AlignTo = { node: string; edge: "left" | "center" | "right" | "top" | "middle" | "bottom"; offset?: number /* u */ };
+Stack   = { below?: string; above?: string; rightOf?: string; leftOf?: string; gap?: number /* u, default 2 */ };
+```
+
+Resolution order on a slide: pins (format lines), then stacks and aligns in dependency order
+(an anchor must be resolved first; cycles and missing anchors fall back to the box), then fit,
+then groups. `third` means the first third line on that axis and `two-thirds` the second; `edge`
+the canvas edge; `safe` the platform safe zone; `margin` the margin `m`. Left and right (or top and
+bottom) pinned together size the box; a center pin with an edge pin on the same axis is rejected.
+
+### 2.5b `Group`: flow
+
+```ts
+Group = { direction?: "column" | "row"; gap?: number /* u */; align?: "start" | "center" | "end";
+          padding?: number /* u */; pin?: Pins };
+```
+
+A slide declares groups in `Slide.groups`; a node joins one with `layout.group`. Members are laid
+out in z-order along the direction with `gap` between their ink, cross-aligned by `align`, inside
+a box that `pin` places (default: where the first member's box is). A headline, a subhead and a
+call to action in a column stay a column in every format, or flip to a row in a landscape
+variant. `TypeData.group` (the spacing rules' tag) is read as `layout.group` when the slide
+declares a group of that name.
+
+### 2.5c `variants`: per-orientation overrides
+
+```ts
+variants?: { portrait?: Partial<Node>; square?: Partial<Node>; landscape?: Partial<Node>; story?: Partial<Node> }
+```
+
+The format's orientation class (`xds formats` prints it: portrait 4:5 and 3:4, square, landscape,
+story 9:16) picks the variant, whose fields are deep-merged over the node (`box`, `layout`,
+`data`, `hidden`) before anything else reads it. One source, several targets.
+
+### 2.5d Expressive treatments (`TypeData`) and shapes (`ShapeData`)
+
+```ts
+// TypeData, in addition to §2.5
+scale?: number;            // factor of the role's size (role.scale: of the level's band default)
+skew?: number;             // degrees, a slant of the glyphs
+fill?: "solid" | "none";   // "none" + stroke = outline text
+stroke?: { width: number /* u */; color?: string };
+extrude?: { depth: number /* u */; angle?: number /* deg, default 135 */; color?: string; steps?: number };
+repeat?: { count: number; dx?: number; dy?: number /* u */; outline?: boolean; fade?: boolean };
+plate?: { padding?: number; radius?: number /* u */; fill?: string; stroke?: Stroke };
+fitWidth?: boolean;        // size the text so its longest line fills the box width
+
+// an image-layer node's data is an asset or a drawn shape
+ShapeData = { shape: "star-4" | "star-8" | "sparkle" | "ring" | "rings" | "lens" | "ellipse" | "rect" | "line"
+                     | "plus" | "arc" | "grid";
+              stroke?: Stroke; fill?: string /* token or "none" */; params?: Record<string, number> };
+```
+
+The `expressive` type level is display lettering treated as a graphic: a wide size band, tight
+leading, no measure. `brand.expression` declares the project's expression system (the angles,
+skews, stroke widths, one extrusion direction, radii and ornament family it draws from), and the
+coherence rules in [design rules §8](./design-rules.md#8-expression-and-coherence) check every
+treatment and ornament against it.
+
 ### 2.6 `Pose`
 
 ```ts
@@ -318,6 +398,16 @@ auto-camera adapt to its bounds instead.
 The complete description of a slide's light is these six fields. There are no light lists to edit
 and no stored derived rig. [Lighting and backgrounds](./lighting-and-backgrounds.md) explains how
 the rig is built from them.
+
+### 2.11 `Master`: nodes on every slide
+
+```ts
+project.master?: { nodes: Node[] }
+```
+
+Master nodes (a background, the logo, a footer) render on every slide, behind the slide's own
+nodes of the same layer, and are edited once, in Present mode. A slide leaves them off with
+`master: false` or lists the ids to leave off. Their ids are project-unique like any node's.
 
 ### 2.9 `Camera`
 

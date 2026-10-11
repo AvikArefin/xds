@@ -11,7 +11,7 @@ import type {
   Slide,
   TypeNode,
 } from "@xds/protocol";
-import { DEFAULT_LAYER_ORDER } from "@xds/protocol";
+import { DEFAULT_LAYER_ORDER, isShape } from "@xds/protocol";
 import type { GuideJson, Level } from "./types";
 
 export const LIGHTING_DEFAULTS: Required<Omit<Lighting, "tint">> & { tint?: string } = {
@@ -53,7 +53,7 @@ export function nodeLabel(n: Node, p?: Project | null): string {
     return obj?.name ?? n.id;
   }
   if (n.layer === "ground") return n.data.design;
-  return n.data.asset;
+  return isShape(n.data) ? n.data.shape : n.data.asset;
 }
 
 export function effectiveLighting(p: Project, slide: Slide | null): typeof LIGHTING_DEFAULTS {

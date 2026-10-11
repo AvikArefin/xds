@@ -4,7 +4,7 @@
  * (background, 2D boxes, text, the 3D subject's frame position), which is cheap enough for a rail.
  */
 import { memo, useState } from "react";
-import type { Asset, Node, Project, Slide, TypeNode } from "@xds/protocol";
+import { isAsset, type Asset, type Node, type Project, type Slide, type TypeNode } from "@xds/protocol";
 import { fileUrl } from "../api";
 import { slideBaseColor } from "../stage/typeStyle";
 import { colorHex, effectiveCamera, layerOrder } from "../store";
@@ -68,10 +68,11 @@ export const SlideThumb = memo(function SlideThumb({
         };
         if (n.layer === "ground") return <div key={n.id} className="thumb-ground" style={style} />;
         if (n.layer === "image") {
-          const a = assets.get(n.data.asset);
+          const d = isAsset(n.data) ? n.data : null;
+          const a = d ? assets.get(d.asset) : undefined;
           return (
             <div key={n.id} className="thumb-image" style={style}>
-              {a && <img src={fileUrl(a.path)} alt="" draggable={false} style={{ objectFit: n.data.fit === "fill" ? "fill" : n.data.fit ?? "contain" }} />}
+              {a && d && <img src={fileUrl(a.path)} alt="" draggable={false} style={{ objectFit: d.fit === "fill" ? "fill" : d.fit ?? "contain" }} />}
             </div>
           );
         }

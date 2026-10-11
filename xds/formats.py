@@ -102,6 +102,9 @@ class BandSpec:
 
 
 BANDS: dict[Level, BandSpec] = {
+    # Expressive: display lettering as a graphic (design-rules §8). Wide band, tight leading,
+    # no measure; the coherence rules take over where the typographic ones let go.
+    "expressive": BandSpec(0.160, 0.075, 0.50, 12, (0.70, 1.10), 2, (None, None), 45),
     "display": BandSpec(0.110, 0.075, 0.20, 12, (0.90, 1.10), 2, (None, None), 45),
     "headline": BandSpec(0.065, 0.050, 0.09, 12, (1.00, 1.20), 3, (None, 24), 45),
     "subhead": BandSpec(0.042, 0.032, 0.05, 12, (1.10, 1.35), 3, (None, 40), 60),

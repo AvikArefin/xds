@@ -1,7 +1,7 @@
 /** Response shapes of the local HTTP API (xds/api.py). The project schema itself is @xds/protocol. */
 import type { AuditReport, DesignManifest, ExportRecord, Finding } from "@xds/protocol";
 
-export type Level = "display" | "headline" | "subhead" | "body" | "caption";
+export type Level = "expressive" | "display" | "headline" | "subhead" | "body" | "caption";
 
 /** One type band of `formats.Guide.to_json()` (snake_case keys, px values). */
 export interface GuideBand {
