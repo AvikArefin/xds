@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { ProjectListItem } from "../types";
+import type { ProjectListItem, Snapshot } from "../types";
 import { isDirty, useStudio } from "../store";
 import { formatOptions, useFormatCatalog } from "./FormatSelect";
 import { Icon } from "./Icon";
@@ -145,6 +145,130 @@ function NewTab() {
   );
 }
 
+function describe(s: Snapshot): string {
+  if (s.label) return s.label;
+  if (s.migrateBackup) return "Before migrate";
+  if (s.reason.startsWith("auto: ")) return `Before a big save: ${s.reason.slice(6)}`;
+  if (s.reason.startsWith("before restore")) return "Before a restore";
+  return "Snapshot";
+}
+
+function when(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** Snapshots of the open project: restore one, take one, delete one. */
+function RestoreTab() {
+  const [items, setItems] = useState<Snapshot[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const readOnly = useStudio((s) => s.readOnly);
+  const refresh = () =>
+    api
+      .snapshots()
+      .then((r) => setItems(r.snapshots))
+      .catch((e) => setError((e as Error).message));
+  useEffect(() => void refresh(), []);
+
+  const take = async () => {
+    const st = useStudio.getState();
+    if (isDirty(st) && !(await st.save())) return;
+    const label = await useStudio.getState().ask({
+      title: "Snapshot now",
+      message: "Copies project.json, designs/ and screens/ into .snapshots/. A labelled snapshot is kept until you delete it.",
+      label: "Label (optional)",
+      confirm: "Snapshot",
+    });
+    if (label === null) return;
+    setBusy("take");
+    try {
+      const r = await api.takeSnapshot(label.trim() || undefined);
+      useStudio.getState().notify("success", `Snapshot ${r.snapshot.id} saved.`);
+      await refresh();
+    } catch (e) {
+      useStudio.getState().notify("error", `Snapshot failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async (s: Snapshot) => {
+    const st = useStudio.getState();
+    const r = await st.ask({
+      title: `Restore “${describe(s)}”?`,
+      message: `${when(s.createdAt)} · ${s.summary.slides ?? "?"} slides · ${s.summary.nodes ?? "?"} nodes. The project on disk is replaced${
+        isDirty(st) ? ", and your unsaved edits are lost" : ""
+      }. The current state is snapshotted first, so this can be undone from this list.`,
+      input: false,
+      confirm: "Restore",
+      danger: true,
+    });
+    if (r === null) return;
+    setBusy(s.id);
+    try {
+      const res = await api.restoreSnapshot(s.id);
+      useStudio.getState().setProjectBrowser(null);
+      await useStudio.getState().load("refresh");
+      useStudio.getState().notify("success", `Restored ${describe(s)}. The state before is snapshot ${res.safety.id}.`);
+    } catch (e) {
+      useStudio.getState().notify("error", `Restore failed: ${(e as Error).message}`);
+      setBusy(null);
+    }
+  };
+
+  const remove = async (s: Snapshot) => {
+    const r = await useStudio.getState().ask({
+      title: `Delete snapshot “${describe(s)}”?`,
+      message: "This cannot be undone.",
+      input: false,
+      confirm: "Delete",
+      danger: true,
+    });
+    if (r === null) return;
+    try {
+      await api.deleteSnapshot(s.id);
+      await refresh();
+    } catch (e) {
+      useStudio.getState().notify("error", `Delete failed: ${(e as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="pb-tab">
+      {error && <div className="callout sev-error">{error}</div>}
+      <div className="muted small">
+        Snapshots are taken by hand, before a big save (a format change, a slide added or removed, many nodes changed) and before a
+        restore. They hold project.json, designs and screens.
+      </div>
+      <ul className="pb-list">
+        {items?.map((s) => (
+          <li key={s.id} className="pb-item pb-snapshot">
+            <div className="pb-snapshot-main">
+              <span className="pb-name">{describe(s)}</span>
+              <span className="muted small">
+                {when(s.createdAt)} · {s.summary.slides ?? "?"} slides · {s.summary.nodes ?? "?"} nodes
+                {s.summary.format?.preset ? ` · ${s.summary.format.preset}` : s.summary.format?.width ? ` · ${s.summary.format.width}×${s.summary.format.height}` : ""}
+                {s.summary.schemaVersion !== undefined && s.summary.schemaVersion !== 3 ? ` · schema v${s.summary.schemaVersion}` : ""}
+              </span>
+            </div>
+            <button type="button" className="btn small" disabled={busy !== null || readOnly} onClick={() => void restore(s)}>
+              {busy === s.id ? "Restoring…" : "Restore"}
+            </button>
+            {!s.migrateBackup && <IconButton icon="trash" title="Delete snapshot" size={12} disabled={busy !== null} onClick={() => void remove(s)} />}
+          </li>
+        ))}
+        {items && !items.length && <li className="muted small pad">No snapshots yet.</li>}
+      </ul>
+      <div className="dialog-actions">
+        <button type="button" className="btn primary" disabled={busy !== null || readOnly} onClick={() => void take()}>
+          {busy === "take" ? "Saving…" : "Snapshot now…"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ProjectBrowser() {
   const tab = useStudio((s) => s.projectBrowser);
   const set = useStudio((s) => s.setProjectBrowser);
@@ -160,10 +284,13 @@ export function ProjectBrowser() {
             <button type="button" className={tab === "new" ? "active" : ""} onClick={() => set("new")}>
               New project
             </button>
+            <button type="button" className={tab === "restore" ? "active" : ""} onClick={() => set("restore")}>
+              Restore
+            </button>
           </div>
           <IconButton icon="x" title="Close" onClick={() => set(null)} />
         </div>
-        {tab === "open" ? <OpenTab /> : <NewTab />}
+        {tab === "open" ? <OpenTab /> : tab === "new" ? <NewTab /> : <RestoreTab />}
       </div>
     </div>
   );

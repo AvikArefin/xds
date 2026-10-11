@@ -413,6 +413,45 @@ def cmd_schema(a: argparse.Namespace, out: Out) -> int:
     return 0
 
 
+def cmd_snapshot(a: argparse.Namespace, out: Out) -> int:
+    from . import snapshots
+
+    root = proj.find_root(a.project)
+    if a.delete:
+        r = snapshots.delete(root, a.delete)
+        out.emit(r, f"deleted snapshot {a.delete}")
+        return 0
+    if a.list:
+        items = snapshots.list_snapshots(root)
+        out.emit({"snapshots": items}, snapshots_text(items))
+        return 0
+    rec = snapshots.take(root, label=a.label)
+    out.emit({"snapshot": rec}, f"snapshot {rec['id']} ({rec['dir']})")
+    return 0
+
+
+def snapshots_text(items: list[dict[str, Any]]) -> str:
+    if not items:
+        return "no snapshots"
+    lines = []
+    for r in items:
+        s = r.get("summary") or {}
+        fmt = s.get("format") or {}
+        size = f"{fmt.get('width')}×{fmt.get('height')}" if fmt.get("width") else ""
+        what = r.get("label") or r.get("reason") or ""
+        lines.append(f"{r['id']:<34} {str(r.get('createdAt', ''))[:19]:<20} {what:<40} "
+                     f"{s.get('slides', '?')} slides · {s.get('nodes', '?')} nodes · {fmt.get('preset') or size}")
+    return "\n".join(lines)
+
+
+def cmd_restore(a: argparse.Namespace, out: Out) -> int:
+    from . import snapshots
+
+    r = snapshots.restore(proj.find_root(a.project), a.snapshot)
+    out.emit(r, f"restored {a.snapshot} ({r['files']} files); the state before is snapshot {r['safety']['id']}")
+    return 0
+
+
 def cmd_clean(a: argparse.Namespace, out: Out) -> int:
     root = proj.find_root(a.project)
     cache = root / "cache"
@@ -608,6 +647,16 @@ def build_parser() -> argparse.ArgumentParser:
     g = sp.add_mutually_exclusive_group(required=True)
     g.add_argument("--emit-types", action="store_true")
     g.add_argument("--check", action="store_true")
+
+    sp = add("snapshot", cmd_snapshot, "save a snapshot of the project's sources into .snapshots/")
+    sp.add_argument("project")
+    sp.add_argument("--label", help="a name for it (labelled snapshots are never pruned)")
+    sp.add_argument("--list", action="store_true", help="list the snapshots (and migrate backups), newest first")
+    sp.add_argument("--delete", metavar="ID", help="delete one snapshot")
+
+    sp = add("restore", cmd_restore, "put a snapshot back (the current state is snapshotted first)")
+    sp.add_argument("project")
+    sp.add_argument("snapshot", metavar="ID", help="a snapshot id from `xds snapshot --list`")
 
     sp = add("clean", cmd_clean, "delete cache/")
     sp.add_argument("project")

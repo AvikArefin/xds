@@ -19,6 +19,8 @@ function baseCommands(): Command[] {
   const cmds: Command[] = [
     { id: "open", label: "Open project…", hint: "⌘O", run: () => st.setProjectBrowser("open") },
     { id: "new", label: "New project…", run: () => st.setProjectBrowser("new") },
+    { id: "restore", label: "Restore a snapshot…", hint: "snapshots of big saves", run: () => st.setProjectBrowser("restore") },
+    { id: "snapshot", label: "Snapshot now…", run: () => st.setProjectBrowser("restore") },
     { id: "add-slide", label: "Add slide", run: () => st.addSlide() },
     { id: "duplicate-slide", label: "Duplicate slide", hint: "⌘D with nothing selected", run: () => st.duplicateSlide(st.activeSlideId) },
     { id: "copy", label: "Copy", hint: "⌘C · the selection, or the slide", run: () => st.copy() },

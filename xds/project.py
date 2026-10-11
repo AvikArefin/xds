@@ -447,10 +447,11 @@ def write_atomic(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def save(path: str | Path, doc: dict[str, Any], base_hash: str | None) -> dict[str, str]:
+def save(path: str | Path, doc: dict[str, Any], base_hash: str | None) -> dict[str, Any]:
     """Validate, guard against outside changes, stamp `updatedAt`, and replace project.json.
+    A big change (see `snapshots.big_change`) snapshots the current file first.
 
-    Returns `{ hash, fileHash }`. Raises `XdsError` 422 (invalid) or 409 (`SAVE_CONFLICT`).
+    Returns `{ hash, fileHash, snapshot? }`. Raises `XdsError` 422 (invalid) or 409 (`SAVE_CONFLICT`).
     """
     root = find_root(path)
     try:
@@ -463,9 +464,15 @@ def save(path: str | Path, doc: dict[str, Any], base_hash: str | None) -> dict[s
     if base_hash is not None and base_hash != current:
         raise XdsError("SAVE_CONFLICT", "project.json changed on disk since it was loaded",
                        status=409, details={"hash": current})
+    from . import snapshots
+
+    snapshot = snapshots.before_save(root, _raw_or_none(root), doc)
     project.updated_at = now()
     write_atomic(root / PROJECT_FILE, dumps(project.to_json()))
-    return {"hash": source_hash(root), "fileHash": project_file_hash(root)}
+    out = {"hash": source_hash(root), "fileHash": project_file_hash(root)}
+    if snapshot:
+        out["snapshot"] = snapshot
+    return out
 
 
 def write_project(root: Path, project: Project) -> None:

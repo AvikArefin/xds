@@ -308,6 +308,34 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
                                              replace=replace)
         return ok(result=result)
 
+    @app.get("/api/snapshots")
+    async def list_snapshots() -> dict[str, Any]:
+        from . import snapshots
+
+        return ok(snapshots=await run_in_threadpool(snapshots.list_snapshots, state.require_root()))
+
+    @app.post("/api/snapshots")
+    async def take_snapshot(body: dict[str, Any] | None = None) -> dict[str, Any]:
+        from . import snapshots
+
+        label = (body or {}).get("label")
+        return ok(snapshot=await run_in_threadpool(snapshots.take, state.require_root(), label=label))
+
+    @app.post("/api/snapshots/restore")
+    async def restore_snapshot(body: dict[str, Any]) -> dict[str, Any]:
+        """Put a snapshot back; the file change then reloads the editor."""
+        from . import snapshots
+
+        if not body.get("id"):
+            raise XdsError("BAD_REQUEST", "body needs { id }", status=422)
+        return ok(**await run_in_threadpool(snapshots.restore, state.require_root(), body["id"]))
+
+    @app.delete("/api/snapshots/{snapshot_id}")
+    async def delete_snapshot(snapshot_id: str) -> dict[str, Any]:
+        from . import snapshots
+
+        return ok(**await run_in_threadpool(snapshots.delete, state.require_root(), snapshot_id))
+
     @app.post("/api/migrate")
     async def migrate_project() -> dict[str, Any]:
         """`xds migrate` for the active project (backs up project.json first)."""

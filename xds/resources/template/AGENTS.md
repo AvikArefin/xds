@@ -39,7 +39,7 @@ answer so a quick "yes" is enough:
 | `screens/<id>/index.html` | UI pages shown on device screens, see §6 |
 | `assets/` | images, and 3D models you brought in yourself |
 | `sources/` | yours: `.blend` files, scripts, originals. XDS ignores it |
-| `cache/`, `export/`, `.migrate-backup/` | generated; never edit |
+| `cache/`, `export/`, `.migrate-backup/`, `.snapshots/` | generated; never edit (`.snapshots/` holds restorable copies: `xds snapshot . --list`) |
 
 ## 2. The loop
 
@@ -53,6 +53,8 @@ xds audit . --json      # render + measure + design rules → findings, each wit
 #   look at cache/<hash>/annotated/*.png
 xds export . --json     # writes export/<stamp>/*.png (refuses while audit errors are open)
 xds export . --pdf --json   # the deck as one PDF instead, a page per slide (LinkedIn carousel)
+xds snapshot . --label "before the rewrite" --json   # a restorable copy of the sources (.snapshots/)
+xds restore . ID --json     # put one back; the state before is snapshotted first
 ```
 
 - Fix every audit **error**, then review the **warnings**. Ignore `info` until the slide is done.

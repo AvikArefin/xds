@@ -119,7 +119,7 @@ export interface StudioState {
   hiddenLayers: Layer[];
   inspectorTab: string;
   commandPaletteOpen: boolean;
-  projectBrowser: null | "open" | "new";
+  projectBrowser: null | "open" | "new" | "restore";
   focusRect: { slideId: string; x: number; y: number; w: number; h: number; t: number } | null;
   prompt: PromptRequest | null;
 

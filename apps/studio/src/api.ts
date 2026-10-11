@@ -13,6 +13,7 @@ import type {
   ProjectsResponse,
   SaveResponse,
   ServerEvent,
+  Snapshot,
 } from "./types";
 
 export const API_VERSION = 2;
@@ -107,6 +108,10 @@ export const api = {
       "POST",
       "/api/migrate",
     ),
+  snapshots: () => request<{ snapshots: Snapshot[] }>("GET", "/api/snapshots"),
+  takeSnapshot: (label?: string) => request<{ snapshot: Snapshot }>("POST", "/api/snapshots", { label }),
+  restoreSnapshot: (id: string) => request<{ restored: Snapshot; safety: Snapshot; files: number }>("POST", "/api/snapshots/restore", { id }),
+  deleteSnapshot: (id: string) => request<{ deleted: string }>("DELETE", `/api/snapshots/${encodeURIComponent(id)}`),
   library: () => request<{ models: LibraryModel[]; logos: LibraryLogo[] }>("GET", "/api/library"),
   addLibraryModel: (model: string, opts: { id?: string; slide?: string; screen?: string } = {}) =>
     request<{ result: { id: string; node: string | null } }>("POST", "/api/models/library", { model, ...opts }),

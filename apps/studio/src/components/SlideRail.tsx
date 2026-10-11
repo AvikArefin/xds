@@ -135,6 +135,7 @@ function Toolbar() {
     <div className="rail-toolbar">
       <IconButton icon="open" title="Open project (⌘O)" onClick={() => st.setProjectBrowser("open")} />
       <IconButton icon="search" title="Search commands (⌘K)" onClick={() => st.setPalette(true)} />
+      <IconButton icon="history" title="Snapshots: restore a previous state" onClick={() => st.setProjectBrowser("restore")} />
       <IconButton icon="undo" title="Undo (⌘Z)" className="rail-undo" disabled={!canUndo} onClick={st.undo} />
       <IconButton icon="redo" title="Redo (⇧⌘Z)" disabled={!canRedo} onClick={st.redo} />
       <button

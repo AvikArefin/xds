@@ -93,6 +93,17 @@ export interface FormatsResponse {
   guide: Guide | null;
 }
 
+export interface Snapshot {
+  id: string;
+  dir: string;
+  createdAt: string;
+  label: string | null;
+  /** "manual", "auto: <why>", "before restore of <id>", or "migrate". */
+  reason: string;
+  migrateBackup: boolean;
+  summary: { name?: string; schemaVersion?: number; format?: { preset?: string; width?: number; height?: number }; slides?: number; nodes?: number };
+}
+
 export interface ProjectListItem {
   path: string;
   id: string | null;

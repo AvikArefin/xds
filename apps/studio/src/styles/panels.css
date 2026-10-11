@@ -589,4 +589,17 @@
   display: flex;
   gap: 6px;
 }
+.pb-item.pb-snapshot {
+  cursor: default;
+}
+.pb-item.pb-snapshot:hover {
+  background: none;
+}
+.pb-snapshot-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
 

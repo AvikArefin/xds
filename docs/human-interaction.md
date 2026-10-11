@@ -27,7 +27,7 @@ editor.
 
 | Area | Contents |
 | --- | --- |
-| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Undo, Redo, Save |
+| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields (Text adds **Wrap** and **Stack**). |
@@ -93,6 +93,14 @@ reloads from disk. Undo has one step per drag or field change.
 - **New project**: `Cmd/Ctrl + O` → **New project** → name, folder, format → **Create**. (Terminal:
   `xds init ~/xd-projects/launch --name "Launch"`.) It starts with one slide on a `solid`
   background, a one-color brand, and an `AGENTS.md` for AI agents.
+- **Restore**: the rail's clock icon (or `Cmd/Ctrl + O` → **Restore**) lists the project's
+  snapshots, newest first: the ones you took (**Snapshot now…**, with a label), the ones taken
+  automatically before a big save (a format change, a slide added or removed, more than a quarter
+  of the nodes changed), the safety copy taken before every restore, and migrate backups.
+  **Restore** replaces project.json, designs and screens on disk and reloads the editor; the state
+  before is itself a snapshot, so a restore can be undone from the same list. Snapshots live in
+  `.snapshots/`; the twenty newest automatic ones are kept, labelled ones until deleted.
+  (Terminal: `xds snapshot . --label "…"`, `xds snapshot . --list`, `xds restore . ID`.)
 - **Open a project**: `Cmd/Ctrl + O`, then a project or **Browse…**. One marked *needs migrate*
   opens on a **This project needs migrating** screen; **Migrate project** upgrades it and keeps a
   backup in `.migrate-backup/`.
