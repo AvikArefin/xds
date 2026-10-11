@@ -897,4 +897,5 @@ export interface ExportRecord {
     [k: string]: number;
   };
   forced: boolean;
+  sourceFormat?: string;
 }

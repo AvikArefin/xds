@@ -11,7 +11,7 @@ import { useEffect, type RefObject } from "react";
 import { stackOf, type Node } from "@xds/protocol";
 import { fallbackGuide, liveFindings, type LiveGuide, type LiveNode } from "@xds/editor-core";
 import { measureLines } from "../stage/ink";
-import { boxBoundsPx, getSlide, nodesOf, typeStyle, useStudio } from "../store";
+import { boxBoundsPx, getSlide, slideNodes, typeStyle, useStudio } from "../store";
 
 function liveGuide(): LiveGuide {
   const s = useStudio.getState();
@@ -53,7 +53,7 @@ function collect(frame: HTMLElement, zoom: number): { nodes: LiveNode[]; slideId
   const { width: W, height: H } = s.project.format;
   const origin = frame.getBoundingClientRect();
   const nodes: LiveNode[] = [];
-  for (const n of nodesOf(slide)) {
+  for (const n of slideNodes(s.project, slide)) {
     if (n.hidden || s.hiddenLayers.includes(n.layer)) continue;
     const waived = n.exceptions?.map((e) => e.rule);
     if (n.layer === "render") {

@@ -59,7 +59,9 @@ import {
   removeNodes,
   reorderInLayer,
   renderNodePose,
+  orientationOf,
   updateNodes,
+  updateRawNodes,
   updateSlide,
   type AlignHow,
   type ReorderTo,
@@ -156,6 +158,8 @@ export interface StudioState {
   exportBlocked: Finding[] | null;
   /** The format of the last export started, so "Export anyway" repeats it. */
   exportFormat: "png" | "pdf";
+  /** The preset of the last export started as a target (data-models §2.5c), if any. */
+  exportTarget: string | null;
   exports: ExportEntry[];
 
   // --- notices
@@ -204,6 +208,8 @@ export interface StudioActions {
   makeSlideNode(id: string): void;
   /** Show or leave off the master nodes on the active slide (`slide.master`). */
   setSlideMaster(show: boolean): void;
+  /** Give nodes (or take from them) an override for the format's orientation (data-models §2.5c). */
+  setVariant(ids: string[], on: boolean): Promise<void>;
 
   setZoom(z: number | "fit"): void;
   zoomBy(f: number): void;
@@ -273,7 +279,8 @@ export interface StudioActions {
   toggleLive(open?: boolean): void;
   markIntentional(f: Finding): Promise<void>;
   /** PNGs, one per slide, or the deck as one PDF. */
-  exportSlides(format: "png" | "pdf", force?: boolean): Promise<void>;
+  /** `target`: export the source reflowed to that preset (the files land in export/<stamp>-<preset>/). */
+  exportSlides(format: "png" | "pdf", force?: boolean, target?: string | null): Promise<void>;
   loadExports(): Promise<void>;
   dismissExportBlocked(): void;
   saveThen(what: string): Promise<boolean>;
@@ -324,6 +331,7 @@ const initial: StudioState = {
   jobs: {},
   exportBlocked: null,
   exportFormat: "png",
+  exportTarget: null,
   exports: [],
   notices: [],
 };
@@ -1011,6 +1019,42 @@ export const useStudio = create<Studio>()(
             }),
           );
         },
+        setVariant: async (ids, on) => {
+          const s = get();
+          if (!canEditDoc() || !s.project) return;
+          const o = orientationOf(s.project.format);
+          const nodes = slideNodes(s.project, slideOf()).filter((n) => ids.includes(n.id));
+          if (!nodes.length) return;
+          if (!on) {
+            const filled = nodes.filter((n) => Object.keys(n.variants?.[o] ?? {}).length);
+            if (filled.length) {
+              const r = await get().ask({
+                title: `Drop the ${o} override${filled.length > 1 ? "s" : ""}?`,
+                message: `${filled.map((n) => n.name || n.id).join(", ")}: the ${o} values go away and the base shows again in this format.`,
+                input: false,
+                confirm: "Drop override",
+                danger: true,
+              });
+              if (r === null) return;
+            }
+          }
+          commit(
+            updateRawNodes(get().project!, s.activeSlideId, ids, (n) => {
+              const variants = { ...(n.variants ?? {}) } as NonNullable<Node["variants"]>;
+              if (on) {
+                if (variants[o]) return n;
+                variants[o] = {};
+              } else {
+                if (!variants[o]) return n;
+                delete variants[o];
+              }
+              const out = { ...n } as Node;
+              if (Object.keys(variants).length) out.variants = variants;
+              else delete out.variants;
+              return out;
+            }),
+          );
+        },
         makeMaster: async (id) => {
           const s = get();
           const slide = slideOf();
@@ -1495,17 +1539,17 @@ export const useStudio = create<Studio>()(
         },
 
         // ---- export ----------------------------------------------------------------------------
-        exportSlides: async (format, force = false) => {
+        exportSlides: async (format, force = false, target = null) => {
           const s = get();
           if (!s.project || s.jobs.export?.running) return;
           if (s.readOnly) return notify("warning", "Fix the structural findings first.");
           // The export must match the file on disk (dataflow §7), so it never saves on its own.
           if (isDirty(s)) return notify("warning", "Save first: the export renders the saved file.");
-          set({ exportBlocked: null, exportFormat: format });
+          set({ exportBlocked: null, exportFormat: format, exportTarget: target });
           job("export", { running: true, lines: [] });
           try {
-            const r = await server.exportSlides(format, force);
-            notify("success", `Exported ${r.files.length} file(s) to ${r.dir}`);
+            const r = await server.exportSlides(format, force, target ?? undefined);
+            notify("success", `Exported ${r.files.length} file(s)${target ? ` as ${target}` : ""} to ${r.dir}`);
             await get().loadExports();
           } catch (e) {
             if (e instanceof ServerError && e.code === "EXPORT_BLOCKED") {

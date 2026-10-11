@@ -11,3 +11,4 @@ export * from "./typeSize";
 export * from "./edits";
 export * from "./treatments";
 export * from "./rules";
+export * from "./variants";

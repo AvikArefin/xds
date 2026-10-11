@@ -5,7 +5,7 @@
  */
 import { memo, useState } from "react";
 import { isAsset, isShape, type Asset, type Node, type Project, type Slide, type TypeNode } from "@xds/protocol";
-import { effectiveSize } from "@xds/editor-core";
+import { effectiveNodes, effectiveSize } from "@xds/editor-core";
 import { fileUrl } from "../api";
 import { ShapeSvg, shapeStyle } from "../stage/shapes";
 import { stackUnit } from "../stage/TypeLayer";
@@ -40,7 +40,7 @@ export const SlideThumb = memo(function SlideThumb({
   }
 
   const order = layerOrder(project);
-  const nodes = ((slide.nodes ?? []) as Node[]).filter((n) => !n.hidden);
+  const nodes = effectiveNodes(project, slide).filter((n) => !n.hidden);
   const sorted = [...nodes].sort((a, b) => order.indexOf(a.layer) - order.indexOf(b.layer));
   const cam = effectiveCamera(slide);
   const assets = new Map<string, Asset>((project.assets ?? []).map((a) => [a.id, a]));

@@ -94,7 +94,11 @@ export function ExportBlockedDialog() {
           <button type="button" className="btn" onClick={dismissExportBlocked}>
             Cancel
           </button>
-          <button type="button" className="btn danger" onClick={() => void exportSlides(useStudio.getState().exportFormat, true)}>
+          <button
+            type="button"
+            className="btn danger"
+            onClick={() => void exportSlides(useStudio.getState().exportFormat, true, useStudio.getState().exportTarget)}
+          >
             Export anyway
           </button>
         </div>

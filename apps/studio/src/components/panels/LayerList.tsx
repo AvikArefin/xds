@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Layer, Node } from "@xds/protocol";
 import { LAYER_LABELS } from "@xds/protocol";
 import { api, type LibraryLogo } from "../../api";
-import { isMasterNode } from "@xds/editor-core";
+import { hasVariant, isMasterNode, orientationOf } from "@xds/editor-core";
 import { nodeLabel, slideNodes, useActiveSlide, useStudio } from "../../store";
 import { SHAPES, SHAPE_LABELS, ShapePreview } from "../../stage/shapes";
 import { addStarterBackground } from "../commands";
@@ -293,6 +293,7 @@ export function LayerList({ layer }: { layer: Layer }) {
         {frontToBack.map((n) => {
           const master = isMasterNode(project, n.id);
           const group = n.layer !== "render" ? n.layout?.group : undefined;
+          const variant = hasVariant(n, orientationOf(project.format)) ? orientationOf(project.format) : undefined;
           return (
           <NodeRow
             key={n.id}
@@ -300,7 +301,7 @@ export function LayerList({ layer }: { layer: Layer }) {
             selected={selectedIds.includes(n.id)}
             locked={!!locked[n.id]}
             draggable={!master}
-            tags={[...(group ? [group] : []), ...(master ? ["master"] : [])]}
+            tags={[...(group ? [group] : []), ...(master ? ["master"] : []), ...(variant ? [variant] : [])]}
             onSelect={(e) => select([n.id], { toggle: e.shiftKey || e.metaKey })}
             onDrop={(fromId) => reorder(fromId, own.indexOf(n))}
             extra={

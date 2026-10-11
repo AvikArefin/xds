@@ -19,6 +19,8 @@ from pydantic import (
     ConfigDict,
     Field,
     PlainSerializer,
+    TypeAdapter,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -33,6 +35,39 @@ LEVELS: tuple[Level, ...] = ("expressive", "display", "headline", "subhead", "bo
 # The orientation classes a format falls in (variants and layouts are keyed by them).
 Orientation = Literal["portrait", "square", "landscape", "story"]
 ORIENTATIONS: tuple[Orientation, ...] = ("portrait", "square", "landscape", "story")
+
+
+def orientation_of(width: float, height: float) -> Orientation:
+    """story: taller than 1.7:1; portrait: taller than 1.05:1; square: within 1.05 either way;
+    landscape otherwise. The same thresholds as `orientationOf` in @xds/editor-core."""
+    r = height / max(1.0, width)
+    if r >= 1.7:
+        return "story"
+    if r > 1.05:
+        return "portrait"
+    if r >= 1 / 1.05:
+        return "square"
+    return "landscape"
+
+
+# The keys a variant may override; `id`, `layer` and `variants` itself never change.
+VARIANT_KEYS = ("box", "layout", "data", "hidden", "name", "exceptions")
+
+
+def merge_variant(base: Any, patch: Any) -> Any:
+    """Deep-merge a variant over a node's JSON: `None` deletes the key, dicts merge key by key,
+    anything else replaces (the same rule as `mergeVariant` in @xds/editor-core)."""
+    if not isinstance(patch, dict) or not isinstance(base, dict):
+        return patch
+    out = dict(base)
+    for k, v in patch.items():
+        if v is None:
+            out.pop(k, None)
+        elif isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = merge_variant(out[k], v)
+        else:
+            out[k] = v
+    return out
 
 Hex = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
 Id = Annotated[str, Field(min_length=1, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
@@ -564,6 +599,20 @@ class RenderNode(_NodeBase):
 
 
 Node = Annotated[Union[GroundNode, ImageNode, TypeNode, RenderNode], Field(discriminator="layer")]
+NodeAdapter = TypeAdapter(Node)
+
+
+def apply_variant(node: Any, orientation: Orientation) -> Any:
+    """The node as a format of this orientation shows it: its base with `variants[orientation]`
+    merged over it (data-models §2.5c). Raises `ValidationError` for a variant that does not
+    produce a valid node; `Project.effective_nodes` falls back to the base then (the gate reports
+    `VARIANT_INVALID`)."""
+    patch = (node.variants or {}).get(orientation)
+    if not patch:
+        return node
+    doc = node.model_dump(mode="json", by_alias=True, exclude_none=True)
+    merged = merge_variant(doc, {k: v for k, v in patch.items() if k in VARIANT_KEYS})
+    return NodeAdapter.validate_python(merged)
 
 
 class Slide(Model):
@@ -654,9 +703,21 @@ class Project(Model):
         off = set(slide.master) if isinstance(slide.master, list) else set()
         return [n for n in self.master.nodes if n.id not in off]
 
+    @property
+    def orientation(self) -> Orientation:
+        return orientation_of(self.format.width, self.format.height)
+
     def effective_nodes(self, slide: Slide) -> list[Node]:
-        """Every node a slide draws: its master nodes first (behind), then its own."""
-        return [*self.master_nodes_for(slide), *slide.nodes]
+        """Every node a slide draws: its master nodes first (behind), then its own, each with the
+        format's orientation variant applied (an invalid variant falls back to the base)."""
+        o = self.orientation
+        out = []
+        for n in [*self.master_nodes_for(slide), *slide.nodes]:
+            try:
+                out.append(apply_variant(n, o))
+            except ValidationError:
+                out.append(n)
+        return out
 
     def asset(self, asset_id: str) -> Asset | None:
         return next((a for a in self.assets if a.id == asset_id), None)
@@ -843,6 +904,9 @@ class ExportRecord(Model):
     files: list[str]
     audit: dict[str, int]
     forced: bool
+    # Set when the export was made from a target (the source reflowed to another preset): the
+    # source's format, so the record says where the files came from.
+    source_format: str | None = None
 
 
 # The models whose JSON Schema becomes packages/protocol/src/generated/project.ts.

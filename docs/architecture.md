@@ -251,7 +251,7 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | POST | `/api/projects/init` | scaffold a new project |
 | POST | `/api/projects/choose` | macOS folder picker (AppleScript) |
 | POST | `/api/audit` | render + audit; streams progress lines over SSE; returns the report |
-| POST | `/api/export` | audit gate + export; returns the files written |
+| POST | `/api/export` | audit gate + export `{ format: png \| pdf, force?, target? }`; with `target` (a preset) the source reflowed to it is exported into `export/<stamp>-<preset>/`; returns the files written |
 | GET | `/api/exports` | finished exports with their `export.json` records and file links |
 | GET | `/api/screens/{id}.png` | a device screen rendered to PNG (cached under `cache/<hash>/screens/`) |
 | GET | `/api/starters` · POST `/api/designs/add` | starter designs, and copying one into `designs/` |
@@ -283,10 +283,10 @@ xds check PROJECT                         # schema + references + designs (no br
 xds guide PROJECT [--slide ID]            # the design numbers for this format
 xds rules                                 # every audit rule with principle + thresholds
 xds measure PROJECT [--slide ID]…        # text only (no 3D): lines, heights, stacks, text rules
-xds render PROJECT [--slide ID]           # slide PNGs + contact sheet → cache/<hash>/
-xds audit PROJECT [--slide ID]            # render + measure + rules → audit.json + annotated PNGs
+xds render PROJECT [--slide ID] [--format PRESET]   # slide PNGs + contact sheet → cache/<hash>/ (--format: a target, cache/targets/<preset>/)
+xds audit PROJECT [--slide ID] [--format PRESET]    # render + measure + rules → audit.json + annotated PNGs
 xds fix PROJECT [--slide ID]… [--rule R]… [--severity S] [--dry-run]   # apply the findings' edits
-xds export PROJECT [--out DIR] [--force] [--pdf]  # audit gate → export/<stamp>/
+xds export PROJECT [--out DIR] [--force] [--pdf] [--format PRESET]  # audit gate → export/<stamp>/ (a target: export/<stamp>-<preset>/)
 xds migrate [PROJECT | --all] [--dry-run] [--conform]
 xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae
               [--height M | --scale F] [--front back|left|right|up|down] [--ground]   # normalize
@@ -306,6 +306,7 @@ xds grid PROJECT FILE [--step PCT]        # an image with a labeled % grid → c
 xds formats
 xds schema --emit-types | --check        # xds development; --emit-types only inside the checkout
 xds reflow PROJECT (--format PRESET | --size WxH) [--dry-run]   # retarget: boxes relative to the margins, sizes to the bands
+xds reflow PROJECT --check [--format PRESET]   # the fluidity check: a target per orientation class, text-only rules, a table
 xds layout list | show ID                 # the shipped slide layouts (docs/layouts.md)
 xds layout apply PROJECT ID [--slide ID] [--mode fill|replace|new] [--add-roles] [--dry-run]
 xds init PROJECT --layout ID              # seed the first slide from a layout

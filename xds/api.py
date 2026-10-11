@@ -270,8 +270,11 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
         fmt = body.get("format", "png")
         if fmt not in ("png", "pdf"):
             raise XdsError("BAD_REQUEST", f"unknown export format '{fmt}' (png or pdf)", status=422)
+        target = body.get("target") or None
+        if target and target not in formats.CATALOG:
+            raise XdsError("UNKNOWN_FORMAT", f"'{target}' is not a format preset", status=422)
         result = await run_in_threadpool(export.export, root, force=bool(body.get("force")), format=fmt,
-                                         progress=state.progress("export"))
+                                         target=target, progress=state.progress("export"))
         return ok(**result)
 
     @app.get("/api/exports")

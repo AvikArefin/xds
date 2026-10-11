@@ -25,6 +25,8 @@ xds fix PROJECT --json        apply the findings' structured fixes (`edits`); th
   apply each remaining finding's `fix` by hand, or record a deliberate exception with a reason
 repeat until no errors, then review the warnings
 xds export PROJECT --json     writes export/<stamp>/*.png (--pdf: one PDF)
+xds export PROJECT --format PRESET --json   the same deck in another format (a target: export/<stamp>-<preset>/)
+xds reflow PROJECT --check --json           how well the deck survives other orientations (the fluidity check)
 ```
 
 Rules of the road:
@@ -40,9 +42,12 @@ Rules of the road:
   fill` to re-place the text you already wrote by level. Then change words, not coordinates.
 - Pick type sizes from the band defaults first. Change them only for a reason, and prefer a
   `scale` (a factor of the band default) over a px `size`: it holds in every format.
-- To retarget a finished deck to another format, `xds reflow PROJECT --format PRESET` (boxes
-  relative to the margins, sizes to the new bands), then audit: it keeps proportions, not line
-  breaks.
+- To ship a deck in another format, don't change the project: `xds export PROJECT --format PRESET`
+  renders a **target** (the source reflowed to that preset, under `cache/targets/`) into
+  `export/<stamp>-<preset>/`. Run `xds reflow PROJECT --check` first: it reflows to one preset per
+  orientation class and lists what breaks; fix a class with a `variants.<class>` override on the
+  node (§2), never by moving the source. `xds reflow PROJECT --format PRESET` changes the source
+  itself (boxes relative to the margins, sizes to the new bands) when the project really moves.
 - Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin. Say it with
   relations rather than coordinates ([data models §2.5a](./data-models.md#25a-layout-relations-that-resolve-to-a-box)):
   pin a block's edge to the margin, align it with another block, stack it a gap below (or beside)
@@ -103,6 +108,14 @@ The full schema is in [data models](./data-models.md). The most common edits:
     "layout": { "pin": { "right": { "to": "margin" }, "bottom": { "to": "margin" } } },
     "data": { "asset": "logo" } } ] }
 // a slide without it: "master": false   (or the ids to leave off: "master": ["logo"])
+
+// one source, several formats: a variant for an orientation class overrides fields there only
+// (portrait | square | landscape | story; a null drops a key, so "layout": null frees the block)
+{ "id": "h1", "layer": "type", "box": { "x": 5.93, "y": 4.74, "w": 60, "h": 12 },
+  "layout": { "pin": { "left": { "to": "margin" }, "top": { "to": "margin" } } },
+  "data": { "text": "Launch day", "role": "headline" },
+  "variants": { "landscape": { "box": { "w": 45 }, "data": { "scale": 0.9 } },
+                "story": { "layout": { "pin": { "top": { "to": "safe", "offset": 2 } } } } } }
 
 // a whole slide from a layout: `xds layout apply . split-left --mode new --json` writes the column,
 // its group, the subject's `place` and the roles it needs; `xds layout show split-left` prints them

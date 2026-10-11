@@ -30,7 +30,7 @@ editor.
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (**Live**: the text and spacing rules run on the active slide after every edit, a preview with its own counts and findings; then the audit's counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers**, **Master** (the nodes on every slide, and whether this slide shows them) and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos, the project's images, or **Shape…**: a drawn ornament). Text / 2D / Background: the layer's nodes and **+ New …** |
-| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (group, pins, align to, stack, fit to text), its **Group** when it is in one (direction, gap, align, padding, the box's pins, Ungroup), **Master** (show on every slide) and its layer's fields (Text adds **Wrap** and **Treatments**). |
+| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (group, pins, align to, stack, fit to text), its **Group** when it is in one (direction, gap, align, padding, the box's pins, Ungroup), **Master** (show on every slide), **Variant** (an override for this format's orientation class) and its layer's fields (Text adds **Wrap** and **Treatments**). |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
 layer on the canvas only, so you can work on what's under it; it is never saved, and exports
@@ -154,6 +154,15 @@ reloads from disk. Undo has one step per drag or field change.
   **Show master nodes on this slide** leaves them all off one slide. Deleting a master node asks,
   since it disappears everywhere. Relations of a master node may only reach other master nodes;
   making a block a master releases its relations to the slide's blocks.
+- **One source, several formats**: every format has an orientation class (portrait, square,
+  landscape, story; the rail's Format selector and `xds formats` say which). A block that needs
+  a different place or size in one class gets an override there: select it, tick **Variant →
+  Override for landscape** (whatever the current class is), then edit as usual. While the override
+  is on, every edit to that block goes into the override and the base keeps the other classes'
+  values; the list row carries the class name. Untick to drop it (it asks when the override has
+  values). To see the deck in another class without changing the project, use the Present
+  panel's **Also export as…** (below), or `xds reflow . --check` for a table of what breaks per
+  class.
 - **Background**: there is no page color. Each slide's back Background node covers the canvas, and
   new slides copy the previous slide's (unless a master background covers every slide). To change
   it: `5`, select it, change its design or knobs. **+ New background…** adds a project design or
@@ -197,6 +206,10 @@ reloads from disk. Undo has one step per drag or field change.
   one PDF, ready to upload as a LinkedIn carousel (a document post). Save first. Both are also
   in the command palette. It stops on open audit errors;
   **Export anyway** forces it and records that. Finished exports are listed in the Present panel.
+  **Also export as…** picks another preset: the saved deck is reflowed to it (a target under
+  `cache/targets/`, the source untouched), its orientation's overrides apply, and the PNGs land in
+  `export/<stamp>-<preset>/`; the list shows the preset on that export. (Terminal:
+  `xds export . --format PRESET`.)
 - **Outside changes**: when an agent edits the files, the editor reloads at once. The file on disk
   is the truth, and unsaved editor edits are replaced (a notice says so).
 

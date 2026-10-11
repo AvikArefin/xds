@@ -91,7 +91,9 @@ export const api = {
     request<{ root: string }>("POST", "/api/projects/init", body),
   chooseFolder: () => request<{ path: string | null }>("POST", "/api/projects/choose", {}),
   audit: (slideId?: string) => request<AuditResponse>("POST", "/api/audit", slideId ? { slideId } : {}),
-  export: (format: "png" | "pdf", force = false) => request<ExportResponse>("POST", "/api/export", { format, force }),
+  /** `target`: a preset to export the source reflowed to (lands in export/<stamp>-<preset>/). */
+  export: (format: "png" | "pdf", force = false, target?: string) =>
+    request<ExportResponse>("POST", "/api/export", { format, force, ...(target ? { target } : {}) }),
   exports: () => request<{ exports: ExportEntry[] }>("GET", "/api/exports"),
   starters: () => request<{ designs: string[] }>("GET", "/api/starters"),
   addDesign: (starter: string) => request<{ id: string }>("POST", "/api/designs/add", { starter }),

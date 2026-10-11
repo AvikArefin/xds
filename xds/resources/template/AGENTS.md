@@ -56,6 +56,8 @@ xds audit . --json      # render + measure + design rules → findings, each wit
 xds fix . --json        # apply the findings' structured fixes (`edits`: positions, sizes, gaps, camera); --dry-run to look first
 xds export . --json     # writes export/<stamp>/*.png (refuses while audit errors are open)
 xds export . --pdf --json   # the deck as one PDF instead, a page per slide (LinkedIn carousel)
+xds export . --format PRESET --json   # the same deck in another format (export/<stamp>-<preset>/; the source is untouched)
+xds reflow . --check --json           # how the deck survives other orientations; fix a class with a node's variants.<class>
 xds snapshot . --label "before the rewrite" --json   # a restorable copy of the sources (.snapshots/)
 xds restore . ID --json     # put one back; the state before is snapshotted first
 ```

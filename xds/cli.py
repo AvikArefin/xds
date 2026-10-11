@@ -198,7 +198,12 @@ def cmd_rules(a: argparse.Namespace, out: Out) -> int:
 def cmd_render(a: argparse.Namespace, out: Out) -> int:
     from . import browser
 
-    result = browser.render(a.project, slide_ids=[a.slide] if a.slide else None, progress=out.line)
+    path = a.project
+    if a.format:
+        from . import targets
+
+        path = targets.build(a.project, a.format, progress=out.line)["root"]
+    result = browser.render(path, slide_ids=[a.slide] if a.slide else None, progress=out.line)
     text = "\n".join(str(s.png) for s in result.slides)
     if result.contact_sheet:
         text += f"\ncontact sheet: {result.contact_sheet}"
@@ -209,9 +214,13 @@ def cmd_render(a: argparse.Namespace, out: Out) -> int:
 def cmd_audit(a: argparse.Namespace, out: Out) -> int:
     from . import export
 
-    report = export.audit(a.project, slide_ids=[a.slide] if a.slide else None, progress=out.line)
+    report = export.audit(a.project, slide_ids=[a.slide] if a.slide else None, target=a.format, progress=out.line)
     data = dump(report)
     root = proj.find_root(a.project)
+    if a.format:
+        from . import targets
+
+        root = targets.target_root(root, a.format)
     cache = root / "cache" / report.source_hash
     s = report.summary
     text = (f"{s.errors} error(s), {s.warnings} warning(s), {s.infos} info, {s.waived} waived\n"
@@ -234,7 +243,7 @@ def cmd_export(a: argparse.Namespace, out: Out) -> int:
     from . import export
 
     result = export.export(a.project, out=a.out, force=a.force, format="pdf" if a.pdf else "png",
-                           progress=out.line)
+                           target=a.format, progress=out.line)
     forced = " (forced past open errors)" if result["record"]["forced"] else ""
     out.emit(result, f"exported {len(result['files'])} file(s) to {result['dir']}{forced}")
     return 0
@@ -415,7 +424,7 @@ def cmd_grid(a: argparse.Namespace, out: Out) -> int:
 def cmd_formats(a: argparse.Namespace, out: Out) -> int:
     cat = formats.catalog_json()
     out.emit({"formats": cat}, "\n".join(
-        f"{f['key']:<24} {f['width']}×{f['height']:<6} {f['aspect']:<17} {f['group']:<7} {f['label']}"
+        f"{f['key']:<24} {f['width']}×{f['height']:<6} {f['aspect']:<17} {f['orientation']:<10} {f['group']:<7} {f['label']}"
         for f in cat)
         + f"\n{'(no preset)':<24} any          {'':<17} Custom  `xds init --size WxH`: shown 1:1")
     return 0
@@ -443,6 +452,12 @@ def cmd_reflow(a: argparse.Namespace, out: Out) -> int:
     from . import reflow
     from .models import Format
 
+    if a.check:
+        from . import targets
+
+        r = targets.fluidity(a.project, presets=a.format and [a.format], progress=out.line)
+        out.emit(r, targets.fluidity_text(r))
+        return 1 if r["total"]["errors"] else 0
     if bool(a.format) == bool(a.size):
         raise XdsError("USAGE", "Give --format PRESET or --size WxH.", status=2)
     if a.format:
@@ -612,13 +627,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("rules", cmd_rules, "every audit rule with its principle and thresholds")
     sp.add_argument("--project", help="use this project's format and rule overrides")
 
+    target_help = "a target: the source reflowed to this preset (cache/targets/<preset>/), not the source"
+
     sp = add("render", cmd_render, "slide PNGs + contact sheet into cache/<hash>/")
     sp.add_argument("project")
     sp.add_argument("--slide")
+    sp.add_argument("--format", choices=sorted(formats.CATALOG), help=target_help)
 
     sp = add("audit", cmd_audit, "render + measure + rules → audit.json + annotated PNGs")
     sp.add_argument("project")
     sp.add_argument("--slide")
+    sp.add_argument("--format", choices=sorted(formats.CATALOG), help=target_help)
 
     sp = add("fix", cmd_fix, "apply the audit's structured fixes (findings' `edits`) to project.json")
     sp.add_argument("project")
@@ -633,6 +652,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--out")
     sp.add_argument("--pdf", action="store_true", help="the deck as one PDF instead of a PNG per slide")
     sp.add_argument("--force", action="store_true", help="export despite open errors (recorded)")
+    sp.add_argument("--format", choices=sorted(formats.CATALOG),
+                    help=target_help + "; the files land in export/<stamp>-<preset>/")
 
     sp = add("migrate", cmd_migrate, "upgrade project files to the current schema")
     sp.add_argument("project", nargs="?")
@@ -726,6 +747,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--format", choices=sorted(formats.CATALOG), help="a preset from `xds formats`")
     sp.add_argument("--size", metavar="WxH", help="a custom size, e.g. 1440x1080")
     sp.add_argument("--dry-run", action="store_true", help="report what would move without writing")
+    sp.add_argument("--check", action="store_true",
+                    help="the fluidity check: reflow to one preset per orientation class (or --format), "
+                         "run the text-only rules on each, print a table; exit 1 on errors")
 
     sp = add("layout", cmd_layout, "slide layouts written in relations: list, show, apply to a slide")
     lsub = sp.add_subparsers(dest="layout_cmd", required=True)

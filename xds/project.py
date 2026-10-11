@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from .models import (
     SCHEMA_VERSION,
+    VARIANT_KEYS,
     Finding,
     GroundNode,
     ImageNode,
@@ -27,6 +28,7 @@ from .models import (
     RenderNode,
     ShapeData,
     TypeNode,
+    apply_variant,
     now,
 )
 
@@ -50,7 +52,7 @@ STRUCTURAL_RULES = frozenset({
     "UNKNOWN_SCREEN", "NOT_A_MODEL", "UNKNOWN_RULE", "UNKNOWN_THRESHOLD", "NOT_WAIVABLE",
     "DESIGN_INVALID", "DESIGN_UNKNOWN_PARAM", "DESIGN_BAD_EXPRESSION", "DESIGN_VALUE_TYPE",
     "UNKNOWN_PART", "UNKNOWN_CLIP", "PART_OUT_OF_RANGE", "MODEL_INVALID",
-    "SCREEN_ASPECT_MISMATCH", "STACK_ANCHOR", "STACK_CYCLE",
+    "SCREEN_ASPECT_MISMATCH", "STACK_ANCHOR", "STACK_CYCLE", "VARIANT_INVALID",
 })
 
 
@@ -363,6 +365,7 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
         scopes.append(("master", None, p.master.nodes))
         out += _check_layout(p.master.nodes, "master", None, None)
     for sp, slide, nodes in scopes:
+        out += _check_variants(nodes, sp, slide.id if slide is not None else None)
         if slide is not None:
             out += _check_layout(slide.nodes, sp, slide.id, slide.groups)
             if slide.lighting:
@@ -423,6 +426,33 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
 
         out += designs.check(root, p, designs_used)
         out += models3d.check_project(root, p)
+    return out
+
+
+def _check_variants(nodes: list[Any], sp: str, slide_id: str | None) -> list[Finding]:
+    """Every orientation variant (data-models §2.5c) must merge into a valid node: unknown keys,
+    bad values and keys a variant may not change (`id`, `layer`, `variants`) are VARIANT_INVALID."""
+    out: list[Finding] = []
+    for ni, node in enumerate(nodes):
+        for orientation, patch in (node.variants or {}).items():
+            vp = f"{sp}.nodes[{ni}].variants.{orientation}"
+            kw = {"nodes": [node.id], "slide_id": slide_id}
+            bad = sorted(k for k in patch if k not in VARIANT_KEYS)
+            if bad:
+                out.append(_f("VARIANT_INVALID", f"{vp}.{bad[0]}",
+                              f"A variant can't set '{bad[0]}'.",
+                              f"A variant overrides {', '.join(VARIANT_KEYS)} only.", **kw))
+                continue
+            try:
+                apply_variant(node, orientation)
+            except ValidationError as e:
+                first = e.errors()[0] if e.errors() else {}
+                # the union's tag sits first in the location ("type", "data", "size"): drop it
+                loc = ".".join(str(x) for x in list(first.get("loc", ()))[1:])
+                out.append(_f("VARIANT_INVALID", f"{vp}.{loc}" if loc else vp,
+                              f"The {orientation} variant of '{node.id}' does not make a valid node: "
+                              f"{first.get('msg', 'invalid')}.",
+                              "Give the variant the same shape as the node's own fields.", **kw))
     return out
 
 

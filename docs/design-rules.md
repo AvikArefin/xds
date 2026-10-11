@@ -56,8 +56,11 @@ Everything scales from the format, so the same rules work for a 1080 px post and
 | `generic-screen` | any | = width (shown 1:1) | none |
 
 Platform UI dimensions change over time. This table is data, and updating it is a one-line change.
-`xds formats` lists the presets with their aspect ("4:3 landscape", "3:4 portrait"); a brief that
-gives only an aspect needs the orientation and the platform before a preset can be picked.
+`xds formats` lists the presets with their aspect ("4:3 landscape", "3:4 portrait") and their
+**orientation class** (`portrait`, `square`, `landscape`, `story`: the class a node's variants and
+a layout's form are keyed by, [data models §2.5c](./data-models.md#25c-variants-per-orientation-overrides));
+a brief that gives only an aspect needs the orientation and the platform before a preset can be
+picked.
 
 ### 1.2 Type size bands
 
@@ -121,6 +124,23 @@ band default to the old. Values that are already format-relative are left alone:
 (§1.2: a role's `scale` is a factor of its band default), stack gaps (in u), pins, `place`, the
 camera, rotation. The editor's **Format** selector does the same through `/api/reflow` and asks
 first. Audit afterwards: reflow keeps proportions, not line breaks.
+
+**Targets: one source, several formats.** The project need not change format to ship in another:
+`xds export PROJECT --format PRESET` (also `xds render` and `xds audit`, and the Present panel's
+**Also export as…**) builds a **target** under `cache/targets/<preset>/`: the source reflowed to
+that preset as a project of its own, with the source's designs, screens, assets and fonts
+mirrored by hard link. The target renders with its own orientation class, so the nodes' variants
+for that class apply ([data models §2.5c](./data-models.md#25c-variants-per-orientation-overrides)),
+and the export lands in the **source's** `export/<stamp>-<preset>/` with `sourceFormat` in its
+record. Nothing in the source is written.
+
+**The fluidity check** is how well a deck survives: `xds reflow PROJECT --check` builds a target
+for one preset per orientation class the source is not in (`instagram-portrait`,
+`instagram-square`, `linkedin-landscape`, `instagram-story`; `--format` picks one), runs the
+text-only rules (§1.5) on each, and prints a table of errors, warnings and the first findings per
+target (`--json` for agents; exit 1 when a target has errors). A deck built from pins, stacks,
+scales and groups should come out near zero; one built from absolute boxes shows where it breaks,
+and a variant for that class fixes it without touching the source orientation.
 
 ### 1.5 `xds measure`
 

@@ -27,11 +27,16 @@ def _structural_report(loaded: proj.Loaded) -> XdsError:
                              for f in loaded.findings])
 
 
-def audit(path: str | Path, *, slide_ids: list[str] | None = None,
+def audit(path: str | Path, *, slide_ids: list[str] | None = None, target: str | None = None,
           progress: browser.Progress = lambda s: None) -> AuditReport:
-    """check → render (cached) → rules → cache/<hash>/audit.json + annotated PNGs."""
+    """check → render (cached) → rules → cache/<hash>/audit.json + annotated PNGs.
+    With `target`, the source is first reflowed to that preset (targets.py) and the target audited."""
     from .audit import engine
 
+    if target:
+        from . import targets
+
+        path = targets.build(path, target, progress=progress)["root"]
     progress("check")
     loaded = proj.load(path)
     if not loaded.ok:
@@ -69,10 +74,22 @@ def _write_pdf(pngs: list[Path], dest: Path) -> None:
 
 
 def export(path: str | Path, *, out: str | Path | None = None, force: bool = False,
-           format: Literal["png", "pdf"] = "png", progress: browser.Progress = lambda s: None) -> dict[str, Any]:
+           format: Literal["png", "pdf"] = "png", target: str | None = None,
+           progress: browser.Progress = lambda s: None) -> dict[str, Any]:
     """The audit gate, then write the rendered slides to export/<stamp>/ (as PNGs, or as one PDF)
-    with export.json."""
-    loaded = proj.load(path, deep=False)
+    with export.json. With `target`, the source reflowed to that preset is rendered and audited
+    (targets.py) and the files land in the source's export/<stamp>-<preset>/."""
+    source = proj.load(path, deep=False)
+    source_format = None
+    if target:
+        from . import targets
+
+        source_format = source.require().format
+        source_format = source_format.preset or f"{source_format.width}x{source_format.height}"
+        troot = Path(targets.build(source.root, target, progress=progress)["root"])
+        loaded = proj.load(troot, deep=False)
+    else:
+        loaded = source
     root = loaded.root
     report = audit(root, progress=progress)
     errors = open_errors(report)
@@ -83,8 +100,8 @@ def export(path: str | Path, *, out: str | Path | None = None, force: bool = Fal
 
     project = proj.load(root, deep=False).require()
     cache = root / "cache" / report.source_hash
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    dest = Path(out).expanduser().resolve() if out else root / "export" / stamp
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S") + (f"-{target}" if target else "")
+    dest = Path(out).expanduser().resolve() if out else source.root / "export" / stamp
     dest.mkdir(parents=True, exist_ok=True)
     pngs = []
     for i, slide in enumerate(project.slides, start=1):
@@ -109,6 +126,7 @@ def export(path: str | Path, *, out: str | Path | None = None, force: bool = Fal
         audit={"errors": report.summary.errors, "warnings": report.summary.warnings,
                "infos": report.summary.infos, "waived": report.summary.waived},
         forced=bool(force and errors),
+        source_format=source_format,
     )
     (dest / "export.json").write_text(
         json.dumps(record.model_dump(mode="json", by_alias=True), indent=2) + "\n")

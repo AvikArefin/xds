@@ -3,6 +3,7 @@
  * mutated). None of them touches `parts`, `animation` or `screens` of a render node: those are
  * agent-only and are carried through unchanged.
  */
+import { orientationOf, resolveVariants, writeNode } from "./variants";
 import type {
   Box,
   GroundNode,
@@ -66,7 +67,9 @@ export function masterNodesFor(project: Project, slide: Slide | null | undefined
 export function effectiveNodes(project: Project, slide: Slide | null | undefined): Node[] {
   const own = (slide?.nodes ?? []) as Node[];
   const master = masterNodesFor(project, slide);
-  return master.length ? [...master, ...own] : own;
+  const all = master.length ? [...master, ...own] : own;
+  // The format's orientation picks each node's variant (data-models §2.5c).
+  return resolveVariants(all, orientationOf(project.format));
 }
 
 function updateMasterNodes(project: Project, ids: Set<string>, fn: (n: Node) => Node): Project {
@@ -140,8 +143,24 @@ export function updateSlide(project: Project, slideId: string, fn: (s: Slide) =>
   return hit ? { ...project, slides } : project;
 }
 
-/** Update nodes by id on a slide; a master node's id (shown there) updates the master node. */
+/**
+ * Update nodes by id on a slide; a master node's id (shown there) updates the master node. `fn`
+ * sees the node as the format shows it: while the format's orientation has a variant for the
+ * node, the change is stored in that variant (`writeNode`), so the base keeps the other
+ * orientations' values. `updateRawNodes` edits the stored node itself.
+ */
 export function updateNodes(
+  project: Project,
+  slideId: string,
+  ids: Iterable<string>,
+  fn: (n: Node) => Node,
+): Project {
+  const o = orientationOf(project.format);
+  return updateRawNodes(project, slideId, ids, (n) => writeNode(n, o, fn));
+}
+
+/** Update the stored nodes (base and variants as written), bypassing variant routing. */
+export function updateRawNodes(
   project: Project,
   slideId: string,
   ids: Iterable<string>,

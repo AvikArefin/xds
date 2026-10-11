@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from .models import LEVELS, Format, Level
+from .models import LEVELS, Format, Level, Orientation, orientation_of
 
 
 @dataclass(frozen=True)
@@ -146,6 +146,8 @@ class Guide:
     budget: dict[str, int] = field(default_factory=lambda: {
         "wordsPerSlide": 35, "families": 2, "sizes": 4, "blocks": 7})
     subject_height: tuple[float, float] = (30, 75)
+    # The orientation class (data-models §2.5c): what picks a node's variant and a layout's form.
+    orientation: Orientation = "portrait"
 
     def readable(self, screen_px: float) -> float:
         return screen_px / self.k
@@ -215,8 +217,13 @@ def derive(fmt: Format, overrides: dict[str, Any] | None = None) -> Guide:
         preset=p.key, label=p.label, width=w, height=h, view_width=p.view_width,
         s=s, k=round(k, 4), u=u, m=m, margins=margins, content=content,
         spacing_scale=[u * f for f in (1, 2, 3, 4, 6, 8, 12, 16)],
-        safe_zones=zones, bands=bands,
+        safe_zones=zones, bands=bands, orientation=orientation_of(w, h),
     )
+
+
+def orientation(fmt: Format) -> Orientation:
+    """The orientation class of a format (`xds formats` prints it)."""
+    return orientation_of(fmt.width, fmt.height)
 
 
 def aspect_label(width: int, height: int) -> str:
@@ -233,7 +240,8 @@ def aspect_label(width: int, height: int) -> str:
 def catalog_json() -> list[dict[str, Any]]:
     return [
         {"key": p.key, "label": p.label, "group": p.group, "width": p.width, "height": p.height,
-         "aspect": aspect_label(p.width, p.height), "viewWidth": p.view_width, "dpi": p.dpi}
+         "aspect": aspect_label(p.width, p.height), "orientation": orientation_of(p.width, p.height),
+         "viewWidth": p.view_width, "dpi": p.dpi}
         for p in CATALOG.values()
     ]
 
@@ -279,7 +287,8 @@ def format_guide_text(g: Guide, contrast: str | None = None, expression: str | N
         viewed = f"print, {round(96 / g.k)} dpi"
     zones = ", ".join(f"{z.name} {z.w:.0f}×{z.h:.0f}" for z in g.safe_zones) or "none"
     lines = [
-        f"format       {g.preset} {g.width}×{g.height}, {aspect_label(g.width, g.height)} ({viewed})",
+        f"format       {g.preset} {g.width}×{g.height}, {aspect_label(g.width, g.height)}, "
+        f"class {g.orientation} ({viewed})",
         f"unit u       {g.u} px      spacing scale: {' '.join(map(str, g.spacing_scale))}",
         f"margin m     {g.m} px     content area: x {g.content['x0']}–{g.content['x1']}, "
         f"y {g.content['y0']}–{g.content['y1']}",

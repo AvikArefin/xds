@@ -26,6 +26,7 @@ export interface Zone {
 /** `formats.derive(...).to_json()`. */
 export interface Guide {
   preset: string;
+  orientation?: "portrait" | "square" | "landscape" | "story";
   label: string;
   width: number;
   height: number;

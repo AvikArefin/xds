@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { LAYER_LABELS, type Layer } from "@xds/protocol";
 import { layerOrder, useStudio } from "../../store";
+import { formatOptions, useFormatCatalog } from "../FormatSelect";
 import { Icon } from "../Icon";
-import { IconButton, ListRow } from "../ui";
+import { IconButton, ListRow, Select } from "../ui";
 import { MasterPanel } from "./MasterPanel";
 
 function fmtStamp(stamp: string) {
@@ -17,6 +18,9 @@ export function PresentPanel() {
   const exportJob = useStudio((s) => s.jobs.export);
   const hiddenLayers = useStudio((s) => s.hiddenLayers);
   const { setLayerOrder, setMode, exportSlides, loadExports, toggleLayer } = useStudio.getState();
+  const catalog = useFormatCatalog();
+  const current = project.format.preset;
+  const targetOptions = formatOptions(catalog).filter((o) => o.value !== current);
   useEffect(() => {
     void loadExports();
   }, [loadExports]);
@@ -86,6 +90,15 @@ export function PresentPanel() {
           </button>
         </span>
       </div>
+      <div className="export-target" title="Export the saved deck reflowed to another preset (one source, several formats). The files land in export/<stamp>-<preset>/.">
+        <Select
+          value={undefined}
+          options={targetOptions}
+          noneLabel="Also export as…"
+          disabled={readOnly || exportJob?.running || !targetOptions.length}
+          onChange={(v) => v && void exportSlides("png", false, v)}
+        />
+      </div>
       {exportJob?.running && (
         <div className="job-lines">
           {exportJob.lines.slice(-6).map((l, i) => (
@@ -98,6 +111,11 @@ export function PresentPanel() {
           <li key={e.stamp} className="export-item">
             <div className="export-head">
               <span>{fmtStamp(e.stamp)}</span>
+              {e.record?.sourceFormat && (
+                <span className="badge" title={`The ${e.record.sourceFormat} source reflowed to ${e.record.format}`}>
+                  {e.record.format}
+                </span>
+              )}
               {e.record?.forced && <span className="badge sev-warn">forced</span>}
               {e.record && (
                 <span className="muted small">

@@ -9,6 +9,7 @@ import { MasterInspector } from "./MasterInspector";
 import { GroundInspector, ImageInspector, ShapeInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
 import { SceneInspector } from "./SceneInspector";
 import { TreatmentsInspector } from "./TreatmentsInspector";
+import { VariantInspector } from "./VariantInspector";
 
 function NodeHeader({ id }: { id: string }) {
   const slide = useActiveSlide();
@@ -60,6 +61,7 @@ export function Inspector() {
           <LayoutInspector nodes={boxNodes} />
           {groupName && group && <GroupInspector name={groupName} group={group} members={members} />}
           {nodes.length === 1 && <MasterInspector node={nodes[0]} />}
+          <VariantInspector nodes={nodes} />
           {mode === "type" && <TypeInspector nodes={nodes as TypeNode[]} />}
           {mode === "type" && <TreatmentsInspector nodes={nodes as TypeNode[]} />}
           {mode === "image" && <ImageInspector nodes={nodes as ImageNode[]} />}

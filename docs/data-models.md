@@ -97,7 +97,9 @@ lights and camera became `lighting` and `Slide.camera`).
 A preset brings the platform's **safe zones** (where the app's UI covers the image, e.g. story
 captions) and its **view width** (how wide the image appears on a phone screen). The audit
 needs both (see [design rules](./design-rules.md)). A custom size with no preset uses the
-`generic-screen` profile, shown 1:1 (`xds init --size 1440x1080` makes one).
+`generic-screen` profile, shown 1:1 (`xds init --size 1440x1080` makes one). Every format also
+falls in an **orientation class** (`portrait`, `square`, `landscape`, `story`), derived from its
+size (§2.5c), which picks the nodes' variants; the guide reports it as `orientation`.
 
 ### 2.2 `Brand`
 
@@ -330,9 +332,24 @@ only where the target slide declares it. The spacing rules read `layout.group` f
 variants?: { portrait?: Partial<Node>; square?: Partial<Node>; landscape?: Partial<Node>; story?: Partial<Node> }
 ```
 
-The format's orientation class (`xds formats` prints it: portrait 4:5 and 3:4, square, landscape,
-story 9:16) picks the variant, whose fields are deep-merged over the node (`box`, `layout`,
-`data`, `hidden`) before anything else reads it. One source, several targets.
+The format's **orientation class** picks the variant: `story` when the height is at least 1.7 ×
+the width (9:16), `portrait` above 1.05 (4:5, 3:4), `square` within 1.05 either way, `landscape`
+otherwise (`xds formats` and `xds guide` print it; `orientation_of` in xds/models.py and
+`orientationOf` in @xds/editor-core share the thresholds). The variant's fields are deep-merged
+over the node before anything reads it (`Project.effective_nodes`, `effectiveNodes` in the
+editor): `box`, `layout`, `data`, `hidden`, `name` and `exceptions` may be overridden, plain
+objects merge key by key, and a `null` deletes the key, so `"layout": null` drops every relation
+in that orientation. `id`, `layer` and `variants` can't change. The gate validates each variant
+by merging it and re-validating the node (`VARIANT_INVALID`, with the path into the variant);
+an invalid variant never breaks the base, which shows instead.
+
+In the editor, a node with an override for the current orientation is edited **through** it:
+every change (box, layout, data, hidden) is written as a diff into `variants[<class>]`, and the
+base keeps the other orientations' values (`updateNodes` → `writeNode`; `updateRawNodes` edits the
+stored node). Copy, paste and duplicate carry `variants` as they are, and `xds reflow` leaves them
+alone. One source, several targets: `xds export PROJECT --format PRESET` renders the source
+reflowed to that preset with its orientation's variants applied
+([design rules §1.4](./design-rules.md#14-xds-reflow)).
 
 ### 2.5d Expressive treatments (`TypeData`) and shapes (`ShapeData`)
 
