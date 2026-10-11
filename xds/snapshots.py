@@ -74,10 +74,13 @@ def big_change(before: Any, after: Any) -> str | None:
     if b < a:
         return f"{a - b} slide{'s' if a - b > 1 else ''} removed"
     old, new = _nodes(before), _nodes(after)
-    changed = sum(1 for k, v in old.items() if new.get(k) != v) + sum(1 for k in new if k not in old)
-    total = max(len(old), 1)
-    if old and changed / total > BIG_NODE_SHARE:
-        return f"{changed} of {len(old)} nodes changed"
+    changed = sum(1 for k, v in old.items() if k in new and new[k] != v)
+    added = sum(1 for k in new if k not in old)
+    removed = sum(1 for k in old if k not in new)
+    if old and (changed + added + removed) / len(old) > BIG_NODE_SHARE:
+        parts = [f"{n} node{'s' if n > 1 else ''} {what}" for n, what in
+                 ((changed, "changed"), (added, "added"), (removed, "removed")) if n]
+        return ", ".join(parts)
     return None
 
 

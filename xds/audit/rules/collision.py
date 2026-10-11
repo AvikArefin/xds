@@ -12,6 +12,7 @@ from ...models import Edit
 from ..registry import Hit, rule
 
 if TYPE_CHECKING:
+    from ...models import MeasuredNode
     from ..measured import MeasuredSlide
     from ..thresholds import Thresholds
 
@@ -42,6 +43,12 @@ def _clear_of(s: MeasuredSlide, node_id: str, ink: R, obstacle: R, gap: float) -
     return s.move_fix(node_id, dy=_clear_dy(ink, obstacle, gap))
 
 
+def _interlocked(a: MeasuredNode, b: MeasuredNode) -> bool:
+    """Two expressive blocks of the same group: lettering set as one graphic, whose words may
+    touch or interlock by design (design-rules §8). Their legibility is EXPRESSIVE_UNREADABLE's."""
+    return a.level == "expressive" and b.level == "expressive" and bool(a.group) and a.group == b.group
+
+
 @rule("TEXT_OVERLAP", family=FAMILY, severity="error")
 def text_overlap(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """Overlapping text can't be read.
@@ -52,6 +59,8 @@ def text_overlap(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     judged on what was drawn.
     """
     for a, b in combinations(s.text_nodes, 2):
+        if _interlocked(a, b):
+            continue  # expressive words of one message touch on purpose; EXPRESSIVE_UNREADABLE guards the message
         if (a.treated and a.ink_polygon) or (b.treated and b.ink_polygon):
             both = s.text_ink_mask(a) & s.text_ink_mask(b)
             area = int(both.sum())
@@ -84,6 +93,8 @@ def text_crowded(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     Two text blocks closer than max(u, crowdedGap × the smaller font size) without overlapping.
     """
     for a, b in combinations(s.text_nodes, 2):
+        if _interlocked(a, b):
+            continue
         gaps = [(ra.gap(rb), ra, rb) for ra in s.line_rects(a) for rb in s.line_rects(b)]
         gap, ra, rb = min(gaps, key=lambda g: g[0])
         if gap <= 0:

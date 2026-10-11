@@ -241,6 +241,8 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
 
   const onInkRef = useRef(onInk);
   onInkRef.current = onInk;
+  const fitAdjust = useRef(new Map<string, number>());
+  const fitPasses = useRef(new Map<string, number>());
   useLayoutEffect(() => {
     if (!measure) return;
     // Reading the layout starts any font loads; measure again once they're done.
@@ -252,18 +254,41 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
       };
     }
     // Fit-to-width first: the size that makes the widest line fill the box, from the base style.
+    // `fitAdjust` holds a per-node ratio (≤ 1) learned below when the DOM still overflowed.
     const nextFit = new Map<string, number>();
     base.forEach(({ node, style }, i) => {
       if (!node.data.fitWidth) return;
       const font = `${style.italic ? "italic " : ""}${style.weight} ${style.size}px ${cssFontFamily(style.family)}`;
       const natural = widestLinePx(font, style.letterSpacing * style.size, node.data.text, style.uppercase);
-      nextFit.set(node.id, fitWidthSize(natural, style.size, rects[i].w));
+      nextFit.set(node.id, fitWidthSize(natural, style.size, rects[i].w * (fitAdjust.current.get(node.id) ?? 1)));
     });
     let fitChanged = nextFit.size !== fitted.size;
     for (const [id, size] of nextFit) if (fitted.get(id) !== size) fitChanged = true;
     if (fitChanged) {
       setFitted(nextFit);
       return; // the re-render with the fitted sizes runs this effect again
+    }
+    // The canvas metrics that chose the fitted size can differ from the DOM's layout by a hair
+    // (kerning, hinting): when the fitted text still overflows its box, shrink it by the measured
+    // ratio and run again. Only ever smaller, in half-px steps, so this settles in a pass or two.
+    let correctedAny = false;
+    if ((fitPasses.current.get(layoutKey) ?? 0) < 4) {
+      for (const { node } of styled) {
+        const size = fitted.get(node.id);
+        const el = els.current.get(node.id);
+        if (!size || !el) continue;
+        const textEl = (el.querySelector("[data-xds-text]") as HTMLElement) ?? el;
+        const over = textEl.scrollWidth - el.clientWidth;
+        if (over <= 0.5 || el.clientWidth <= 0) continue;
+        const ratio = (fitAdjust.current.get(node.id) ?? 1) * (el.clientWidth / textEl.scrollWidth) * 0.995;
+        fitAdjust.current.set(node.id, ratio);
+        correctedAny = true;
+      }
+    }
+    if (correctedAny) {
+      fitPasses.current.set(layoutKey, (fitPasses.current.get(layoutKey) ?? 0) + 1);
+      setFontTick((t) => t + 1); // runs the fit pass again with the learned ratio
+      return;
     }
     const ink = new Map<string, TextInk>();
     const nextPlates = new Map<string, Rect>();
@@ -304,7 +329,11 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
         const b = rects[i];
         const d = node.data;
         const v = d.valign ?? "top";
-        const text = typeTextStyle(style, d.align);
+        // A fitted block is sized to its widest line: it never wraps or breaks a word (an overflow is
+        // the audit's TEXT_CLIPPED, not a broken word).
+        const text: CSSProperties = d.fitWidth
+          ? { ...typeTextStyle(style, d.align), whiteSpace: "pre", overflowWrap: "normal" }
+          : typeTextStyle(style, d.align);
         const stroke = strokeStyle(node, style, project, u, false);
         const clones: (CloneOffset & { color: string; kind: "extrude" | "repeat" })[] = [];
         if (d.extrude) {

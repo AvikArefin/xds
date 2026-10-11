@@ -34,6 +34,32 @@ def test_text_overlap(tmp_path):
     assert f.region is not None and f.measured["overlapPx"] > 0
 
 
+def test_interlocked_expressive_words_are_not_collisions(tmp_path):
+    """Expressive words of one group may touch or overlap by design (design-rules §8)."""
+    c = Case(tmp_path)
+    c.text("w1", 64, 200, ["SHIFT"], size=160, level="expressive", widths=[700], group="message")
+    c.text("w2", 120, 330, ["YOUR"], size=160, level="expressive", widths=[500], group="message")
+    found = rules_of(c.run())
+    assert "TEXT_OVERLAP" not in found and "TEXT_CROWDED" not in found
+    c2 = Case(tmp_path / "other")
+    c2.text("w1", 64, 200, ["SHIFT"], size=160, level="expressive", widths=[700], group="message")
+    c2.text("w2", 120, 330, ["YOUR"], size=160, level="expressive", widths=[500])   # not in the group
+    assert "TEXT_OVERLAP" in rules_of(c2.run())
+
+
+def test_fitted_expressive_sizes_are_not_choices(tmp_path, monkeypatch):
+    c = Case(tmp_path)
+    c.text("w1", 64, 200, ["SHIFT"], size=272, level="expressive", widths=[700], group="message")
+    c.text("w2", 64, 520, ["YOUR"], size=257, level="expressive", widths=[500], group="message")
+    project = c.project()
+    for n in project.slides[0].nodes:
+        if n.layer == "type":
+            n.data.fit_width = True
+    from xds.audit import engine
+    found = rules_of(engine.run(project, c.write(), "hash-fit"))
+    assert "SIZE_NEAR_MISS" not in found and "HIERARCHY_WEAK" not in found
+
+
 def test_text_crowded(tmp_path):
     c = Case(tmp_path)
     c.text("title", 64, 200, ["Big title"], size=72, widths=[400])  # line box 200..279.2

@@ -46,7 +46,8 @@
       "layout": {
         "pin": {
           "left": {
-            "to": "margin"
+            "to": "margin",
+            "offset": 4
           },
           "top": {
             "to": "margin",
@@ -64,7 +65,8 @@
         "extrude": {
           "depth": 1.5,
           "angle": 135
-        }
+        },
+        "group": "message"
       },
       "variants": {
         "landscape": {
@@ -104,7 +106,8 @@
         "fitWidth": true,
         "skew": -12,
         "uppercase": true,
-        "lineHeight": 0.85
+        "lineHeight": 0.85,
+        "group": "message"
       },
       "variants": {
         "landscape": {
@@ -132,7 +135,8 @@
         },
         "pin": {
           "left": {
-            "to": "margin"
+            "to": "margin",
+            "offset": 2
           }
         },
         "fit": "text"
@@ -150,6 +154,7 @@
             "width": 0.5
           }
         },
+        "group": "message",
         "extrude": {
           "depth": 1,
           "angle": 135
@@ -204,11 +209,11 @@
         "pin": {
           "left": {
             "to": "margin"
-          },
-          "cy": {
-            "to": "center",
-            "offset": 6
           }
+        },
+        "stack": {
+          "below": "word3",
+          "gap": 6
         }
       },
       "data": {
@@ -271,35 +276,6 @@
       }
     },
     {
-      "id": "spark",
-      "slot": "ornament",
-      "layer": "image",
-      "box": {
-        "x": 0,
-        "y": 0,
-        "w": 3,
-        "h": 2.4
-      },
-      "layout": {
-        "pin": {
-          "right": {
-            "to": "margin",
-            "offset": -6
-          },
-          "bottom": {
-            "to": "margin",
-            "offset": -10
-          }
-        }
-      },
-      "data": {
-        "shape": "sparkle",
-        "stroke": {
-          "width": 0.25
-        }
-      }
-    },
-    {
       "id": "label",
       "slot": "caption",
       "level": "caption",
@@ -313,10 +289,12 @@
       "layout": {
         "pin": {
           "right": {
-            "to": "margin"
+            "to": "margin",
+            "offset": 1.5
           },
           "bottom": {
-            "to": "margin"
+            "to": "margin",
+            "offset": 1.5
           }
         },
         "fit": "text"

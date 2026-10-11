@@ -32,7 +32,11 @@ def test_big_change_reasons():
     many = json.loads(json.dumps(base))
     for n in many["slides"][0]["nodes"][:3]:
         n["data"]["text"] = "edited"
-    assert snapshots.big_change(base, many) == "3 of 8 nodes changed"
+    assert snapshots.big_change(base, many) == "3 nodes changed"
+    grown = json.loads(json.dumps(base))
+    grown["slides"][0]["nodes"] += [node(8), node(9), node(10)]
+    del grown["slides"][0]["nodes"][0]
+    assert snapshots.big_change(base, grown) == "3 nodes added, 1 node removed"
     assert snapshots.big_change(None, base) is None
 
 

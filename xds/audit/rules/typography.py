@@ -21,10 +21,18 @@ FAMILY = "type"
 SIZE_KEYS = tuple(f"{lvl}.size" for lvl in LEVELS)
 
 
+def _fitted(s: MeasuredSlide, n: MeasuredNode) -> bool:
+    """An expressive block sized to its box width (`fitWidth`): its size is geometry, not a
+    choice, so the size rules (near miss, hierarchy, count) leave it out."""
+    src = s.source(n.id)
+    return n.level == "expressive" and bool(getattr(getattr(src, "data", None), "fit_width", False))
+
+
 def _sizes(s: MeasuredSlide) -> list[tuple[float, list[MeasuredNode]]]:
-    """Distinct font sizes on the slide (within 0.5 px), ascending, with their nodes."""
+    """Distinct font sizes on the slide (within 0.5 px), ascending, with their nodes. Fitted
+    expressive blocks are left out (`_fitted`)."""
     out: list[tuple[float, list[MeasuredNode]]] = []
-    for n in sorted(s.reading_text, key=lambda n: n.style.size):
+    for n in sorted((n for n in s.reading_text if not _fitted(s, n)), key=lambda n: n.style.size):
         if out and n.style.size - out[-1][0] <= 0.5:
             out[-1][1].append(n)
         else:
