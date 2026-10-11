@@ -26,6 +26,7 @@ import type {
   Project,
   RenderNode,
   SceneObject,
+  Shape,
   Slide,
   TypeNode,
   GroundNode,
@@ -204,6 +205,8 @@ export interface StudioActions {
 
   addText(role: string): void;
   addImage(assetId: string, aspect?: number): void;
+  /** A drawn ornament (ShapeData) on the 2D layer: a 6u square inside the margin, stroked 0.5u. */
+  addShapeNode(shape: Shape): void;
   /** Register a library logo as an asset (by reference) if the project hasn't yet, and place it. */
   addLibraryLogo(logo: LibraryLogo): void;
   addBackground(designId: string): void;
@@ -916,6 +919,20 @@ export const useStudio = create<Studio>()(
           const content = guide ? guide.content.x1 - guide.content.x0 : s.project.format.width * 0.8;
           const size = { w: content * (st.level === "body" || st.level === "caption" ? 0.7 : 1), h: Math.ceil(st.size * st.lineHeight * 1.15) };
           const r = addNode(s.project, s.activeSlideId, node, guide ?? undefined, size);
+          commit(r.project, { selectedIds: [r.id] });
+        },
+        addShapeNode: (shape) => {
+          const s = get();
+          if (!canEditDoc() || !s.project) return;
+          if (s.mode !== "image") return notify("info", "Switch to 2D (3) to add a shape.");
+          const u = s.guide?.u ?? Math.max(4, Math.round(Math.min(s.project.format.width, s.project.format.height) / 135));
+          const node: ImageNode = {
+            id: shape,
+            layer: "image",
+            box: { x: 0, y: 0, w: 10, h: 10 },
+            data: { shape, stroke: { width: 0.5 } },
+          };
+          const r = addNode(s.project, s.activeSlideId, node, s.guide ?? undefined, { w: 6 * u, h: 6 * u });
           commit(r.project, { selectedIds: [r.id] });
         },
         addImage: (assetId, aspect) => {

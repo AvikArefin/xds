@@ -25,9 +25,17 @@ from .models import (
     ImageNode,
     Project,
     RenderNode,
+    ShapeData,
     TypeNode,
     now,
 )
+
+# The knobs each ornament reads from `ShapeData.params` (apps/studio/src/stage/shapes.tsx draws them).
+SHAPE_PARAMS: dict[str, tuple[str, ...]] = {
+    "star-4": ("points", "inner"), "star-8": ("points", "inner"), "sparkle": ("points", "inner"),
+    "ring": (), "rings": ("count", "spread", "angle"), "lens": ("count",), "ellipse": (),
+    "rect": ("radius",), "line": ("angle",), "plus": (), "arc": ("angle", "sweep"), "grid": ("count",),
+}
 
 PROJECT_FILE = "project.json"
 SOURCE_DIRS = ("designs", "screens", "assets", "fonts")
@@ -250,8 +258,8 @@ def load(path: str | Path, *, deep: bool = True) -> Loaded:
 # --- reference checks ------------------------------------------------------------------------
 
 def _f(rule: str, path: str, message: str, fix: str = "", nodes: list[str] | None = None,
-       slide_id: str | None = None) -> Finding:
-    return Finding(rule=rule, family="check", severity="error", path=path, message=message,
+       slide_id: str | None = None, severity: str = "error") -> Finding:
+    return Finding(rule=rule, family="check", severity=severity, path=path, message=message,  # type: ignore[arg-type]
                    fix=fix, nodes=nodes or [], slide_id=slide_id)
 
 
@@ -365,6 +373,22 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
                                   f"'{node.data.role}' is not a type role.",
                                   "Declare it under brand.typography (with a level).", **kw))
                 color(node.data.color, f"{np_}.data.color", **kw)
+            elif isinstance(node, ImageNode) and isinstance(node.data, ShapeData):
+                d = node.data
+                if d.stroke is not None:
+                    color(d.stroke.color, f"{np_}.data.stroke.color", **kw)
+                if d.fill is not None and d.fill != "none":
+                    color(d.fill, f"{np_}.data.fill", **kw)
+                if d.fill == "none" and d.stroke is None:
+                    out.append(_f("SHAPE_INVISIBLE", f"{np_}.data",
+                                  f"Shape '{node.id}' has no fill and no stroke: nothing is drawn.",
+                                  "Give it a stroke (width in u) or a fill token.", severity="warn", **kw))
+                known = SHAPE_PARAMS.get(d.shape, ())
+                for key in d.params or {}:
+                    if key not in known:
+                        out.append(_f("SHAPE_PARAM_UNKNOWN", f"{np_}.data.params.{key}",
+                                      f"'{d.shape}' has no knob '{key}'.",
+                                      f"Its knobs: {', '.join(known) or '(none)'}.", severity="warn", **kw))
             elif isinstance(node, ImageNode):
                 a = assets.get(node.data.asset)
                 if a is None or a.kind not in ("image", "svg"):

@@ -29,7 +29,7 @@ editor.
 | --- | --- |
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
-| **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
+| **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos, the project's images, or **Shape…**: a drawn ornament). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (pins, align to, stack, fit to text) and its layer's fields (Text adds **Wrap**). |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
@@ -128,6 +128,13 @@ reloads from disk. Undo has one step per drag or field change.
 - **Logo**: `3` → **+ New image…** → **Library** → a cortextech logo (`full-logomark` on dark
   backgrounds, `-white-bg` on white; always the full logo, on every slide). It's referenced, never copied, and
   arrives at its own aspect with Contain fit.
+- **Ornaments**: `3` → **+ New image…** → **Shape…** → a star, sparkle, ring, rings, lens,
+  ellipse, rectangle, line, plus, arc or grid (also **Add shape…** in the palette). It arrives as a
+  6u square inside the margin with a 0.5u stroke in the slide's text color, drawn by the renderer
+  (no file), and is placed, rotated, pinned and stacked like any 2D block. The **Shape** inspector
+  sets the shape, the stroke width (in u) and color, the fill (Default, None or a brand color) and
+  the shape's own knobs (points, count, spread, radius, angle, sweep). The audit's expression rules
+  keep ornaments to one family and one stroke width per slide.
 - **3D model**: `4` → **+ Add model…** → **Library** (iPhone 17 Pro, MacBook Pro 14″, referenced,
   never copied) or **From file…** (`.glb`, `.gltf`, `.dae`, or drop on the canvas). It arrives
   framed and lit. Right-drag and scroll to place it; the gizmo or pose fields tilt it on this

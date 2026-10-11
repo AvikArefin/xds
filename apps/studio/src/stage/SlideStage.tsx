@@ -236,7 +236,16 @@ export function SlideStage(props: SlideStageProps) {
                     placements={placements}
                   />
                 ) : layer === "image" ? (
-                  <ImageLayer nodes={byLayer.image} project={project} hash={props.hash} width={width} height={height} placements={placements} />
+                  <ImageLayer
+                    nodes={byLayer.image}
+                    project={project}
+                    hash={props.hash}
+                    width={width}
+                    height={height}
+                    placements={placements}
+                    background={bg}
+                    guide={props.guide}
+                  />
                 ) : layer === "type" ? (
                   <TypeLayer
                     nodes={byLayer.type}

@@ -202,3 +202,33 @@ def test_layout_relations_gate(blank):
 def test_a_stack_names_exactly_one_anchor(blank):
     edit(blank, lambda d: d["slides"][0]["nodes"].append(_text("x", stack={"below": "a", "above": "b"})))
     assert "SCHEMA_INVALID" in codes(proj.load(blank))
+
+
+def test_shape_reference_checks(blank):
+    def add(d):
+        d["slides"][0]["nodes"] += [
+            {"id": "ok", "layer": "image", "box": {"x": 10, "y": 10, "w": 10, "h": 10},
+             "data": {"shape": "rings", "stroke": {"width": 0.5, "color": "paper"}, "params": {"count": 4}}},
+            {"id": "badcolor", "layer": "image", "box": {"x": 10, "y": 10, "w": 10, "h": 10},
+             "data": {"shape": "star-8", "stroke": {"width": 0.5, "color": "nope"}, "fill": "nope2"}},
+            {"id": "ghost", "layer": "image", "box": {"x": 10, "y": 10, "w": 10, "h": 10},
+             "data": {"shape": "ring", "fill": "none"}},
+            {"id": "knob", "layer": "image", "box": {"x": 10, "y": 10, "w": 10, "h": 10},
+             "data": {"shape": "line", "stroke": {"width": 1}, "params": {"sweep": 90}}},
+        ]
+    edit(blank, add)
+    loaded = proj.load(blank)
+    by_rule = {}
+    for f in loaded.findings:
+        by_rule.setdefault(f.rule, []).append(f)
+    assert sorted(f.path for f in by_rule["UNKNOWN_COLOR"]) == [
+        "slides[0].nodes[2].data.fill", "slides[0].nodes[2].data.stroke.color"]
+    assert [f.nodes for f in by_rule["SHAPE_INVISIBLE"]] == [["ghost"]]
+    assert by_rule["SHAPE_INVISIBLE"][0].severity == "warn"
+    assert by_rule["SHAPE_PARAM_UNKNOWN"][0].path == "slides[0].nodes[4].data.params.sweep"
+    assert "angle" in by_rule["SHAPE_PARAM_UNKNOWN"][0].fix
+    assert not loaded.ok   # the unknown colors are errors
+    # warnings alone keep the project valid
+    edit(blank, lambda d: d["slides"][0]["nodes"].pop(2))
+    loaded = proj.load(blank)
+    assert loaded.ok and {f.rule for f in loaded.findings} == {"SHAPE_INVISIBLE", "SHAPE_PARAM_UNKNOWN"}

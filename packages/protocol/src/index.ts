@@ -13,6 +13,8 @@ export const LAYERS: Layer[] = ["ground", "render", "image", "type"];
 /** An image-layer node's data is an asset reference or a drawn shape (an ornament). */
 export const isShape = (d: ImageNode["data"]): d is ShapeData => "shape" in d;
 export const isAsset = (d: ImageNode["data"]): d is ImageData => "asset" in d;
+/** The ornaments the renderer draws (data-models §2.5d). */
+export type Shape = ShapeData["shape"];
 /** The node's own stack, wherever it was written (`layout.stack`, or the older `data.stack`). */
 export const stackOf = (n: Node) =>
   n.layer === "render" ? undefined : (n.layout?.stack ?? (n.layer === "type" ? n.data.stack : undefined));

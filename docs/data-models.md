@@ -348,6 +348,26 @@ ShapeData = { shape: "star-4" | "star-8" | "sparkle" | "ring" | "rings" | "lens"
               stroke?: Stroke; fill?: string /* token or "none" */; params?: Record<string, number> };
 ```
 
+A shape is drawn by the renderer as inline SVG in the node's box (`apps/studio/src/stage/shapes.tsx`),
+so it is real ink for the audit and needs no file. The stroke is `stroke.width × u` px; its color
+defaults to the slide's default text color. A stroked shape has no fill unless `fill` names a
+token; an unstroked shape is filled with the stroke color. Stars, sparkle, ring, plus and arc keep
+their aspect (the largest centered square); ellipse, lens, rings, rect, line and grid fill the box.
+`params` are the shape's own knobs; the gate reports an unknown one (`SHAPE_PARAM_UNKNOWN`, warn)
+and a shape with `fill: "none"` and no stroke (`SHAPE_INVISIBLE`, warn):
+
+| Shape | Knobs (default) |
+| --- | --- |
+| `star-4`, `star-8` | `points` (4 / 8), `inner` (inner radius as a fraction, 0.4) |
+| `sparkle` | `points` (4), `inner` (0.15); concave sides |
+| `ring`, `ellipse`, `plus` | none |
+| `rings` | `count` (3), `spread` (u, 0: concentric; > 0: identical ellipses stepping along `angle`), `angle` (90) |
+| `lens` | `count` (3): a frame, nested ellipses, a cross hair |
+| `rect` | `radius` (corners in u, 0) |
+| `line` | `angle` (0): the longest segment through the center |
+| `arc` | `angle` (0, where it starts, clockwise from the top), `sweep` (180) |
+| `grid` | `count` (4 cells per axis) |
+
 The `expressive` type level is display lettering treated as a graphic: a wide size band, tight
 leading, no measure. `brand.expression` declares the project's expression system (the angles,
 skews, stroke widths, one extrusion direction, radii and ornament family it draws from), and the

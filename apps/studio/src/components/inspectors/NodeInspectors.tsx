@@ -1,4 +1,16 @@
-import { isAsset, type Box, type DesignParam, type GroundNode, type ImageData, type ImageNode, type Node, type TypeNode } from "@xds/protocol";
+import {
+  isAsset,
+  isShape,
+  type Box,
+  type DesignParam,
+  type GroundNode,
+  type ImageData,
+  type ImageNode,
+  type Node,
+  type ShapeData,
+  type TypeNode,
+} from "@xds/protocol";
+import { SHAPES, SHAPE_LABELS, SHAPE_PARAMS } from "../../stage/shapes";
 import { boxPx, nodeLabel, nodesOf, typeStyle, useActiveSlide, useStudio } from "../../store";
 import { Icon } from "../Icon";
 import {
@@ -320,6 +332,103 @@ export function ImageInspector({ nodes: all }: { nodes: ImageNode[] }) {
           onChange={(v) => patchData(ids, { fit: v })}
         />
       </Row>
+    </Section>
+  );
+}
+
+type ShapeNode = ImageNode & { data: ShapeData };
+
+/** An ornament (data-models §2.5d): its shape, stroke, fill and the shape's own knobs. */
+export function ShapeInspector({ nodes: all }: { nodes: ImageNode[] }) {
+  const project = useStudio((s) => s.project)!;
+  const readOnly = useStudio((s) => s.readOnly);
+  const patchData = useStudio((s) => s.patchData);
+  const nodes = all.filter((n): n is ShapeNode => isShape(n.data));
+  const ids = nodes.map((n) => n.id);
+  if (!nodes.length) return null;
+  const shape = shared(nodes, (n) => n.data.shape);
+  const strokeWidth = shared(nodes, (n) => n.data.stroke?.width);
+  const strokeColor = shared(nodes, (n) => n.data.stroke?.color);
+  const fill = shared(nodes, (n) => n.data.fill ?? "__default");
+  const setStroke = (patch: { width?: number; color?: string | undefined }) =>
+    useStudio.getState().editNodes(ids, (n) => {
+      if (n.layer !== "image" || !isShape(n.data)) return n;
+      const stroke = { ...(n.data.stroke ?? { width: 0.5 }), ...patch };
+      if (patch.color === undefined && "color" in patch) delete (stroke as { color?: string }).color;
+      return { ...n, data: { ...n.data, stroke } } as Node;
+    });
+  const fillOptions = [
+    { value: "__default", label: "Default", hint: "none when stroked, else the stroke color" },
+    { value: "none", label: "None" },
+    ...project.brand.colors.map((c) => ({ value: c.name, label: c.name, hint: c.hex, swatch: c.hex, group: "Brand colors" })),
+  ];
+  const params = typeof shape === "string" ? SHAPE_PARAMS[shape] : [];
+  return (
+    <Section title="Shape">
+      <Row label="Shape">
+        <Select
+          value={shape}
+          options={SHAPES.map((s) => ({ value: s, label: SHAPE_LABELS[s], hint: s }))}
+          disabled={readOnly}
+          onChange={(v) => v && patchData(ids, { shape: v }, ["params"])}
+        />
+      </Row>
+      <Row label="Stroke" hint="width in u; empty: no stroke">
+        <div className="field-grid">
+          <NumberField
+            label="W"
+            value={strokeWidth}
+            placeholder="none"
+            step={0.25}
+            min={0}
+            max={20}
+            unit="u"
+            disabled={readOnly}
+            onChange={(v) => (v === undefined || v <= 0 ? patchData(ids, {}, ["stroke"]) : setStroke({ width: v }))}
+          />
+          <ColorTokenSelect
+            project={project}
+            value={strokeColor}
+            allowNone
+            noneLabel="Default"
+            disabled={readOnly || strokeWidth === undefined}
+            onChange={(v) => setStroke({ color: v })}
+          />
+        </div>
+      </Row>
+      <Row label="Fill">
+        <Select
+          value={fill}
+          options={fillOptions}
+          disabled={readOnly}
+          onChange={(v) => (!v || v === "__default" ? patchData(ids, {}, ["fill"]) : patchData(ids, { fill: v }))}
+        />
+      </Row>
+      {params.map((p) => (
+        <Row key={p.key} label={p.label}>
+          <NumberField
+            value={shared(nodes, (n) => n.data.params?.[p.key])}
+            placeholder={p.default}
+            step={p.step}
+            min={p.min}
+            max={p.max}
+            unit={p.unit}
+            track={false}
+            disabled={readOnly}
+            onChange={(v) =>
+              useStudio.getState().editNodes(ids, (n) => {
+                if (n.layer !== "image" || !isShape(n.data)) return n;
+                const next = { ...(n.data.params ?? {}) };
+                if (v === undefined) delete next[p.key];
+                else next[p.key] = v;
+                const data = { ...n.data, params: next };
+                if (!Object.keys(next).length) delete (data as { params?: unknown }).params;
+                return { ...n, data } as Node;
+              })
+            }
+          />
+        </Row>
+      ))}
     </Section>
   );
 }

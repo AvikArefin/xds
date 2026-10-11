@@ -4,7 +4,7 @@ import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
 import { TextField } from "../ui";
 import { BrandInspector } from "./BrandInspector";
 import { LayoutInspector } from "./LayoutInspector";
-import { GroundInspector, ImageInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
+import { GroundInspector, ImageInspector, ShapeInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
 import { SceneInspector } from "./SceneInspector";
 
 function NodeHeader({ id }: { id: string }) {
@@ -54,6 +54,7 @@ export function Inspector() {
           <LayoutInspector nodes={boxNodes} />
           {mode === "type" && <TypeInspector nodes={nodes as TypeNode[]} />}
           {mode === "image" && <ImageInspector nodes={nodes as ImageNode[]} />}
+          {mode === "image" && <ShapeInspector nodes={nodes as ImageNode[]} />}
           {mode === "ground" && <GroundInspector nodes={nodes as GroundNode[]} />}
         </div>
       );

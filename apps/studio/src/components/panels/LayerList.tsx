@@ -3,6 +3,7 @@ import type { Layer, Node } from "@xds/protocol";
 import { LAYER_LABELS } from "@xds/protocol";
 import { api, type LibraryLogo } from "../../api";
 import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
+import { SHAPES, SHAPE_LABELS, ShapePreview } from "../../stage/shapes";
 import { addStarterBackground } from "../commands";
 import { Icon } from "../Icon";
 import { IconButton, ListRow, Menu, MenuItem } from "../ui";
@@ -71,10 +72,11 @@ function AddMenu({ layer }: { layer: Layer }) {
   const project = useStudio((s) => s.project)!;
   const designs = useStudio((s) => s.designs);
   const readOnly = useStudio((s) => s.readOnly);
-  const { addText, addImage, addLibraryLogo, addBackground, setMode } = useStudio.getState();
+  const { addText, addImage, addLibraryLogo, addBackground, addShapeNode, setMode } = useStudio.getState();
   const [logos, setLogos] = useState<LibraryLogo[] | null>(null);
   const [starters, setStarters] = useState<string[] | null>(null);
   const [showStarters, setShowStarters] = useState(false);
+  const [showShapes, setShowShapes] = useState(false);
   useEffect(() => {
     if (showStarters && !starters) api.starters().then((r) => setStarters(r.designs)).catch(() => setStarters([]));
   }, [showStarters, starters]);
@@ -175,6 +177,26 @@ function AddMenu({ layer }: { layer: Layer }) {
               ))
             ) : (
               <div className="menu-note">No image assets. Put files in assets/ and register them in project.json.</div>
+            )}
+            <div className="menu-sep" />
+            {!showShapes ? (
+              <MenuItem onClick={() => setShowShapes(true)}>Shape…</MenuItem>
+            ) : (
+              <>
+                <div className="menu-label">Shape (drawn, no file)</div>
+                {SHAPES.map((shape) => (
+                  <MenuItem
+                    key={shape}
+                    hint={<ShapePreview shape={shape} />}
+                    onClick={() => {
+                      addShapeNode(shape);
+                      close();
+                    }}
+                  >
+                    {SHAPE_LABELS[shape]}
+                  </MenuItem>
+                ))}
+              </>
             )}
           </>
         )}

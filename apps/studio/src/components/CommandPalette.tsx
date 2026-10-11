@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Lighting } from "@xds/protocol";
 import { api } from "../api";
+import { SHAPES, SHAPE_LABELS } from "../stage/shapes";
 import { useStudio } from "../store";
 import { addStarterBackground } from "./commands";
 
@@ -46,6 +47,22 @@ function baseCommands(): Command[] {
           label: look[0].toUpperCase() + look.slice(1),
           hint: "this slide",
           run: () => useStudio.getState().patchLighting({ look }),
+        })),
+    },
+    {
+      id: "shape",
+      label: "Add shape…",
+      hint: "an ornament on the 2D layer",
+      run: () => {},
+      sub: () =>
+        SHAPES.map((shape) => ({
+          id: `shape-${shape}`,
+          label: SHAPE_LABELS[shape],
+          hint: shape,
+          run: () => {
+            useStudio.getState().setMode("image");
+            useStudio.getState().addShapeNode(shape);
+          },
         })),
     },
     {

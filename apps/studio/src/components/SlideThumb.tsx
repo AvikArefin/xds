@@ -4,9 +4,11 @@
  * (background, 2D boxes, text, the 3D subject's frame position), which is cheap enough for a rail.
  */
 import { memo, useState } from "react";
-import { isAsset, type Asset, type Node, type Project, type Slide, type TypeNode } from "@xds/protocol";
+import { isAsset, isShape, type Asset, type Node, type Project, type Slide, type TypeNode } from "@xds/protocol";
 import { effectiveSize } from "@xds/editor-core";
 import { fileUrl } from "../api";
+import { ShapeSvg, shapeStyle } from "../stage/shapes";
+import { stackUnit } from "../stage/TypeLayer";
 import { bandFor, slideBaseColor } from "../stage/typeStyle";
 import { colorHex, effectiveCamera, layerOrder } from "../store";
 
@@ -42,9 +44,10 @@ export const SlideThumb = memo(function SlideThumb({
   const sorted = [...nodes].sort((a, b) => order.indexOf(a.layer) - order.indexOf(b.layer));
   const cam = effectiveCamera(slide);
   const assets = new Map<string, Asset>((project.assets ?? []).map((a) => [a.id, a]));
+  const base = slideBaseColor(project, slide);
 
   return (
-    <div className="thumb" style={{ width, height, background: slideBaseColor(project, slide) ?? "#222" }}>
+    <div className="thumb" style={{ width, height, background: base ?? "#222" }}>
       {sorted.map((n) => {
         if (n.layer === "render") {
           if (cam.mode !== "frame") return <div key={n.id} className="thumb-subject" style={{ left: "40%", top: "35%", width: "20%", height: "35%" }} />;
@@ -69,6 +72,16 @@ export const SlideThumb = memo(function SlideThumb({
         };
         if (n.layer === "ground") return <div key={n.id} className="thumb-ground" style={style} />;
         if (n.layer === "image") {
+          if (isShape(n.data)) {
+            const u = stackUnit(project);
+            const bw = (b.w / 100) * W;
+            const bh = (b.h / 100) * H;
+            return (
+              <div key={n.id} className="thumb-image" style={style}>
+                <ShapeSvg shape={n.data.shape} w={bw} h={bh} u={u} style={shapeStyle(n.data, project, base, u)} params={n.data.params ?? undefined} />
+              </div>
+            );
+          }
           const d = isAsset(n.data) ? n.data : null;
           const a = d ? assets.get(d.asset) : undefined;
           return (
