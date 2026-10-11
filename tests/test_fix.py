@@ -25,7 +25,7 @@ def project_with_text(root):
         d["brand"]["typography"]["body"] = {"level": "body", "font": "Inter"}
         d["slides"][0]["nodes"].append({
             "id": "t1", "layer": "type", "box": {"x": 5, "y": 10, "w": 50, "h": 6},
-            "layout": {"stack": {"below": "t0", "gap": 2}},
+            "layout": {"stack": {"below": "s1-background", "gap": 2}},
             "data": {"text": "Hi", "role": "body", "size": 30}})
     return edit_file(root, fn)
 
