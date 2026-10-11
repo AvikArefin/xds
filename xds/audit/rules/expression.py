@@ -38,7 +38,7 @@ def _system(s: MeasuredSlide) -> Expression | None:
 
 def _visible(s: MeasuredSlide) -> list[Any]:
     """The slide's 2D source nodes that are shown and measured (hidden ones carry no treatment)."""
-    return [n for n in s.slide.nodes
+    return [n for n in s.project.effective_nodes(s.slide)
             if n.layer != "render" and not n.hidden and s.node(n.id) is not None]
 
 

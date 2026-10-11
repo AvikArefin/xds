@@ -85,6 +85,20 @@ The full schema is in [data models](./data-models.md). The most common edits:
   "layout": { "stack": { "rightOf": "h1", "gap": 2 }, "pin": { "bottom": { "to": "margin" } } },
   "data": { "asset": "logo" } }
 
+// a column: the headline, subhead and call to action flow with 3u between them, pinned to the
+// margin's top-left (members join with layout.group; their own stacks and aligns are overridden)
+"groups": { "intro": { "direction": "column", "gap": 3, "align": "start",
+                       "pin": { "left": { "to": "margin" }, "top": { "to": "margin" } } } }
+{ "id": "cta", "layer": "type", "box": { "x": 0, "y": 0, "w": 40, "h": 6 },
+  "layout": { "group": "intro", "fit": "text" }, "data": { "text": "Pre-order", "role": "cta" } }
+
+// the logo on every slide: a master node (project level, behind each slide's own nodes)
+"master": { "nodes": [
+  { "id": "logo", "layer": "image", "box": { "x": 0, "y": 0, "w": 12, "h": 6 },
+    "layout": { "pin": { "right": { "to": "margin" }, "bottom": { "to": "margin" } } },
+    "data": { "asset": "logo" } } ] }
+// a slide without it: "master": false   (or the ids to leave off: "master": ["logo"])
+
 // the product, on the right third, a bit smaller
 "camera": { "mode": "frame", "x": 64, "y": 58, "height": 50 }
 

@@ -98,7 +98,7 @@ def measure(path: str | Path, *, slide_ids: list[str] | None = None,
             m: SlideMeasure = measures[sid]
             ms = MeasuredSlide(project, slide, m, Path(tmp), t, positions[sid])
             findings: list[Finding] = audit_slide(ms, t, skip)
-            sources = {n.id: n for n in slide.nodes if isinstance(n, TypeNode)}
+            sources = {n.id: n for n in project.effective_nodes(slide) if isinstance(n, TypeNode)}
             nodes = [node_report(n, sources[n.id], project, t) for n in m.nodes
                      if n.layer == "type" and n.id in sources]
             slides.append({"slideId": sid, "name": slide.name, "nodes": nodes,

@@ -647,6 +647,17 @@ class Project(Model):
     def slide(self, slide_id: str) -> Slide | None:
         return next((s for s in self.slides if s.id == slide_id), None)
 
+    def master_nodes_for(self, slide: Slide) -> list[Node]:
+        """The master nodes a slide shows: all, none (`master: false`) or all but the listed ids."""
+        if not self.master or slide.master is False:
+            return []
+        off = set(slide.master) if isinstance(slide.master, list) else set()
+        return [n for n in self.master.nodes if n.id not in off]
+
+    def effective_nodes(self, slide: Slide) -> list[Node]:
+        """Every node a slide draws: its master nodes first (behind), then its own."""
+        return [*self.master_nodes_for(slide), *slide.nodes]
+
     def asset(self, asset_id: str) -> Asset | None:
         return next((a for a in self.assets if a.id == asset_id), None)
 

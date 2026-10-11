@@ -222,7 +222,7 @@ from `thresholds.py` and scale with the format.
 | --- | --- | --- | --- |
 | `ALIGN_NEAR_MISS` | warn | two blocks' left, center or right edges differ by 1 to `u/2` px | align exactly, or separate clearly |
 | `MARGIN_NEAR_MISS` | info | a block edge sits within `u/2` of the margin but not on it | snap to the margin |
-| `GROUPING_AMBIGUOUS` | warn | the gap *inside* a group is not ≤ ⅔ of the gap to its nearest outside neighbor | Gestalt proximity: related things sit closer than unrelated ones. Groups come from `TypeData.group`; ungrouped blocks are clustered by gap |
+| `GROUPING_AMBIGUOUS` | warn | the gap *inside* a group is not ≤ ⅔ of the gap to its nearest outside neighbor | Gestalt proximity: related things sit closer than unrelated ones. Groups come from `layout.group` (a flow group) or `TypeData.group`; ungrouped blocks are clustered by gap |
 | `SPACING_INCONSISTENT` | warn | in a stack of ≥ 3 blocks of the same group, gaps differ by > 20 % | rhythm |
 | `SPACING_OFF_SCALE` | info | a vertical gap is not within 2 px of a multiple of `u` | a consistent spacing scale |
 | `MARGINS_UNEVEN` | info | left/right (or top/bottom) content margins differ by 5–25 % | intentional asymmetry is bigger than that |

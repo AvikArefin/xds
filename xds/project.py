@@ -357,15 +357,20 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
                 out.append(_f("UNKNOWN_THRESHOLD", f"rules.set.{key}", f"No threshold '{key}'.",
                               "See `xds rules --json` for the names."))
 
-    for si, slide in enumerate(p.slides):
-        sp = f"slides[{si}]"
-        out += _check_layout(slide, sp)
-        if slide.lighting:
-            color(slide.lighting.tint, f"{sp}.lighting.tint", slide_id=slide.id)
-        exceptions(slide.exceptions, f"{sp}.exceptions", slide_id=slide.id)
-        for ni, node in enumerate(slide.nodes):
+    scopes: list[tuple[str, Any, list[Any]]] = [(f"slides[{si}]", s, s.nodes) for si, s in enumerate(p.slides)]
+    if p.master and p.master.nodes:
+        # master nodes (data-models §2.11): checked like a slide's; they relate to each other only
+        scopes.append(("master", None, p.master.nodes))
+        out += _check_layout(p.master.nodes, "master", None, None)
+    for sp, slide, nodes in scopes:
+        if slide is not None:
+            out += _check_layout(slide.nodes, sp, slide.id, slide.groups)
+            if slide.lighting:
+                color(slide.lighting.tint, f"{sp}.lighting.tint", slide_id=slide.id)
+            exceptions(slide.exceptions, f"{sp}.exceptions", slide_id=slide.id)
+        for ni, node in enumerate(nodes):
             np_ = f"{sp}.nodes[{ni}]"
-            kw = {"nodes": [node.id], "slide_id": slide.id}
+            kw = {"nodes": [node.id], "slide_id": slide.id if slide is not None else None}
             exceptions(node.exceptions, f"{np_}.exceptions", **kw)
             if isinstance(node, TypeNode):
                 if node.data.role not in p.brand.typography:
@@ -395,7 +400,7 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
                     out.append(_f("UNKNOWN_ASSET", f"{np_}.data.asset",
                                   f"'{node.data.asset}' is not an image or svg asset.", **kw))
             elif isinstance(node, GroundNode):
-                designs_used.setdefault(node.data.design, []).append((np_, node, slide.id))
+                designs_used.setdefault(node.data.design, []).append((np_, node, slide.id if slide is not None else None))
                 if not (root / "designs" / f"{node.data.design}.svg").exists():
                     out.append(_f("UNKNOWN_DESIGN", f"{np_}.data.design",
                                   f"No design 'designs/{node.data.design}.svg'.",
@@ -421,31 +426,32 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
     return out
 
 
-def _check_layout(slide: Any, sp: str) -> list[Finding]:
+def _check_layout(nodes: list[Any], sp: str, slide_id: str | None, groups: dict[str, Any] | None) -> list[Finding]:
     """Layout relations (data-models §2.5a): stack and align anchors are 2D nodes on the same
     slide (STACK_ANCHOR, ALIGN_TARGET), they don't loop (STACK_CYCLE), a node doesn't both stack
     and align on one axis (LAYOUT_CONFLICT), and `layout.group` names one of the slide's groups
-    (GROUP_UNKNOWN)."""
+    (GROUP_UNKNOWN). Master nodes (`sp == "master"`) relate to master nodes only."""
     out: list[Finding] = []
-    by_id = {n.id: n for n in slide.nodes}
+    by_id = {n.id: n for n in nodes}
     two_d = (TypeNode, ImageNode, GroundNode)
+    where = "in the master" if slide_id is None else "on this slide"
     # every relation that makes `a` depend on `b`, for the cycle check
     edges: dict[str, set[str]] = {}
-    for ni, node in enumerate(slide.nodes):
+    for ni, node in enumerate(nodes):
         if isinstance(node, RenderNode):
             continue
         layout = node.layout
         stack = (layout.stack if layout and layout.stack else None) or (node.data.stack if isinstance(node, TypeNode) else None)
         stack_path = (f"{sp}.nodes[{ni}].layout.stack" if layout and layout.stack else f"{sp}.nodes[{ni}].data.stack")
-        kw = {"nodes": [node.id], "slide_id": slide.id}
-        candidates = ", ".join(n.id for n in slide.nodes if n.id != node.id and isinstance(n, two_d)) or "(none)"
+        kw = {"nodes": [node.id], "slide_id": slide_id}
+        candidates = ", ".join(n.id for n in nodes if n.id != node.id and isinstance(n, two_d)) or "(none)"
 
         def bad_target(target_id: str) -> str | None:
             target = by_id.get(target_id)
             if target is node:
                 return "is itself"
             if target is None:
-                return "is not on this slide"
+                return f"is not {where}"
             if not isinstance(target, two_d):
                 return f"is a {target.layer} node"
             return None
@@ -456,7 +462,7 @@ def _check_layout(slide: Any, sp: str) -> list[Finding]:
             if why:
                 out.append(_f("STACK_ANCHOR", f"{stack_path}.{key}",
                               f"'{node.id}' stacks {key} '{stack.anchor}', which {why}.",
-                              f"Anchor it to a text, image or background node on this slide: {candidates}.", **kw))
+                              f"Anchor it to a text, image or background node {where}: {candidates}.", **kw))
             else:
                 edges.setdefault(node.id, set()).add(stack.anchor)
         if layout and layout.align:
@@ -465,7 +471,7 @@ def _check_layout(slide: Any, sp: str) -> list[Finding]:
                 if why:
                     out.append(_f("ALIGN_TARGET", f"{sp}.nodes[{ni}].layout.align[{ai}].node",
                                   f"'{node.id}' aligns its {al.edge} with '{al.node}', which {why}.",
-                                  f"Align it with a text, image or background node on this slide: {candidates}.", **kw))
+                                  f"Align it with a text, image or background node {where}: {candidates}.", **kw))
                     continue
                 edges.setdefault(node.id, set()).add(al.node)
                 if stack is not None:
@@ -474,10 +480,11 @@ def _check_layout(slide: Any, sp: str) -> list[Finding]:
                         out.append(_f("LAYOUT_CONFLICT", f"{sp}.nodes[{ni}].layout.align[{ai}]",
                                       f"'{node.id}' both stacks and aligns on the {axis} axis; the stack wins.",
                                       "Keep one: remove the align on that axis, or the stack.", **kw))
-        if layout and layout.group and layout.group not in (slide.groups or {}):
-            names = ", ".join(sorted(slide.groups or {})) or "(none declared)"
+        if layout and layout.group and layout.group not in (groups or {}):
+            names = ", ".join(sorted(groups or {})) or "(none declared)"
+            what = "the master has no groups" if slide_id is None else "this slide does not declare"
             out.append(_f("GROUP_UNKNOWN", f"{sp}.nodes[{ni}].layout.group",
-                          f"'{node.id}' joins group '{layout.group}', which this slide does not declare.",
+                          f"'{node.id}' joins group '{layout.group}', which {what}.",
                           f"Declare it in the slide's `groups`, or pick one of: {names}.", **kw))
     reported: set[frozenset[str]] = set()
     for start in edges:
@@ -495,7 +502,7 @@ def _check_layout(slide: Any, sp: str) -> list[Finding]:
                     out.append(_f("STACK_CYCLE", f"{sp}.nodes", "Related blocks anchor to each other in a "
                                   f"circle: {' → '.join(cycle + [cur])}.",
                                   "Give one of them a fixed position: remove its stack or align and set its box.",
-                                  nodes=cycle, slide_id=slide.id))
+                                  nodes=cycle, slide_id=slide_id))
                 break
             path.append(cur)
     return out

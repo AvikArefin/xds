@@ -12,7 +12,7 @@ import type {
   TypeNode,
 } from "@xds/protocol";
 import { DEFAULT_LAYER_ORDER, isShape } from "@xds/protocol";
-import { effectiveSize } from "@xds/editor-core";
+import { effectiveNodes, effectiveSize } from "@xds/editor-core";
 import type { GuideJson, Level } from "./types";
 
 export const LIGHTING_DEFAULTS: Required<Omit<Lighting, "tint">> & { tint?: string } = {
@@ -42,8 +42,15 @@ export function getSlide(p: Project | null, id: string | null | undefined): Slid
   return p.slides.find((s) => s.id === id) ?? null;
 }
 
+/** A slide's own nodes (not its master nodes; see `slideNodes`). */
 export function nodesOf(slide: Slide | null): Node[] {
   return (slide?.nodes ?? []) as Node[];
+}
+
+/** Every node a slide shows: the project's master nodes it doesn't leave off, then its own. */
+export function slideNodes(p: Project | null, slide: Slide | null): Node[] {
+  if (!p) return nodesOf(slide);
+  return effectiveNodes(p, slide);
 }
 
 export function nodeLabel(n: Node, p?: Project | null): string {

@@ -73,6 +73,12 @@ export function useShortcuts() {
         st.copy();
         return;
       }
+      if (mod && key === "g") {
+        e.preventDefault();
+        if (e.shiftKey) st.ungroupSelection();
+        else st.groupSelection("column");
+        return;
+      }
       if (mod && key === "v") {
         e.preventDefault();
         st.paste();

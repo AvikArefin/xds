@@ -22,9 +22,10 @@ from .thresholds import Thresholds, build
 SEVERITY_ORDER = {"error": 0, "warn": 1, "info": 2}
 
 
-def _waivers(slide, finding: Finding) -> str | None:
+def _waivers(ms: MeasuredSlide, finding: Finding) -> str | None:
     """The reason a finding is waived: an exception on one of its nodes or on the slide."""
-    by_id = {n.id: n for n in slide.nodes}
+    slide = ms.slide
+    by_id = {n.id: n for n in ms.project.effective_nodes(slide)}
     sources = [by_id[i] for i in finding.nodes if i in by_id] + [slide]
     for src in sources:
         for e in src.exceptions or []:
@@ -59,7 +60,7 @@ def audit_slide(ms: MeasuredSlide, t: Thresholds, off: set[str]) -> list[Finding
                 fix=hit.fix, principle=spec.principle,
                 edits=[e.model_copy(update={"slide_id": ms.id}) for e in hit.edits] or None,
             )
-            reason = _waivers(ms.slide, f)
+            reason = _waivers(ms, f)
             if reason:
                 f.status = "waived"
                 f.waiver = {"reason": reason}

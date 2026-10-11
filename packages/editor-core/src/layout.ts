@@ -8,10 +8,13 @@
  * Order: pins first (they depend on the format only), then stacks and aligns in dependency order
  * (an anchor before what hangs on it; a missing anchor or a cycle leaves the node where its box
  * is), then `fit`. A stack or an align on an axis overrides a pin on that axis; a stack overrides
- * an align on the same axis (the gate reports LAYOUT_CONFLICT for that). Groups (flow) are a
- * later step and a no-op here.
+ * an align on the same axis (the gate reports LAYOUT_CONFLICT for that). Last come the slide's
+ * flow groups (data-models §2.5b): a group's members are packed along its direction with a gap
+ * between their ink, cross-aligned inside a box its pins place (or, unpinned, the union of the
+ * members' boxes, so the group packs where it is and its padding is ignored). The group decides
+ * both axes of a member, so a member's own stack or align is overridden.
  */
-import { stackOf, type AlignTo, type Node, type Pin, type Pins, type Stack } from "@xds/protocol";
+import { stackOf, type AlignTo, type Group, type Node, type Pin, type Pins, type Stack } from "@xds/protocol";
 import type { Rect } from "./box";
 
 /** A node's relations as the engine reads them: `layout`, with a type node's older `data.stack`. */
@@ -58,7 +61,7 @@ export interface LayoutItem {
   layout?: LayoutSpec | null;
 }
 
-export type Decider = "pin" | "align" | "stack" | "fit";
+export type Decider = "pin" | "align" | "stack" | "fit" | "group";
 export type Edge = "left" | "right" | "top" | "bottom" | "cx" | "cy";
 export type Axis = "x" | "y";
 
@@ -78,6 +81,18 @@ export interface AlignResolution {
   at: number;
 }
 
+export interface GroupResolution {
+  name: string;
+  /** The member's position in the flow (0 = first). */
+  index: number;
+  /** The flow axis. */
+  axis: Axis;
+  /** The group's box, px (the members are packed inside it). */
+  box: Rect;
+  /** Pinned edges of the group box and their lines, like a node's. */
+  pins?: Partial<Record<Edge, number>>;
+}
+
 export interface LayoutPlacement {
   rect: Rect;
   /** Which relation decided each field; absent fields are the node's own. */
@@ -86,7 +101,11 @@ export interface LayoutPlacement {
   pins?: Partial<Record<Edge, number>>;
   align?: Partial<Record<Axis, AlignResolution>>;
   stack?: StackResolution;
+  group?: GroupResolution;
 }
+
+/** The slide's flow groups, by name (`Slide.groups`). */
+export type GroupSpecs = Record<string, Group>;
 
 export const axisOf = (edge: AlignTo["edge"] | Edge): Axis =>
   edge === "left" || edge === "center" || edge === "right" || edge === "cx" ? "x" : "y";
@@ -182,10 +201,66 @@ function inkOf(item: LayoutItem): Required<Ink> {
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
+/** Apply pins to a rect in place; returns the decided fields and the lines pinned to. */
+function applyPins(r: Rect, pin: Pins, guide: LayoutGuide, u: number) {
+  const decided: LayoutPlacement["decided"] = {};
+  const pins: Partial<Record<Edge, number>> = {};
+  const px = (edge: Edge, p: Pin | null | undefined) => {
+    if (!p) return undefined;
+    const line = lineFor(edge, p.to, guide);
+    pins[edge] = line;
+    return line + (p.offset ?? 0) * u;
+  };
+  const L = px("left", pin.left);
+  const R = px("right", pin.right);
+  const CX = px("cx", pin.cx);
+  if (L !== undefined && R !== undefined) {
+    r.x = L;
+    r.w = Math.max(1, R - L);
+    decided.x = decided.w = "pin";
+  } else if (L !== undefined) {
+    r.x = L;
+    decided.x = "pin";
+  } else if (R !== undefined) {
+    r.x = R - r.w;
+    decided.x = "pin";
+  } else if (CX !== undefined) {
+    r.x = CX - r.w / 2;
+    decided.x = "pin";
+  }
+  const T = px("top", pin.top);
+  const B = px("bottom", pin.bottom);
+  const CY = px("cy", pin.cy);
+  if (T !== undefined && B !== undefined) {
+    r.y = T;
+    r.h = Math.max(1, B - T);
+    decided.y = decided.h = "pin";
+  } else if (T !== undefined) {
+    r.y = T;
+    decided.y = "pin";
+  } else if (B !== undefined) {
+    r.y = B - r.h;
+    decided.y = "pin";
+  } else if (CY !== undefined) {
+    r.y = CY - r.h / 2;
+    decided.y = "pin";
+  }
+  return { decided, pins: Object.keys(pins).length ? pins : undefined };
+}
+
+function unionOf(rs: Rect[]): Rect {
+  const x0 = Math.min(...rs.map((r) => r.x));
+  const y0 = Math.min(...rs.map((r) => r.y));
+  const x1 = Math.max(...rs.map((r) => r.x + r.w));
+  const y1 = Math.max(...rs.map((r) => r.y + r.h));
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
 /**
  * Resolve every 2D node's rect. Only nodes with at least one decided field appear in the result.
+ * `groups` are the slide's flow groups; a node joins one with `layout.group`.
  */
-export function resolveLayout(items: LayoutItem[], guide: LayoutGuide): Map<string, LayoutPlacement> {
+export function resolveLayout(items: LayoutItem[], guide: LayoutGuide, groups: GroupSpecs = {}): Map<string, LayoutPlacement> {
   const u = guide.u || 1;
   const byId = new Map(items.map((i) => [i.id, i]));
   const out = new Map<string, LayoutPlacement>();
@@ -203,48 +278,9 @@ export function resolveLayout(items: LayoutItem[], guide: LayoutGuide): Map<stri
 
     // --- pins -------------------------------------------------------------------------------
     if (s.pin) {
-      const pins: Partial<Record<Edge, number>> = {};
-      const px = (edge: Edge, pin: Pin | null | undefined) => {
-        if (!pin) return undefined;
-        const line = lineFor(edge, pin.to, guide);
-        pins[edge] = line;
-        return line + (pin.offset ?? 0) * u;
-      };
-      const L = px("left", s.pin.left);
-      const R = px("right", s.pin.right);
-      const CX = px("cx", s.pin.cx);
-      if (L !== undefined && R !== undefined) {
-        r.x = L;
-        r.w = Math.max(1, R - L);
-        p.decided.x = p.decided.w = "pin";
-      } else if (L !== undefined) {
-        r.x = L;
-        p.decided.x = "pin";
-      } else if (R !== undefined) {
-        r.x = R - r.w;
-        p.decided.x = "pin";
-      } else if (CX !== undefined) {
-        r.x = CX - r.w / 2;
-        p.decided.x = "pin";
-      }
-      const T = px("top", s.pin.top);
-      const B = px("bottom", s.pin.bottom);
-      const CY = px("cy", s.pin.cy);
-      if (T !== undefined && B !== undefined) {
-        r.y = T;
-        r.h = Math.max(1, B - T);
-        p.decided.y = p.decided.h = "pin";
-      } else if (T !== undefined) {
-        r.y = T;
-        p.decided.y = "pin";
-      } else if (B !== undefined) {
-        r.y = B - r.h;
-        p.decided.y = "pin";
-      } else if (CY !== undefined) {
-        r.y = CY - r.h / 2;
-        p.decided.y = "pin";
-      }
-      if (Object.keys(pins).length) p.pins = pins;
+      const applied = applyPins(r, s.pin, guide, u);
+      Object.assign(p.decided, applied.decided);
+      if (applied.pins) p.pins = applied.pins;
     }
 
     // --- relations to other nodes (anchors first) --------------------------------------------
@@ -300,8 +336,6 @@ export function resolveLayout(items: LayoutItem[], guide: LayoutGuide): Map<stri
       p.decided.h = "fit";
     }
 
-    // --- groups: flow is a later step (no-op) --------------------------------------------------
-
     r.x = r3(r.x);
     r.y = r3(r.y);
     r.w = r3(r.w);
@@ -312,6 +346,49 @@ export function resolveLayout(items: LayoutItem[], guide: LayoutGuide): Map<stri
   };
 
   for (const item of items) resolve(item);
+
+  // --- groups: flow ----------------------------------------------------------------------------
+  for (const [name, g] of Object.entries(groups)) {
+    const members = items.filter((i) => i.layout?.group === name);
+    if (!members.length) continue;
+    const axis: Axis = g.direction === "row" ? "x" : "y";
+    const cross: Axis = axis === "x" ? "y" : "x";
+    const size = (a: Axis) => (a === "x" ? "w" : "h") as "w" | "h";
+    const box = unionOf(members.map((m) => rects.get(m.id)!));
+    const pinned = !!g.pin && Object.values(g.pin).some(Boolean);
+    let pins: Partial<Record<Edge, number>> | undefined;
+    if (pinned) {
+      const applied = applyPins(box, g.pin!, guide, u);
+      pins = applied.pins;
+    }
+    const pad = pinned ? (g.padding ?? 0) * u : 0;
+    const gap = (g.gap ?? 2) * u;
+    let cursor = box[axis] + pad;
+    members.forEach((m, index) => {
+      const r = { ...rects.get(m.id)! };
+      const ink = inkOf(m);
+      const start = axis === "x" ? ink.left : ink.top;
+      const end = axis === "x" ? ink.right : ink.bottom;
+      r[axis] = r3(cursor - start);
+      cursor = r[axis] + end + gap;
+      const extent = r[size(cross)];
+      const align = g.align ?? "start";
+      r[cross] = r3(
+        align === "start"
+          ? box[cross] + pad
+          : align === "center"
+            ? box[cross] + box[size(cross)] / 2 - extent / 2
+            : box[cross] + box[size(cross)] - pad - extent,
+      );
+      rects.set(m.id, r);
+      const prev = out.get(m.id);
+      const p: LayoutPlacement = prev ? { ...prev, rect: r, decided: { ...prev.decided } } : { rect: r, decided: {} };
+      p.decided[axis] = "group";
+      p.decided[cross] = "group";
+      p.group = { name, index, axis, box, pins };
+      out.set(m.id, p);
+    });
+  }
   return out;
 }
 
@@ -350,5 +427,5 @@ export { EDGES as PIN_EDGES };
 /** Does a layout spec hold any relation at all? */
 export function hasRelations(s: LayoutSpec | null | undefined): boolean {
   if (!s) return false;
-  return !!(s.pin && Object.values(s.pin).some(Boolean)) || !!s.align?.length || !!s.stack || !!s.fit;
+  return !!(s.pin && Object.values(s.pin).some(Boolean)) || !!s.align?.length || !!s.stack || !!s.fit || !!s.group;
 }

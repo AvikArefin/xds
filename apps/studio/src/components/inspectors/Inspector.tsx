@@ -1,9 +1,11 @@
 import type { GroundNode, ImageNode, RenderNode, TypeNode } from "@xds/protocol";
 import { LAYER_LABELS } from "@xds/protocol";
-import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
+import { nodeLabel, slideNodes, useActiveSlide, useStudio } from "../../store";
 import { TextField } from "../ui";
 import { BrandInspector } from "./BrandInspector";
+import { GroupInspector } from "./GroupInspector";
 import { LayoutInspector } from "./LayoutInspector";
+import { MasterInspector } from "./MasterInspector";
 import { GroundInspector, ImageInspector, ShapeInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
 import { SceneInspector } from "./SceneInspector";
 import { TreatmentsInspector } from "./TreatmentsInspector";
@@ -13,7 +15,7 @@ function NodeHeader({ id }: { id: string }) {
   const project = useStudio((s) => s.project);
   const readOnly = useStudio((s) => s.readOnly);
   const renameNode = useStudio((s) => s.renameNode);
-  const node = nodesOf(slide).find((n) => n.id === id);
+  const node = slideNodes(project, slide).find((n) => n.id === id);
   if (!node) return null;
   return (
     <div className="node-header">
@@ -35,7 +37,7 @@ export function Inspector() {
   let body: React.ReactNode;
   if (mode === "present") body = <BrandInspector />;
   else {
-    const nodes = nodesOf(slide).filter((n) => selectedIds.includes(n.id) && n.layer === mode);
+    const nodes = slideNodes(project, slide).filter((n) => selectedIds.includes(n.id) && n.layer === mode);
     if (mode === "render") body = <SceneInspector nodes={nodes as RenderNode[]} />;
     else if (!nodes.length)
       body = (
@@ -48,11 +50,16 @@ export function Inspector() {
       );
     else {
       const boxNodes = nodes as (TypeNode | ImageNode | GroundNode)[];
+      const groupName = boxNodes.every((n) => n.layout?.group && n.layout.group === boxNodes[0].layout?.group) ? boxNodes[0].layout?.group : undefined;
+      const group = groupName ? slide?.groups?.[groupName] : undefined;
+      const members = groupName ? slideNodes(project, slide).filter((n) => n.layer !== "render" && n.layout?.group === groupName).length : 0;
       body = (
         <div className="inspector-body">
           {nodes.length === 1 && <NodeHeader id={nodes[0].id} />}
           <TransformInspector nodes={boxNodes} />
           <LayoutInspector nodes={boxNodes} />
+          {groupName && group && <GroupInspector name={groupName} group={group} members={members} />}
+          {nodes.length === 1 && <MasterInspector node={nodes[0]} />}
           {mode === "type" && <TypeInspector nodes={nodes as TypeNode[]} />}
           {mode === "type" && <TreatmentsInspector nodes={nodes as TypeNode[]} />}
           {mode === "image" && <ImageInspector nodes={nodes as ImageNode[]} />}

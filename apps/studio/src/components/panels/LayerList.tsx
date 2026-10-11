@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { Layer, Node } from "@xds/protocol";
 import { LAYER_LABELS } from "@xds/protocol";
 import { api, type LibraryLogo } from "../../api";
-import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
+import { isMasterNode } from "@xds/editor-core";
+import { nodeLabel, slideNodes, useActiveSlide, useStudio } from "../../store";
 import { SHAPES, SHAPE_LABELS, ShapePreview } from "../../stage/shapes";
 import { addStarterBackground } from "../commands";
 import { Icon } from "../Icon";
@@ -16,6 +17,7 @@ export function NodeRow({
   extra,
   draggable,
   onDrop,
+  tags,
 }: {
   node: Node;
   selected: boolean;
@@ -24,13 +26,28 @@ export function NodeRow({
   extra?: React.ReactNode;
   draggable?: boolean;
   onDrop?: (fromId: string) => void;
+  /** Small muted words after the name: a flow group's name, "master". */
+  tags?: string[];
 }) {
   const project = useStudio((s) => s.project);
   const readOnly = useStudio((s) => s.readOnly);
   const { toggleHidden, toggleLock } = useStudio.getState();
   return (
     <ListRow
-      label={nodeLabel(node, project)}
+      label={
+        tags?.length ? (
+          <>
+            {nodeLabel(node, project)}
+            {tags.map((t) => (
+              <span key={t} className="row-tag">
+                {t}
+              </span>
+            ))}
+          </>
+        ) : (
+          nodeLabel(node, project)
+        )
+      }
       title={node.id}
       selected={selected}
       hidden={!!node.hidden}
@@ -260,8 +277,10 @@ export function LayerList({ layer }: { layer: Layer }) {
   const selectedIds = useStudio((s) => s.selectedIds);
   const locked = useStudio((s) => s.locked);
   const readOnly = useStudio((s) => s.readOnly);
+  const project = useStudio((s) => s.project)!;
   const { select, reorder, deleteSelection } = useStudio.getState();
-  const all = nodesOf(slide).filter((n) => n.layer === layer);
+  const all = slideNodes(project, slide).filter((n) => n.layer === layer);
+  const own = all.filter((n) => !isMasterNode(project, n.id));
   const frontToBack = [...all].reverse();
 
   return (
@@ -271,17 +290,21 @@ export function LayerList({ layer }: { layer: Layer }) {
         <span className="muted small">{all.length} on this slide</span>
       </div>
       <ul className="node-list">
-        {frontToBack.map((n) => (
+        {frontToBack.map((n) => {
+          const master = isMasterNode(project, n.id);
+          const group = n.layer !== "render" ? n.layout?.group : undefined;
+          return (
           <NodeRow
             key={n.id}
             node={n}
             selected={selectedIds.includes(n.id)}
             locked={!!locked[n.id]}
-            draggable
+            draggable={!master}
+            tags={[...(group ? [group] : []), ...(master ? ["master"] : [])]}
             onSelect={(e) => select([n.id], { toggle: e.shiftKey || e.metaKey })}
-            onDrop={(fromId) => reorder(fromId, all.indexOf(n))}
+            onDrop={(fromId) => reorder(fromId, own.indexOf(n))}
             extra={
-              selectedIds.includes(n.id) && !readOnly ? (
+              selectedIds.includes(n.id) && !readOnly && !master ? (
                 <>
                   <IconButton icon="up" title="Bring forward" size={12} onClick={(e) => (e.stopPropagation(), reorder(n.id, "forward"))} />
                   <IconButton icon="down" title="Send backward" size={12} onClick={(e) => (e.stopPropagation(), reorder(n.id, "backward"))} />
@@ -290,7 +313,8 @@ export function LayerList({ layer }: { layer: Layer }) {
               ) : null
             }
           />
-        ))}
+          );
+        })}
         {!all.length && <li className="muted small pad">Nothing on this layer yet.</li>}
       </ul>
       <div className="panel-foot">

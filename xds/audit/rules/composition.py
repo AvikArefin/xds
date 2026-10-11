@@ -269,7 +269,7 @@ def uncovered_canvas(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """
     from ...migrate.steps.m0003_ground_paints_canvas import covers_canvas
 
-    nodes = [n.model_dump(mode="json", by_alias=True) for n in s.slide.nodes]
+    nodes = [n.model_dump(mode="json", by_alias=True) for n in s.project.effective_nodes(s.slide)]
     if any(covers_canvas(n) for n in nodes):
         return
     grounds = [n["id"] for n in nodes if n["layer"] == "ground"]

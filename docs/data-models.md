@@ -313,11 +313,16 @@ Group = { direction?: "column" | "row"; gap?: number /* u */; align?: "start" | 
 ```
 
 A slide declares groups in `Slide.groups`; a node joins one with `layout.group`. Members are laid
-out in z-order along the direction with `gap` between their ink, cross-aligned by `align`, inside
-a box that `pin` places (default: where the first member's box is). A headline, a subhead and a
-call to action in a column stay a column in every format, or flip to a row in a landscape
-variant. `TypeData.group` (the spacing rules' tag) is read as `layout.group` when the slide
-declares a group of that name.
+out in order (background, 2D, then text nodes, each in z-order) along the direction with `gap`
+between their ink (text) or boxes, cross-aligned by `align`, inside a box that `pin` places like a
+node's pins (both edges of an axis size it); `padding` insets the members in that box. Unpinned,
+the box is the union of the members' boxes, so the group packs where it is and `padding` is
+ignored. The group decides both axes of a member: its own stack or align is overridden, its
+`fit: "text"` still applies before packing, and sizes are kept (nothing stretches). A headline,
+a subhead and a call to action in a column stay a column in every format, or flip to a row in a
+landscape variant. Deleting the last member deletes the group; a pasted member keeps its group
+only where the target slide declares it. The spacing rules read `layout.group` first and
+`TypeData.group` (the older tag) second.
 
 ### 2.5c `variants`: per-orientation overrides
 
@@ -433,8 +438,13 @@ project.master?: { nodes: Node[] }
 ```
 
 Master nodes (a background, the logo, a footer) render on every slide, behind the slide's own
-nodes of the same layer, and are edited once, in Present mode. A slide leaves them off with
-`master: false` or lists the ids to leave off. Their ids are project-unique like any node's.
+nodes of the same layer, and are edited once: the editor selects them on any slide and writes the
+change to the master. A slide leaves them off with `master: false` or lists the ids to leave off.
+Their ids are project-unique like any node's; `effective_nodes(slide)` (Python) and
+`effectiveNodes(project, slide)` (editor-core) give what a slide draws, and the gate, the audit
+and the measurement read that. A master node's relations may only name other master nodes;
+a slide node's only slide nodes. A master full-canvas background counts for `UNCOVERED_CANVAS`,
+and a new slide copies no background while one exists. 3D nodes stay per slide.
 
 ### 2.9 `Camera`
 
@@ -681,8 +691,9 @@ A zustand store with the `zundo` middleware for undo and redo, split into slices
 | `jobs` | running/finished exports with their progress lines |
 
 Undo history covers `document.project` only. `dirty` is `project !== savedProject`.
-`layout` holds where the active slide's related nodes landed (pins, aligns, stacks, fit: every
-decided box field, with the line, anchor edge or stack base that decided it), as the stage reports
+`layout` holds where the active slide's related nodes landed (pins, aligns, stacks, fit, flow
+groups: every decided box field, with the line, anchor edge, stack base or group box that decided
+it), as the stage reports
 it; it is view state (never saved, not in undo). When it changes, the decided fields of those nodes'
 `box` are updated in `project` and `savedProject` alike (`syncLayout`), without an undo step and
 without making the document dirty. `fitted` holds the sizes `fitWidth` chose for the active

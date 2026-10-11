@@ -97,6 +97,15 @@
   display: flex;
   gap: 3px;
 }
+.row-tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--mono);
+}
 .slide-actions {
   display: flex;
   opacity: 0;

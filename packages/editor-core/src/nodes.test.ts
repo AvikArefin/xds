@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Project, RenderNode, TypeNode } from "@xds/protocol";
 import {
   addNode,
+  updateNodes,
+  allNodeIds,
   addSlide,
   coversCanvas,
   slideBackground,
@@ -9,6 +11,10 @@ import {
   deleteSlide,
   duplicateNodes,
   duplicateSlide,
+  effectiveBackground,
+  effectiveNodes,
+  moveToMaster,
+  moveToSlide,
   findNode,
   freshId,
   moveSlide,
@@ -267,5 +273,51 @@ describe("copy and paste", () => {
     expect((findNode(r.project, "obj-2")!.node as RenderNode).data.object).toBe("bottle");
     expect((findNode(r.project, "title-2")!.node as TypeNode).box).toEqual({ x: 10, y: 10, w: 50, h: 10 });
     expect(duplicateSlide(p, p.slides[1]).project.slides.map((s) => s.id)).toEqual(["s1", "s2", "s3"]);
+  });
+});
+
+describe("master nodes", () => {
+  it("shows master nodes first on every slide unless a slide leaves them off", () => {
+    const p = moveToMaster(project(), "s1", "bg");
+    expect(p.master?.nodes?.map((n) => n.id)).toEqual(["bg"]);
+    expect(ids(p)).toEqual(["title", "obj", "sub", "cta"]);
+    expect(effectiveNodes(p, p.slides[1]).map((n) => n.id)).toEqual(["bg"]);
+    expect(effectiveNodes(p, p.slides[0]).map((n) => n.id)).toEqual(["bg", "title", "obj", "sub", "cta"]);
+    expect(effectiveNodes(p, { ...p.slides[1], master: false })).toEqual([]);
+    expect(effectiveNodes(p, { ...p.slides[1], master: ["bg"] })).toEqual([]);
+    expect(effectiveBackground(p, p.slides[1])?.id).toBe("bg");
+    expect(effectiveBackground(project(), project().slides[1])).toBeUndefined();
+  });
+
+  it("edits and removes a master node through the slide it is seen on", () => {
+    const p = moveToMaster(project(), "s1", "bg");
+    const edited = updateNodes(p, "s2", ["bg"], (n) => ({ ...n, name: "Paper" }));
+    expect(edited.master?.nodes?.[0]?.name).toBe("Paper");
+    expect(findNode(edited, "bg")!.node.name).toBe("Paper");
+    const gone = removeNodes(edited, "s2", ["bg"]);
+    expect(gone.master).toBeUndefined();
+    expect(allNodeIds(p).has("bg")).toBe(true);
+  });
+
+  it("moves a master node back onto one slide, and a new slide skips the background copy while a master covers the canvas", () => {
+    const p = moveToMaster(project(), "s1", "bg");
+    expect(addSlide(p, "s1").project.slides[1].nodes).toEqual([]);
+    const back = moveToSlide(p, "s2", "bg");
+    expect(back.master).toBeUndefined();
+    expect(ids(back, 1)).toEqual(["bg"]);
+  });
+});
+
+describe("groups and paste", () => {
+  it("keeps a member's group only where the target slide declares it", () => {
+    const p = project();
+    p.slides[0].groups = { intro: { direction: "column", gap: 2 } };
+    (p.slides[0].nodes![1] as TypeNode).layout = { group: "intro", pin: { left: { to: "margin" } } };
+    const title = findNode(p, "title")!.node;
+    const same = pasteNodes(p, "s1", [title]);
+    expect((findNode(same.project, same.ids[0])!.node as TypeNode).layout).toEqual({ group: "intro", pin: { left: { to: "margin" } } });
+    const other = pasteNodes(p, "s2", [title]);
+    expect((findNode(other.project, other.ids[0])!.node as TypeNode).layout).toEqual({ pin: { left: { to: "margin" } } });
+    expect(duplicateSlide(p, p.slides[0], "s1").project.slides[1].groups).toEqual({ intro: { direction: "column", gap: 2 } });
   });
 });

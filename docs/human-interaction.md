@@ -29,8 +29,8 @@ editor.
 | --- | --- |
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (**Live**: the text and spacing rules run on the active slide after every edit, a preview with its own counts and findings; then the audit's counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
-| **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos, the project's images, or **Shape…**: a drawn ornament). Text / 2D / Background: the layer's nodes and **+ New …** |
-| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (pins, align to, stack, fit to text) and its layer's fields (Text adds **Wrap** and **Treatments**). |
+| **Side panel** | Present: **Layers**, **Master** (the nodes on every slide, and whether this slide shows them) and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos, the project's images, or **Shape…**: a drawn ornament). Text / 2D / Background: the layer's nodes and **+ New …** |
+| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (group, pins, align to, stack, fit to text), its **Group** when it is in one (direction, gap, align, padding, the box's pins, Ungroup), **Master** (show on every slide) and its layer's fields (Text adds **Wrap** and **Treatments**). |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
 layer on the canvas only, so you can work on what's under it; it is never saved, and exports
@@ -66,9 +66,10 @@ Shortcuts are ignored while typing in a field.
 | `Shift + click` · marquee · `Cmd/Ctrl + A` | add to the selection · select by area · select all in the layer |
 | `Cmd/Ctrl + D` | duplicate the selection; with nothing selected, the slide |
 | `Cmd/Ctrl + C` · `V` | copy the selection (or, with nothing selected, the slide) · paste |
+| `Cmd/Ctrl + G` · `Shift + Cmd/Ctrl + G` | group the selection as a column · ungroup |
 | arrows | nudge: 2D 1 px (`Shift`: `u`); 3D 1 cm (`Shift`: 10 cm) |
 | `Escape` | close the palette or a list; clear the selection |
-| drag a related block | edits its relation instead of its box: a stack's gap, a pin's or align's offset (whole units while Snap is on); a side the layout sizes snaps back |
+| drag a related block | edits its relation instead of its box: a stack's gap, a pin's or align's offset (whole units while Snap is on); a side the layout sizes snaps back. In a group: along the flow, past a neighbor's center, it reorders; across, it snaps back; all members together move the group |
 | drag or resize a block | **gap readouts**: the gap to the nearest block above, below, left and right, in `u`, with `=` when two sides match; with Snap on, a gap snaps to the `u` scale when no edge, margin or third is closer (`Alt` inverts snapping) |
 
 3D viewport: **left-drag** orbits (`yaw`/`pitch`), **right-drag** moves the product on the canvas
@@ -130,10 +131,27 @@ reloads from disk. Undo has one step per drag or field change.
   fitted size). Rotation stays in Transform. Fields turn amber outside the brand's expression
   system (Present → Brand), and the audit's `expression` rules say when a second angle, slant,
   stroke or ornament family creeps in ([design rules §8](./design-rules.md#8-expression-and-coherence)).
+- **Group a column**: select two or more blocks of a slide and press `Cmd/Ctrl + G` (or
+  **Group as column / row** in the palette, or **Group** in the Layout section). They become a
+  flow group named after the first: laid out in order along the direction with a **Gap** in
+  units between their ink, cross-aligned by **Align**, and the canvas shows the group's dashed
+  box. The **Group** section edits it; **Pins** on the group place its box on the format's lines
+  (then **Padding** insets the members), and unpinned it packs where its members are. Drag a
+  member past a neighbor to reorder; drag them all to move the group. **Ungroup** (`Shift +
+  Cmd/Ctrl + G`) leaves the blocks where the flow put them. Members' own stacks and aligns are
+  overridden while they are in the group; their list rows carry the group's name.
+- **Masters**: a block that belongs on every slide (the background, the logo, a footer) is made
+  a master node: select it and tick **Master → Show on every slide** in the inspector (or the
+  palette). It moves to the project's master nodes, drawn behind each slide's own nodes of its
+  layer, and its list row says *master*. Edit it on any slide: the change is for every slide.
+  **Present → Master** lists them, **To slide** moves one back onto the active slide only, and
+  **Show master nodes on this slide** leaves them all off one slide. Deleting a master node asks,
+  since it disappears everywhere. Relations of a master node may only reach other master nodes;
+  making a block a master releases its relations to the slide's blocks.
 - **Background**: there is no page color. Each slide's back Background node covers the canvas, and
-  new slides copy the previous slide's. To change it: `5`, select it, change its design or knobs.
-  **+ New background…** adds a project design or a starter on top. The audit reports
-  `UNCOVERED_CANVAS` if nothing covers the canvas.
+  new slides copy the previous slide's (unless a master background covers every slide). To change
+  it: `5`, select it, change its design or knobs. **+ New background…** adds a project design or
+  a starter on top. The audit reports `UNCOVERED_CANVAS` if nothing covers the canvas.
 - **Logo**: `3` → **+ New image…** → **Library** → a cortextech logo (`full-logomark` on dark
   backgrounds, `-white-bg` on white; always the full logo, on every slide). It's referenced, never copied, and
   arrives at its own aspect with Contain fit.

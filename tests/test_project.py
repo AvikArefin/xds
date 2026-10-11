@@ -232,3 +232,44 @@ def test_shape_reference_checks(blank):
     edit(blank, lambda d: d["slides"][0]["nodes"].pop(2))
     loaded = proj.load(blank)
     assert loaded.ok and {f.rule for f in loaded.findings} == {"SHAPE_INVISIBLE", "SHAPE_PARAM_UNKNOWN"}
+
+
+def test_master_nodes_are_checked_and_shown(blank):
+    """Master nodes (data-models §2.11): reference-checked like a slide's, relate to masters only,
+    and show on every slide unless left off."""
+    def add(d):
+        d["brand"]["typography"]["body"] = {"level": "body", "font": "Satoshi"}
+        d["fonts"] = [{"family": "Satoshi", "path": "xds:fonts/Satoshi/x.woff2"}]
+        bg = d["slides"][0]["nodes"].pop(0)
+        d["master"] = {"nodes": [
+            bg,
+            {"id": "footer", "layer": "type", "box": {"x": 5, "y": 90, "w": 50, "h": 5},
+             "layout": {"pin": {"left": {"to": "margin"}}, "align": [{"node": bg["id"], "edge": "bottom"}]},
+             "data": {"text": "cortextech", "role": "body"}},
+            {"id": "bad", "layer": "type", "box": {"x": 5, "y": 80, "w": 50, "h": 5},
+             "layout": {"stack": {"below": "t-on-slide"}, "group": "g"},
+             "data": {"text": "x", "role": "nope", "color": "red"}},
+        ]}
+        d["slides"][0]["nodes"].append({"id": "t-on-slide", "layer": "type", "box": {"x": 5, "y": 10, "w": 50, "h": 5},
+                                        "data": {"text": "Hi", "role": "body"}})
+        d["slides"].append({"id": "s2", "nodes": [], "master": False})
+    edit(blank, add)
+    loaded = proj.load(blank)
+    found = {(f.rule, f.path) for f in loaded.findings}
+    assert ("UNKNOWN_ROLE", "master.nodes[2].data.role") in found
+    assert ("UNKNOWN_COLOR", "master.nodes[2].data.color") in found
+    assert ("STACK_ANCHOR", "master.nodes[2].layout.stack.below") in found   # a master anchors to masters only
+    assert ("GROUP_UNKNOWN", "master.nodes[2].layout.group") in found
+    assert not any(f.rule == "ALIGN_TARGET" for f in loaded.findings)       # footer aligns with the master background
+    p = Project.model_validate(loaded.raw)
+    assert [n.id for n in p.effective_nodes(p.slides[0])] == ["s1-background", "footer", "bad", "t-on-slide"]
+    assert p.effective_nodes(p.slides[1]) == []
+    p.slides[1].master = ["footer"]
+    assert [n.id for n in p.effective_nodes(p.slides[1])] == ["s1-background", "bad"]
+
+
+def test_master_ids_must_be_unique_across_slides(blank):
+    def add(d):
+        d["master"] = {"nodes": [dict(d["slides"][0]["nodes"][0])]}
+    edit(blank, add)
+    assert codes(proj.load(blank)) == ["SCHEMA_INVALID"]

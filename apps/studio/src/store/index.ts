@@ -19,7 +19,9 @@ import type {
   Format,
   ImageNode,
   Layer,
+  Group,
   Layout,
+  Pins,
   Lighting,
   Node,
   Pose,
@@ -40,7 +42,11 @@ import {
   distributeRects,
   duplicateNodes,
   duplicateSlide as duplicateSlideCore,
+  effectiveNodes,
   freshId,
+  isMasterNode,
+  moveToMaster,
+  moveToSlide,
   gapForPosition,
   layoutSpecOf,
   offsetFor,
@@ -63,7 +69,7 @@ import {
 import type { LibraryLogo } from "../api";
 import { ServerError, server, subscribeEvents } from "./server";
 import type { DesignInfoJson, ExportEntry, GuideJson, Job, Mode, Notice, NoticeLevel } from "./types";
-import { boxPx, effectiveLighting, getSlide, nodesOf, typeStyle } from "./model";
+import { boxPx, effectiveLighting, getSlide, nodesOf, slideNodes, typeStyle } from "./model";
 
 export * from "./types";
 export * from "./model";
@@ -185,6 +191,19 @@ export interface StudioActions {
   patchLayout(ids: string[], fn: (layout: Layout | undefined, node: Node) => Layout | undefined): void;
   /** Remove a relation and leave the box where the layout put it (one undo step). */
   detachLayout(ids: string[], which: "pin" | "align" | "stack" | "fit" | "all"): void;
+  /** Make the selection a flow group on this slide (two or more 2D nodes), named after the first. */
+  groupSelection(direction: "column" | "row"): void;
+  /** Dissolve a group: its members keep their boxes where the flow left them. */
+  ungroup(name: string): void;
+  /** Dissolve the group the selection belongs to. */
+  ungroupSelection(): void;
+  patchGroup(name: string, patch: Partial<Group>): void;
+  /** Move a slide node into the project's master nodes (it then shows on every slide). Asks first. */
+  makeMaster(id: string): Promise<void>;
+  /** Move a master node back onto the active slide. */
+  makeSlideNode(id: string): void;
+  /** Show or leave off the master nodes on the active slide (`slide.master`). */
+  setSlideMaster(show: boolean): void;
 
   setZoom(z: number | "fit"): void;
   zoomBy(f: number): void;
@@ -384,17 +403,20 @@ export const useStudio = create<Studio>()(
         const H = next.format.height;
         const u = s.guide?.u ?? Math.max(4, Math.round(Math.min(W, H) / 135));
         const round = s.snap ? 1 : 0;
-        const old = new Map(nodesOf(before).map((n) => [n.id, n]));
+        const old = new Map(effectiveNodes(prev!, before).map((n) => [n.id, n]));
+        const afterNodes = effectiveNodes(next, after);
+        const reorders: [string, string][] = []; // a group member dragged past another: [id, over]
+        const groupPins = new Map<string, Pins>(); // a pinned group dragged as a whole: its new pins
         const shift = (id: string, axis: "x" | "y"): number => {
           const a = old.get(id);
-          const b = nodesOf(after).find((n) => n.id === id);
+          const b = afterNodes.find((n) => n.id === id);
           if (!a || !b || a.layer === "render" || b.layer === "render") return 0;
           return axis === "x" ? ((b.box.x - a.box.x) / 100) * W : ((b.box.y - a.box.y) / 100) * H;
         };
         const edgeOf = (r: { x: number; y: number; w: number; h: number }, edge: string) =>
           edge === "left" ? r.x : edge === "center" ? r.x + r.w / 2 : edge === "right" ? r.x + r.w : edge === "top" ? r.y : edge === "middle" ? r.y + r.h / 2 : r.y + r.h;
         let changed = false;
-        const nodes = nodesOf(after).map((n) => {
+        const mapped = afterNodes.map((n) => {
           const was = old.get(n.id);
           const place = s.layout[n.id];
           if (n.layer === "render" || !was || was.layer === "render" || !place) return n;
@@ -441,12 +463,80 @@ export const useStudio = create<Studio>()(
             }
             if (place.decided[size] === "fit" && r1[size] !== r0[size]) box[size] = was.box[size];
           }
+          // A flow group member: dragged along the flow it reorders when its center passes a
+          // neighbor's; across it, nothing (the flow puts it back). All members dragged together
+          // move the group: a pinned group's offsets change, an unpinned one simply moves.
+          if (place.group) {
+            const grp = place.group;
+            const axis = grp.axis;
+            const members = afterNodes.filter((m) => m.layer !== "render" && m.layout?.group === grp.name) as Exclude<Node, RenderNode>[];
+            const delta = { x: r1.x - r0.x, y: r1.y - r0.y };
+            const together =
+              members.length > 1 &&
+              members.every((m) => {
+                const a = old.get(m.id);
+                if (!a || a.layer === "render") return false;
+                const ra = boxPx(a.box, W, H);
+                const rb = boxPx(m.box, W, H);
+                return Math.abs(rb.x - ra.x - delta.x) < 0.01 && Math.abs(rb.y - ra.y - delta.y) < 0.01;
+              });
+            if (together) {
+              const gspec = after.groups?.[grp.name];
+              if (grp.pins && gspec?.pin) {
+                if (!groupPins.has(grp.name)) {
+                  const moved = { ...grp.box, x: grp.box.x + delta.x, y: grp.box.y + delta.y };
+                  const pin: Pins = { ...gspec.pin };
+                  for (const ax of ["x", "y"] as const) {
+                    if (!delta[ax]) continue;
+                    const edge = (ax === "x" ? ["left", "right", "cx"] : ["top", "bottom", "cy"]).find(
+                      (e) => grp.pins![e as PinEdge] !== undefined,
+                    ) as PinEdge | undefined;
+                    const pv = edge && pin[edge];
+                    if (edge && pv) pin[edge] = { ...pv, offset: offsetFor(pinnedEdgeValue(moved, edge), grp.pins[edge]!, u, round) };
+                  }
+                  groupPins.set(grp.name, pin);
+                }
+                box.x = was.box.x;
+                box.y = was.box.y;
+              }
+            } else if (delta.x || delta.y) {
+              const extent = (r: { w: number; h: number }) => (axis === "x" ? r.w : r.h);
+              const c0 = r0[axis] + extent(r0) / 2;
+              const c1 = r1[axis] + extent(r1) / 2;
+              const centerOf = (m: Exclude<Node, RenderNode>) => {
+                const r = s.layout[m.id]?.rect ?? boxPx(m.box, W, H);
+                return r[axis] + extent(r) / 2;
+              };
+              const others = members.filter((m) => m.id !== n.id && m.layer === n.layer);
+              const crossed =
+                c1 > c0 ? others.filter((m) => centerOf(m) < c1 && centerOf(m) > c0).pop() : others.filter((m) => centerOf(m) > c1 && centerOf(m) < c0)[0];
+              if (crossed) reorders.push([n.id, crossed.id]);
+              box.x = was.box.x;
+              box.y = was.box.y;
+            }
+          }
           out = { ...out, box } as Node;
           if (out === n) return n;
           changed = true;
           return out;
         });
-        return changed ? updateSlide(next, after.id, (sl) => ({ ...sl, nodes: nodes as Slide["nodes"] })) : next;
+        if (!changed && !reorders.length && !groupPins.size) return next;
+        const byIdOut = new Map(afterNodes.map((n, i) => [n.id, mapped[i]]));
+        let result = changed ? updateNodes(next, after.id, byIdOut.keys(), (n) => byIdOut.get(n.id) ?? n) : next;
+        for (const [id, over] of reorders) {
+          const sl = getSlide(result, after.id);
+          const layer = byIdOut.get(id)?.layer;
+          const layerNodes = nodesOf(sl).filter((m) => m.layer === layer);
+          const target = layerNodes.findIndex((m) => m.id === over);
+          if (target >= 0 && layerNodes.some((m) => m.id === id)) result = reorderInLayer(result, after.id, id, target);
+        }
+        if (groupPins.size)
+          result = updateSlide(result, after.id, (sl) => {
+            const groups = { ...(sl.groups ?? {}) };
+            for (const [name, pin] of groupPins) if (groups[name]) groups[name] = { ...groups[name], pin };
+            return { ...sl, groups };
+          });
+        return result;
       };
 
       /** Replace the project (one undo step unless inside a gesture). */
@@ -456,6 +546,21 @@ export const useStudio = create<Studio>()(
       };
 
       const slideOf = () => getSlide(get().project, get().activeSlideId);
+
+      /** Drop a slide's groups that have no member left. */
+      const pruneGroups = (p: Project, slideId: string): Project => {
+        const slide = getSlide(p, slideId);
+        if (!slide?.groups) return p;
+        const used = new Set(effectiveNodes(p, slide).flatMap((n) => (n.layer !== "render" && n.layout?.group ? [n.layout.group] : [])));
+        const groups = Object.fromEntries(Object.entries(slide.groups).filter(([name]) => used.has(name)));
+        if (Object.keys(groups).length === Object.keys(slide.groups).length) return p;
+        return updateSlide(p, slideId, (sl) => {
+          const out = { ...sl };
+          if (Object.keys(groups).length) out.groups = groups;
+          else delete out.groups;
+          return out;
+        });
+      };
 
       /** Add an image node for `assetId` inside the margin; a wide (or tall) one keeps `aspect`. */
       const placeImage = (project: Project, assetId: string, aspect?: number) => {
@@ -480,7 +585,7 @@ export const useStudio = create<Studio>()(
           if (!opts.quiet) notify("info", "Present mode is read-only. Pick a layer (2–5) to edit.");
           return [];
         }
-        const nodes = nodesOf(slideOf());
+        const nodes = slideNodes(s.project, slideOf());
         const out: string[] = [];
         let lockedHit = false;
         for (const id of ids) {
@@ -643,10 +748,10 @@ export const useStudio = create<Studio>()(
           const sync = (p: Project | null): Project | null => {
             const slide = getSlide(p, s.activeSlideId);
             if (!p || !slide) return p;
-            let changed = false;
-            const nodes = nodesOf(slide).map((n) => {
+            const changes = new Map<string, Node>();
+            for (const n of effectiveNodes(p, slide)) {
               const place = placements.get(n.id);
-              if (n.layer === "render" || !place) return n;
+              if (n.layer === "render" || !place) continue;
               const box: Box = { ...n.box };
               let touched = false;
               for (const key of ["x", "y", "w", "h"] as const) {
@@ -656,11 +761,9 @@ export const useStudio = create<Studio>()(
                 box[key] = v;
                 touched = true;
               }
-              if (!touched) return n;
-              changed = true;
-              return { ...n, box } as Node;
-            });
-            return changed ? updateSlide(p, slide.id, (sl) => ({ ...sl, nodes: nodes as Slide["nodes"] })) : p;
+              if (touched) changes.set(n.id, { ...n, box } as Node);
+            }
+            return changes.size ? updateNodes(p, slide.id, changes.keys(), (n) => changes.get(n.id) ?? n) : p;
           };
           const project = sync(s.project);
           if (project === s.project) return;
@@ -704,7 +807,7 @@ export const useStudio = create<Studio>()(
         select: (ids, opts = {}) => {
           const s = get();
           if (s.mode === "present") return set({ selectedIds: [] });
-          const nodes = nodesOf(slideOf());
+          const nodes = slideNodes(s.project, slideOf());
           const valid = ids.filter((id) => nodes.some((n) => n.id === id && n.layer === s.mode));
           if (opts.additive || opts.toggle) {
             const cur = new Set(s.selectedIds);
@@ -719,7 +822,7 @@ export const useStudio = create<Studio>()(
           const s = get();
           if (s.mode === "present") return;
           set({
-            selectedIds: nodesOf(slideOf())
+            selectedIds: slideNodes(s.project, slideOf())
               .filter((n) => n.layer === s.mode && !n.hidden && !s.locked[n.id])
               .map((n) => n.id),
           });
@@ -838,9 +941,132 @@ export const useStudio = create<Studio>()(
           const s = get();
           const ok = guardIds(s.selectedIds);
           if (!ok.length) return;
-          commit(removeNodes(s.project!, s.activeSlideId, ok), {
-            selectedIds: s.selectedIds.filter((id) => !ok.includes(id)),
+          const masters = ok.filter((id) => isMasterNode(s.project!, id));
+          const run = () =>
+            commit(pruneGroups(removeNodes(get().project!, s.activeSlideId, ok), s.activeSlideId), {
+              selectedIds: s.selectedIds.filter((id) => !ok.includes(id)),
+            });
+          if (!masters.length) return run();
+          void get()
+            .ask({
+              title: masters.length === 1 ? "Delete the master node?" : `Delete ${masters.length} master nodes?`,
+              message: "A master node shows on every slide; deleting it removes it from all of them. To keep it on this slide only, use Make slide node first.",
+              input: false,
+              confirm: "Delete everywhere",
+              danger: true,
+            })
+            .then((r) => r !== null && run());
+        },
+        groupSelection: (direction) => {
+          const s = get();
+          const ok = guardIds(s.selectedIds).filter((id) => !isMasterNode(s.project!, id));
+          const slide = slideOf();
+          if (!slide || !s.project) return;
+          if (ok.length < 2) return notify("info", "Select two or more blocks on this slide to group them.");
+          const taken = new Set(Object.keys(slide.groups ?? {}));
+          const name = freshId(ok[0], taken);
+          let p = updateNodes(s.project, slide.id, ok, (n) => (n.layer === "render" ? n : ({ ...n, layout: { ...(n.layout ?? {}), group: name } } as Node)));
+          p = updateSlide(p, slide.id, (sl) => ({ ...sl, groups: { ...(sl.groups ?? {}), [name]: { direction, gap: 2, align: "start" } } }));
+          commit(p, { selectedIds: ok });
+        },
+        ungroup: (name) => {
+          const s = get();
+          const slide = slideOf();
+          if (!canEditDoc() || !s.project || !slide?.groups?.[name]) return;
+          const members = effectiveNodes(s.project, slide).filter((n) => n.layer !== "render" && n.layout?.group === name).map((n) => n.id);
+          let p = updateNodes(s.project, slide.id, members, (n) => {
+            if (n.layer === "render") return n;
+            const layout = { ...(n.layout ?? {}) };
+            delete layout.group;
+            const out = { ...n } as Exclude<Node, RenderNode>;
+            if (Object.keys(layout).length) out.layout = layout;
+            else delete out.layout;
+            return out;
           });
+          p = updateSlide(p, slide.id, (sl) => {
+            const groups = { ...(sl.groups ?? {}) };
+            delete groups[name];
+            const out = { ...sl };
+            if (Object.keys(groups).length) out.groups = groups;
+            else delete out.groups;
+            return out;
+          });
+          commit(p);
+        },
+        ungroupSelection: () => {
+          const s = get();
+          const node = slideNodes(s.project, slideOf()).find((n) => s.selectedIds.includes(n.id) && n.layer !== "render" && n.layout?.group);
+          const name = node && node.layer !== "render" ? node.layout?.group : undefined;
+          if (name) get().ungroup(name);
+        },
+        patchGroup: (name, patch) => {
+          const s = get();
+          const slide = slideOf();
+          if (!canEditDoc() || !s.project || !slide?.groups?.[name]) return;
+          commit(
+            updateSlide(s.project, slide.id, (sl) => {
+              const g = { ...sl.groups![name], ...patch } as Record<string, unknown>;
+              for (const k of Object.keys(g)) if (g[k] === undefined) delete g[k];
+              return { ...sl, groups: { ...sl.groups, [name]: g as Group } };
+            }),
+          );
+        },
+        makeMaster: async (id) => {
+          const s = get();
+          const slide = slideOf();
+          if (!canEditDoc() || !s.project || !slide) return;
+          const node = nodesOf(slide).find((n) => n.id === id);
+          if (!node) return notify("info", "Only a node of this slide can become a master node.");
+          if (node.layer === "render") return notify("info", "3D objects stay per slide; master nodes are backgrounds, images, shapes and text.");
+          const r = await get().ask({
+            title: `Show “${node.name || node.id}” on every slide?`,
+            message: "It moves to the project's master nodes: drawn behind each slide's own nodes of its layer, edited once for all slides. Relations to this slide's nodes are released.",
+            input: false,
+            confirm: "Make master",
+          });
+          if (r === null) return;
+          const masters = new Set((get().project!.master?.nodes ?? []).map((n) => n.id));
+          let p = updateNodes(get().project!, slide.id, [id], (n) => {
+            if (n.layer === "render" || !n.layout) return n;
+            const layout = { ...n.layout };
+            if (layout.stack && !masters.has(layout.stack.below ?? layout.stack.above ?? layout.stack.rightOf ?? layout.stack.leftOf ?? "")) delete layout.stack;
+            if (layout.align) {
+              const align = layout.align.filter((a) => masters.has(a.node));
+              if (align.length) layout.align = align as typeof layout.align;
+              else delete layout.align;
+            }
+            delete layout.group;
+            const out = { ...n } as Exclude<Node, RenderNode>;
+            if (Object.keys(layout).length) out.layout = layout;
+            else delete out.layout;
+            if (out.layer === "type" && out.data.stack) {
+              const data = { ...out.data };
+              delete data.stack;
+              out.data = data;
+            }
+            return out;
+          });
+          p = pruneGroups(moveToMaster(p, slide.id, id), slide.id);
+          commit(p, { selectedIds: [id] });
+          notify("success", `“${node.name || node.id}” is now a master node, on every slide.`);
+        },
+        makeSlideNode: (id) => {
+          const s = get();
+          if (!canEditDoc() || !s.project || !isMasterNode(s.project, id)) return;
+          commit(moveToSlide(s.project, s.activeSlideId, id), { selectedIds: s.mode === "present" ? [] : [id] });
+        },
+        setSlideMaster: (show) => {
+          const s = get();
+          if (!canEditDoc() || !s.project) return;
+          commit(
+            updateSlide(s.project, s.activeSlideId, (sl) => {
+              const out = { ...sl };
+              if (show) delete out.master;
+              else out.master = false;
+              return out;
+            }),
+            { selectedIds: show ? s.selectedIds : s.selectedIds.filter((id) => !isMasterNode(s.project!, id)) },
+          );
         },
         duplicateSelection: () => {
           const s = get();
@@ -857,7 +1083,7 @@ export const useStudio = create<Studio>()(
             set({ clipboard: { kind: "slide", slide: structuredClone(slide) } });
             return notify("info", `Copied slide “${slide.name || slide.id}”. Paste adds it after the active slide.`);
           }
-          const nodes = nodesOf(slide).filter((n) => s.selectedIds.includes(n.id) && n.layer === s.mode);
+          const nodes = slideNodes(s.project, slide).filter((n) => s.selectedIds.includes(n.id) && n.layer === s.mode);
           if (!nodes.length) return;
           set({ clipboard: { kind: "nodes", layer: s.mode, nodes: structuredClone(nodes) } });
           notify("info", nodes.length === 1 ? "Copied 1 node." : `Copied ${nodes.length} nodes.`);
@@ -1325,7 +1551,7 @@ export const useStudio = create<Studio>()(
       function fixSelectionAfterHistory() {
         const s = get();
         const slide = getSlide(s.project, s.activeSlideId) ?? s.project?.slides[0] ?? null;
-        const nodes = nodesOf(slide);
+        const nodes = slideNodes(s.project, slide);
         const sel = s.selectedIds.filter((id) => nodes.some((n) => n.id === id && n.layer === s.mode));
         if (slide?.id !== s.activeSlideId || sel.length !== s.selectedIds.length)
           useStudio.setState({ activeSlideId: slide?.id ?? "", selectedIds: sel });

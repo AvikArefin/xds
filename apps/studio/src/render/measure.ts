@@ -28,6 +28,7 @@ import type {
   SlideMeasure,
   TypeNode,
 } from "@xds/protocol";
+import { effectiveNodes } from "@xds/editor-core";
 import { toHex } from "../design/color";
 import { findPart, meshesUnder } from "../scene/objects";
 import type { SceneApi } from "../scene/SceneRoot";
@@ -265,7 +266,7 @@ export async function measure(handle: StageHandle, project: Project, slideId: st
   const nodes: MeasuredNode[] = [];
   const renderNodes: RenderNode[] = [];
 
-  for (const node of slide.nodes ?? []) {
+  for (const node of effectiveNodes(project, slide)) {
     if (node.hidden) continue;
     if (node.layer === "render") {
       renderNodes.push(node);

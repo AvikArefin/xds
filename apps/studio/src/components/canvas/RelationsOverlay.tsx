@@ -7,7 +7,7 @@
 import type { Node } from "@xds/protocol";
 import { stackOf, type AlignTo } from "@xds/protocol";
 import { pinnedEdgeValue, type Edge, type LayoutPlacement } from "@xds/editor-core";
-import { boxPx, nodesOf, useActiveSlide, useStudio } from "../../store";
+import { boxPx, slideNodes, useActiveSlide, useStudio } from "../../store";
 
 type BoxNode = Exclude<Node, { layer: "render" }>;
 const TICK = 10;
@@ -34,7 +34,8 @@ export function RelationsOverlay({ ids, W, H, zoom }: { ids: string[]; W: number
   const layout = useStudio((s) => s.layout);
   const guide = useStudio((s) => s.guide);
   const u = guide?.u ?? 8;
-  const nodes = nodesOf(slide).filter((n): n is BoxNode => n.layer !== "render");
+  const project = useStudio((s) => s.project);
+  const nodes = slideNodes(project, slide).filter((n): n is BoxNode => n.layer !== "render");
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const els: JSX.Element[] = [];
   const t = TICK / zoom;

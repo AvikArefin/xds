@@ -10,6 +10,7 @@ import type { GroundNode, ImageNode, Layer, Project, RenderNode, TypeNode } from
 import { DEFAULT_LAYER_ORDER } from "@xds/protocol";
 import {
   boxToPx,
+  effectiveNodes,
   fallbackGuide,
   hasRelations,
   layoutSpecOf,
@@ -113,15 +114,16 @@ export function SlideStage(props: SlideStageProps) {
   const visible = new Set(props.visibleLayers ?? ALL_LAYERS);
   const mounted = new Set(props.mountLayers ?? ALL_LAYERS);
 
+  // The project's master nodes come first, so they sit behind the slide's own nodes of a layer.
   const byLayer = useMemo(() => {
-    const nodes = (slide?.nodes ?? []).filter((n) => !n.hidden);
+    const nodes = effectiveNodes(project, slide).filter((n) => !n.hidden);
     return {
       ground: nodes.filter((n): n is GroundNode => n.layer === "ground"),
       image: nodes.filter((n): n is ImageNode => n.layer === "image"),
       type: nodes.filter((n): n is TypeNode => n.layer === "type"),
       render: nodes.filter((n): n is RenderNode => n.layer === "render"),
     };
-  }, [slide]);
+  }, [project, slide]);
 
   // No render nodes → the subject is known to be absent right away.
   useEffect(() => {
@@ -159,8 +161,8 @@ export function SlideStage(props: SlideStageProps) {
         layout: layoutSpecOf(n),
       };
     });
-    return resolveLayout(items, lg);
-  }, [needsInk, flat, ink, lg, width, height]);
+    return resolveLayout(items, lg, slide?.groups ?? {});
+  }, [needsInk, flat, ink, lg, width, height, slide?.groups]);
   const onLayoutRef = useRef(props.onLayout);
   onLayoutRef.current = props.onLayout;
   useEffect(() => {

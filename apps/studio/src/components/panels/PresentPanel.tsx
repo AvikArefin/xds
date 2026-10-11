@@ -3,6 +3,7 @@ import { LAYER_LABELS, type Layer } from "@xds/protocol";
 import { layerOrder, useStudio } from "../../store";
 import { Icon } from "../Icon";
 import { IconButton, ListRow } from "../ui";
+import { MasterPanel } from "./MasterPanel";
 
 function fmtStamp(stamp: string) {
   const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/.exec(stamp);
@@ -65,6 +66,8 @@ export function PresentPanel() {
           );
         })}
       </ul>
+
+      <MasterPanel />
 
       <div className="panel-head">
         <span className="panel-title">Exports</span>

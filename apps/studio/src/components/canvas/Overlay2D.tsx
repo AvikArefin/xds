@@ -8,9 +8,10 @@
 import { useRef, useState } from "react";
 import type { Box, Layer, Node } from "@xds/protocol";
 import { pxRectToBox, rectsBounds, snapMove, snapResize, snapTargets, type PxRect, type SnapLine } from "@xds/editor-core";
-import { boxBoundsPx, boxPx, nodesOf, pointInBox, useActiveSlide, useStudio } from "../../store";
+import { boxBoundsPx, boxPx, pointInBox, slideNodes, useActiveSlide, useStudio } from "../../store";
 import { GapReadouts } from "./GapReadouts";
 import { SnapLinesOverlay } from "./Overlays";
+import { GroupOverlay } from "./GroupOverlay";
 import { RelationsOverlay } from "./RelationsOverlay";
 
 type BoxNode = Exclude<Node, { layer: "render" }>;
@@ -38,7 +39,8 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
   const [dragRect, setDragRect] = useState<{ rect: PxRect; others: PxRect[] } | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const all = nodesOf(slide).filter((n): n is BoxNode => n.layer !== "render");
+  const project = useStudio((s) => s.project);
+  const all = slideNodes(project, slide).filter((n): n is BoxNode => n.layer !== "render");
   const layerHidden = useStudio((s) => s.hiddenLayers.includes(layer));
   // a layer switched off on the canvas can't be clicked or marquee-selected
   const layerNodes = layerHidden ? [] : all.filter((n) => n.layer === layer);
@@ -304,6 +306,7 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
       <SnapLinesOverlay lines={snapLines} W={W} H={H} zoom={z} />
       {dragRect && <GapReadouts rect={dragRect.rect} others={dragRect.others} u={guide?.u ?? 8} W={W} H={H} zoom={z} />}
       {selected.length > 0 && <RelationsOverlay ids={selected.map((n) => n.id)} W={W} H={H} zoom={z} />}
+      {selected.length > 0 && <GroupOverlay ids={selected.map((n) => n.id)} W={W} H={H} zoom={z} />}
       {hover && outline(hover, "hover-box", false)}
       {selected.map((n) =>
         outline(n, `sel-box${locked[n.id] ? " locked" : ""}`, selected.length === 1 && !readOnly && !locked[n.id]),

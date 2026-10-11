@@ -170,3 +170,46 @@ describe("fit and knobs", () => {
     expect(hasRelations({ fit: "text" })).toBe(true);
   });
 });
+
+describe("flow groups", () => {
+  const text = (id: string, y: number, h: number, layer = "col") =>
+    item(id, { x: 100, y, w: 400, h }, { group: layer }, { ink: { top: 4, bottom: h - 4, left: 0, right: 400 } });
+
+  it("packs a column from where it is, ink to ink, and overrides a member's own stack", () => {
+    const items = [text("a", 300, 100), item("b", { x: 100, y: 900, w: 300, h: 50 }, { group: "col", stack: { below: "a", gap: 9 } })];
+    const r = resolveLayout(items, g, { col: { direction: "column", gap: 2 } });
+    expect(r.get("a")!.rect.y).toBe(300 - 4); // its ink top sits at the group's top
+    expect(r.get("a")!.decided).toEqual({ x: "group", y: "group" });
+    // b's box top: a's ink bottom (296 + 96 = 392) + 2u, minus b's own ink top (0)
+    expect(r.get("b")!.rect.y).toBe(412);
+    expect(r.get("b")!.group).toMatchObject({ name: "col", index: 1, axis: "y" });
+    expect(r.get("b")!.decided.y).toBe("group");
+  });
+
+  it("lays a row out with the cross axis aligned, inside a pinned box with padding", () => {
+    const items = [
+      item("a", { x: 0, y: 0, w: 100, h: 50 }, { group: "row" }),
+      item("b", { x: 0, y: 0, w: 100, h: 30 }, { group: "row" }),
+    ];
+    const r = resolveLayout(items, g, {
+      row: { direction: "row", gap: 1, align: "center", padding: 2, pin: { left: { to: "margin" }, right: { to: "margin" }, top: { to: "margin" }, bottom: { to: "margin", offset: -100 } } },
+    });
+    // the box spans the margins: x 60–940, y 100–900; padding 20
+    expect(r.get("a")!.rect).toEqual({ x: 80, y: 475, w: 100, h: 50 });
+    expect(r.get("b")!.rect).toEqual({ x: 190, y: 485, w: 100, h: 30 });
+    expect(r.get("a")!.group!.box).toEqual({ x: 60, y: 100, w: 880, h: 800 });
+    expect(r.get("a")!.group!.pins).toMatchObject({ left: 60, right: 940 });
+  });
+
+  it("ignores padding for an unpinned group (so it does not drift) and aligns to the end", () => {
+    const items = [item("a", { x: 100, y: 100, w: 200, h: 50 }, { group: "c" }), item("b", { x: 150, y: 400, w: 100, h: 50 }, { group: "c" })];
+    const r = resolveLayout(items, g, { c: { direction: "column", gap: 0, align: "end", padding: 5 } });
+    expect(r.get("a")!.rect).toEqual({ x: 100, y: 100, w: 200, h: 50 });
+    expect(r.get("b")!.rect).toEqual({ x: 200, y: 150, w: 100, h: 50 });
+  });
+
+  it("leaves nodes that name no declared group alone", () => {
+    const r = resolveLayout([item("a", { x: 1, y: 2, w: 3, h: 4 }, { group: "nope" })], g, {});
+    expect(r.size).toBe(0);
+  });
+});

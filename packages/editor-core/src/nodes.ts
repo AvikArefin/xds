@@ -37,7 +37,60 @@ export const NODE_DEFAULT_POSE: Required<Pose> = {
 export function allNodeIds(project: Project): Set<string> {
   const ids = new Set<string>();
   for (const s of project.slides) for (const n of s.nodes ?? []) ids.add(n.id);
+  for (const n of project.master?.nodes ?? []) ids.add(n.id);
   return ids;
+}
+
+// --- master nodes (data-models §2.11) -------------------------------------------------------
+
+/** The project's master nodes (a background, the logo, …), shown on every slide unless left off. */
+export function masterNodes(project: Project): Node[] {
+  return (project.master?.nodes ?? []) as Node[];
+}
+
+export function isMasterNode(project: Project, nodeId: string): boolean {
+  return masterNodes(project).some((n) => n.id === nodeId);
+}
+
+/** The master nodes a slide shows: all of them, none (`master: false`), or all but the listed ids. */
+export function masterNodesFor(project: Project, slide: Slide | null | undefined): Node[] {
+  if (!slide || slide.master === false) return [];
+  const off = new Set(Array.isArray(slide.master) ? slide.master : []);
+  return masterNodes(project).filter((n) => !off.has(n.id));
+}
+
+/**
+ * Every node a slide draws: its master nodes first (so they sit behind the slide's own nodes of
+ * the same layer), then its own. The stage, the lists and the editor's lookups read this.
+ */
+export function effectiveNodes(project: Project, slide: Slide | null | undefined): Node[] {
+  const own = (slide?.nodes ?? []) as Node[];
+  const master = masterNodesFor(project, slide);
+  return master.length ? [...master, ...own] : own;
+}
+
+function updateMasterNodes(project: Project, ids: Set<string>, fn: (n: Node) => Node): Project {
+  if (!project.master?.nodes?.some((n) => ids.has(n.id))) return project;
+  return { ...project, master: { ...project.master, nodes: project.master.nodes.map((n) => (ids.has(n.id) ? fn(n as Node) : n)) } };
+}
+
+/** Move a slide node into the project's master nodes (it then shows on every slide). */
+export function moveToMaster(project: Project, slideId: string, nodeId: string): Project {
+  const slide = project.slides.find((s) => s.id === slideId);
+  const node = (slide?.nodes ?? []).find((n) => n.id === nodeId) as Node | undefined;
+  if (!slide || !node) return project;
+  const slides = project.slides.map((s) => (s.id === slideId ? { ...s, nodes: (s.nodes ?? []).filter((n) => n.id !== nodeId) } : s));
+  return { ...project, slides: slides as Project["slides"], master: { ...(project.master ?? {}), nodes: [...(project.master?.nodes ?? []), node] } };
+}
+
+/** Move a master node back onto one slide (appended to its nodes). */
+export function moveToSlide(project: Project, slideId: string, nodeId: string): Project {
+  const node = masterNodes(project).find((n) => n.id === nodeId);
+  if (!node || !project.slides.some((s) => s.id === slideId)) return project;
+  const rest = masterNodes(project).filter((n) => n.id !== nodeId);
+  const out: Project = { ...project, master: { ...(project.master ?? {}), nodes: rest } };
+  if (!rest.length) delete out.master;
+  return updateSlide(out, slideId, (s) => ({ ...s, nodes: [...(s.nodes ?? []), node] as Slide["nodes"] }));
 }
 
 export interface NodeRef {
@@ -54,6 +107,8 @@ export function findNode(project: Project, nodeId: string): NodeRef | null {
     const index = nodes.findIndex((n) => n.id === nodeId);
     if (index >= 0) return { slide, slideIndex: si, node: nodes[index] as Node, index };
   }
+  const mi = masterNodes(project).findIndex((n) => n.id === nodeId);
+  if (mi >= 0) return { slide: { id: "master", nodes: project.master!.nodes }, slideIndex: -1, node: masterNodes(project)[mi], index: mi };
   return null;
 }
 
@@ -85,6 +140,7 @@ export function updateSlide(project: Project, slideId: string, fn: (s: Slide) =>
   return hit ? { ...project, slides } : project;
 }
 
+/** Update nodes by id on a slide; a master node's id (shown there) updates the master node. */
 export function updateNodes(
   project: Project,
   slideId: string,
@@ -92,19 +148,27 @@ export function updateNodes(
   fn: (n: Node) => Node,
 ): Project {
   const set = new Set(ids);
-  return updateSlide(project, slideId, (s) => ({
+  const next = updateSlide(project, slideId, (s) => ({
     ...s,
     nodes: (s.nodes ?? []).map((n) => (set.has(n.id) ? fn(n as Node) : n)),
   }));
+  return updateMasterNodes(next, set, fn);
 }
 
 export function hasBox(n: Node): n is Exclude<Node, RenderNode> {
   return n.layer !== "render";
 }
 
+/** Remove nodes by id from a slide; a master node's id removes it from the master (every slide). */
 export function removeNodes(project: Project, slideId: string, ids: Iterable<string>): Project {
   const set = new Set(ids);
-  return updateSlide(project, slideId, (s) => ({ ...s, nodes: (s.nodes ?? []).filter((n) => !set.has(n.id)) }));
+  let out = updateSlide(project, slideId, (s) => ({ ...s, nodes: (s.nodes ?? []).filter((n) => !set.has(n.id)) }));
+  if (out.master?.nodes?.some((n) => set.has(n.id))) {
+    const nodes = out.master.nodes.filter((n) => !set.has(n.id));
+    out = { ...out, master: { ...out.master, nodes } };
+    if (!nodes.length) delete (out as { master?: unknown }).master;
+  }
+  return out;
 }
 
 // --- box math ------------------------------------------------------------------------------
@@ -301,7 +365,16 @@ export function pasteNodes(project: Project, slideId: string, nodes: Node[]): { 
     onSlide,
   );
   for (const n of copies) {
-    if (n.layer !== "render") continue;
+    if (n.layer !== "render") {
+      // a flow group is per slide: membership only survives where the group exists
+      if (n.layout?.group && !slide.groups?.[n.layout.group]) {
+        const layout = { ...n.layout };
+        delete layout.group;
+        if (Object.keys(layout).length) n.layout = layout;
+        else delete n.layout;
+      }
+      continue;
+    }
     const obj = objects.find((o) => o.id === n.data.object)!;
     if (!used.has(obj.id)) {
       used.add(obj.id);
@@ -428,9 +501,14 @@ export function coversCanvas(n: Node): n is GroundNode {
   return b.x <= e && b.y <= e && b.x + b.w >= 100 - e && b.y + b.h >= 100 - e && (b.rotation ?? 0) % 360 === 0 && (b.opacity ?? 1) >= 1;
 }
 
-/** The slide's back full-canvas background node, if any. */
+/** The slide's back full-canvas background node, if any (its own, not a master's). */
 export function slideBackground(slide: Slide): GroundNode | undefined {
   return (slide.nodes ?? []).find(coversCanvas);
+}
+
+/** The background a slide shows: a master's full-canvas ground node, else its own. */
+export function effectiveBackground(project: Project, slide: Slide): GroundNode | undefined {
+  return masterNodesFor(project, slide).find(coversCanvas) ?? slideBackground(slide);
 }
 
 export function addSlide(project: Project, afterId?: string): { project: Project; id: string } {
@@ -439,9 +517,10 @@ export function addSlide(project: Project, afterId?: string): { project: Project
   let id = `s${n}`;
   while (taken.has(id)) id = `s${++n}`;
   const ref = project.slides.find((s) => s.id === afterId) ?? project.slides[project.slides.length - 1];
-  // The new slide starts with the same full-canvas background as the one it follows.
+  // The new slide starts with the same full-canvas background as the one it follows, unless a
+  // master background already covers every slide.
   const nodeIds = allNodeIds(project);
-  const back = ref ? slideBackground(ref) : undefined;
+  const back = ref && !masterNodes(project).some(coversCanvas) ? slideBackground(ref) : undefined;
   const nodes: Node[] = back ? [{ ...back, id: freshId(`${id}-background`, nodeIds), name: back.name || "Background" }] : [];
   const slide: Slide = { id, name: `Slide ${project.slides.length + 1}`, nodes };
   const at = afterId ? project.slides.findIndex((s) => s.id === afterId) + 1 : project.slides.length;

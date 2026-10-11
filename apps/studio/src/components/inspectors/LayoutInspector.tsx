@@ -7,7 +7,7 @@
 import type { AlignTo, Layout, Node, Pin, Pins, Stack, TypeNode } from "@xds/protocol";
 import { stackOf } from "@xds/protocol";
 import { PIN_EDGES, type Edge } from "@xds/editor-core";
-import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
+import { nodeLabel, slideNodes, useActiveSlide, useStudio } from "../../store";
 import { Checkbox, MIXED, NumberField, Row, Section, Segmented, Select, shared } from "../ui";
 
 type BoxNode = Exclude<Node, { layer: "render" }>;
@@ -200,17 +200,50 @@ function StackRows({ node, others }: { node: BoxNode; others: BoxNode[] }) {
   );
 }
 
+function GroupRow({ nodes }: { nodes: BoxNode[] }) {
+  const slide = useActiveSlide();
+  const readOnly = useStudio((s) => s.readOnly);
+  const { patchLayout, groupSelection } = useStudio.getState();
+  const names = Object.keys(slide?.groups ?? {});
+  const cur = shared(nodes, (n) => n.layout?.group);
+  return (
+    <Row label="Group" hint="a flow group lays its members out in a column or row (Cmd/Ctrl + G)">
+      <div className="field-grid">
+        <Select
+          value={cur === MIXED ? MIXED : cur}
+          noneLabel="None"
+          options={names.map((g) => ({ value: g, label: `${g} · ${slide!.groups![g].direction ?? "column"}` }))}
+          disabled={readOnly}
+          onChange={(v) =>
+            patchLayout(
+              nodes.map((n) => n.id),
+              (l) => ({ ...(l ?? {}), group: v ?? undefined }),
+            )
+          }
+        />
+        {nodes.length > 1 && !cur && (
+          <button type="button" className="btn small" disabled={readOnly} onClick={() => groupSelection("column")}>
+            Group
+          </button>
+        )}
+      </div>
+    </Row>
+  );
+}
+
 export function LayoutInspector({ nodes }: { nodes: BoxNode[] }) {
   const slide = useActiveSlide();
+  const project = useStudio((s) => s.project);
   const readOnly = useStudio((s) => s.readOnly);
   const { patchLayout } = useStudio.getState();
   const single = nodes.length === 1 ? nodes[0] : null;
-  const others = nodesOf(slide).filter((n): n is BoxNode => n.layer !== "render" && !nodes.some((s) => s.id === n.id));
+  const others = slideNodes(project, slide).filter((n): n is BoxNode => n.layer !== "render" && !nodes.some((s) => s.id === n.id));
   const fit = shared(nodes, (n) => (n.layer === "type" ? n.layout?.fit === "text" : false));
   const allText = nodes.every((n) => n.layer === "type");
   return (
     <Section title="Layout" defaultOpen={nodes.some((n) => n.layout || (n.layer === "type" && n.data.stack))}>
       <div className="muted small">Relations resolve into the box; dragging a related block edits its offset or gap.</div>
+      <GroupRow nodes={nodes} />
       <PinRows nodes={nodes} />
       {single && <AlignRows node={single} others={others} />}
       {single && <StackRows node={single} others={others} />}

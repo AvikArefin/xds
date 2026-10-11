@@ -53,6 +53,7 @@ class Block:
     rect: R
     node: MeasuredNode | None = None
     ids: list[str] = field(default_factory=list)  # node ids (several for the subject)
+    flow_group: str | None = None  # the source node's `layout.group` (a flow group), when set
 
     @property
     def level(self) -> str | None:
@@ -60,7 +61,8 @@ class Block:
 
     @property
     def group(self) -> str | None:
-        return self.node.group if self.node else None
+        """The group the spacing rules reason about: `layout.group` first, then `data.group`."""
+        return self.flow_group or (self.node.group if self.node else None)
 
 
 class MeasuredSlide:
@@ -75,7 +77,7 @@ class MeasuredSlide:
         self.position = position  # 1-based
         self.width, self.height = measure.width, measure.height
         self.memo: dict[str, Any] = {}  # rules sharing expensive results (e.g. contrast scores)
-        self._sources = {n.id: n for n in slide.nodes}
+        self._sources = {n.id: n for n in project.effective_nodes(slide)}
 
     # --- identity ------------------------------------------------------------------------
     @property
@@ -92,6 +94,11 @@ class MeasuredSlide:
 
     def node(self, node_id: str) -> MeasuredNode | None:
         return next((n for n in self.measure.nodes if n.id == node_id), None)
+
+    def _flow_group(self, node_id: str) -> str | None:
+        src = self._sources.get(node_id)
+        layout = getattr(src, "layout", None)
+        return getattr(layout, "group", None) if layout is not None else None
 
     # --- nodes -----------------------------------------------------------------------------
     @cached_property
@@ -166,7 +173,7 @@ class MeasuredSlide:
     @cached_property
     def blocks(self) -> list[Block]:
         """Every visible non-ground element: text blocks, images, and the subject as one block."""
-        out = [Block(n.id, self.name(n.id), n.layer, self.ink(n), n, [n.id])
+        out = [Block(n.id, self.name(n.id), n.layer, self.ink(n), n, [n.id], self._flow_group(n.id))
                for n in self.measure.nodes if n.layer in ("type", "image") and (n.lines or n.layer == "image")]
         if self.subject_block:
             out.append(self.subject_block)

@@ -304,6 +304,12 @@
   stroke-dasharray: 2 2;
   opacity: 0.6;
 }
+.overlay.relations .rel-group {
+  fill: none;
+  stroke: var(--accent);
+  stroke-dasharray: 6 4;
+  opacity: 0.7;
+}
 .overlay.relations .rel-label {
   fill: var(--accent);
   font-family: var(--mono);
