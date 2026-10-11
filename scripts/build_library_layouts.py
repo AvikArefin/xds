@@ -245,9 +245,10 @@ L["thumbnail"] = {
              letterSpacing=0.08),
         text("headline", "headline", "headline", 60, 40, layout={**pin(left="margin", right="two-thirds", cy="center"), **FIT},
              scale=1.4, uppercase=True, wrap="balance", lineHeight=0.95,
-             variants={"portrait": {"layout": {"pin": {"left": M, "right": M, "top": {"to": "margin", "offset": 6}}},
+             # the base pins the center (cy); an edge pin on the same axis must drop it (null deletes)
+             variants={"portrait": {"layout": {"pin": {"left": M, "right": M, "top": {"to": "margin", "offset": 6}, "cy": None}},
                                     "data": {"scale": 1.1}},
-                       "story": {"layout": {"pin": {"left": M, "right": M, "top": {"to": "safe", "offset": 2}}},
+                       "story": {"layout": {"pin": {"left": M, "right": M, "top": {"to": "safe", "offset": 2}, "cy": None}},
                                  "data": {"scale": 1.0}}}),
     ]}
 

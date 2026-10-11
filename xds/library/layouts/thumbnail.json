@@ -110,7 +110,8 @@
               "top": {
                 "to": "margin",
                 "offset": 6
-              }
+              },
+              "cy": null
             }
           },
           "data": {
@@ -129,7 +130,8 @@
               "top": {
                 "to": "safe",
                 "offset": 2
-              }
+              },
+              "cy": null
             }
           },
           "data": {
