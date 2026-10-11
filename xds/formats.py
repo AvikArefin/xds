@@ -248,8 +248,29 @@ def parse_size(text: str) -> tuple[int, int]:
     return int(m.group(1)), int(m.group(2))
 
 
-def format_guide_text(g: Guide, contrast: str | None = None) -> str:
-    """The `xds guide` table (design-rules §1.3). `contrast` is the Lc line from the thresholds."""
+def expression_text(e: Any) -> str:
+    """One line for `xds guide`: the brand's expression system (design-rules §8)."""
+    parts = []
+    if e.angles:
+        parts.append("angles " + "/".join(f"{a:g}°" for a in e.angles))
+    if e.skews:
+        parts.append("skews " + "/".join(f"{a:g}°" for a in e.skews))
+    if e.stroke_widths:
+        parts.append("strokes " + "/".join(f"{w:g}u" for w in e.stroke_widths))
+    if e.extrude_angle is not None:
+        parts.append(f"extrude {e.extrude_angle:g}°")
+    if e.radii:
+        parts.append("radii " + "/".join(f"{r:g}u" for r in e.radii))
+    if e.ornaments:
+        parts.append("ornaments " + ", ".join(e.ornaments))
+    if e.max_treatments:
+        parts.append(f"≤ {e.max_treatments} treatments per slide")
+    return " · ".join(parts) or "declared, empty"
+
+
+def format_guide_text(g: Guide, contrast: str | None = None, expression: str | None = None) -> str:
+    """The `xds guide` table (design-rules §1.3). `contrast` is the Lc line from the thresholds,
+    `expression` the brand's expression system when it declares one."""
     if g.preset == GENERIC:
         viewed = "custom size, shown 1:1; for a platform, use its preset from `xds formats`"
     elif g.view_width:
@@ -280,4 +301,6 @@ def format_guide_text(g: Guide, contrast: str | None = None) -> str:
         f"subject      height {g.subject_height[0]:.0f}–{g.subject_height[1]:.0f}% of canvas · "
         "keep 1u clear of text",
     ]
+    if expression:
+        lines.append(f"expression   {expression}")
     return "\n".join(lines)

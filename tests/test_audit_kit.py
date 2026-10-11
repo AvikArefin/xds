@@ -15,7 +15,7 @@ from PIL import Image
 from xds.audit import engine
 from xds.models import AuditReport, Project
 
-LEVEL_ROLES = ("display", "headline", "subhead", "body", "caption")
+LEVEL_ROLES = ("expressive", "display", "headline", "subhead", "body", "caption")
 
 
 def rgb(hex_color: str) -> tuple[int, int, int]:
@@ -43,6 +43,8 @@ class Case:
         self.subject: dict[str, Any] | None = None
         self.screens: list[dict[str, Any]] = []
         self.project_screens: list[dict[str, Any]] = []
+        self.expression: dict[str, Any] | None = None   # brand.expression
+        self.lighting: dict[str, Any] | None = None     # the slide's lighting override
 
     # --- content ----------------------------------------------------------------------------
     def _box(self, x: float, y: float, w: float, h: float) -> dict[str, float]:
@@ -53,9 +55,11 @@ class Case:
              weight: int = 700, line_height: float | None = None, align: str = "left",
              group: str | None = None, decorative: bool = False, uppercase: bool = False,
              letter_spacing: float = 0.0, overflow: bool = False, font: str = "Inter",
-             exceptions: list[dict[str, str]] | None = None, source: str | None = None) -> None:
-        """A text node; `source` is data.text (default: the lines joined with explicit breaks)."""
-        lh = line_height or {"display": 1.0, "headline": 1.1, "subhead": 1.2}.get(level, 1.45) * size
+             exceptions: list[dict[str, str]] | None = None, source: str | None = None,
+             rotation: float = 0, treat: dict[str, Any] | None = None) -> None:
+        """A text node; `source` is data.text (default: the lines joined with explicit breaks).
+        `treat` adds fields to data (skew, stroke, extrude, …); `rotation` sets box.rotation."""
+        lh = line_height or {"expressive": 0.9, "display": 1.0, "headline": 1.1, "subhead": 1.2}.get(level, 1.45) * size
         rects, mlines = [], []
         for i, text in enumerate(lines):
             w = widths[i] if widths else len(text) * size * 0.5
@@ -72,7 +76,11 @@ class Case:
             data["group"] = group
         if decorative:
             data["decorative"] = True
+        if treat:
+            data.update(treat)
         node = {"id": id, "name": id.title(), "layer": "type", "box": self._box(x, y, bw, bh), "data": data}
+        if rotation:
+            node["box"]["rotation"] = rotation
         if exceptions:
             node["exceptions"] = exceptions
         self.nodes.append(node)
@@ -88,6 +96,23 @@ class Case:
         self.masks["image"][y:y + h, x:x + w] = 255
         self.nodes.append({"id": id, "name": id.title(), "layer": "image", "box": self._box(x, y, w, h),
                            "data": {"asset": "photo"}})
+        self.measured.append({"id": id, "layer": "image", "box": {"x": x, "y": y, "w": w, "h": h}})
+
+    def shape(self, id: str, x: int, y: int, w: int, h: int, shape: str = "star-8", *,
+              stroke: float | None = 0.5, fill: str | None = None, params: dict[str, float] | None = None,
+              rotation: float = 0) -> None:
+        """An ornament on the image layer (nothing is drawn: the expression rules read the source)."""
+        data: dict[str, Any] = {"shape": shape}
+        if stroke is not None:
+            data["stroke"] = {"width": stroke}
+        if fill:
+            data["fill"] = fill
+        if params:
+            data["params"] = params
+        node = {"id": id, "name": id.title(), "layer": "image", "box": self._box(x, y, w, h), "data": data}
+        if rotation:
+            node["box"]["rotation"] = rotation
+        self.nodes.append(node)
         self.measured.append({"id": id, "layer": "image", "box": {"x": x, "y": y, "w": w, "h": h}})
 
     def product(self, x: int, y: int, w: int, h: int, *, color: str | np.ndarray = "#808080",
@@ -111,6 +136,8 @@ class Case:
             slide["exceptions"] = slide_exceptions
         if getattr(self, "camera", None):
             slide["camera"] = self.camera
+        if self.lighting:
+            slide["lighting"] = self.lighting
         doc: dict[str, Any] = {
             "id": "test", "name": "Test",
             "format": {"preset": self.preset, "width": self.w, "height": self.h},
@@ -123,6 +150,8 @@ class Case:
         }
         if rules:
             doc["rules"] = rules
+        if self.expression:
+            doc["brand"]["expression"] = self.expression
         return Project.model_validate(doc)
 
     def write(self) -> Path:

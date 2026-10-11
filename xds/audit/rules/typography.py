@@ -1,4 +1,6 @@
-"""Typography (design-rules §4.3). Decorative text is exempt from these rules."""
+"""Typography (design-rules §4.3). Decorative text is exempt from these rules, and `expressive`
+lettering from the measure and rag rules (LINE_LENGTH, WIDOW, BAD_RAG): it is a graphic, judged
+by the expression rules (§8) instead."""
 
 from __future__ import annotations
 
@@ -166,7 +168,7 @@ def line_length(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """
     for n in s.reading_text:
         band = t.band(n.level)
-        if not band:
+        if not band or n.level == "expressive":
             continue
         lo, hi = band.chars
         lines = n.lines or []
@@ -238,7 +240,7 @@ def widow(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """
     for n in s.reading_text:
         lines = n.lines
-        if len(lines) < 2:
+        if len(lines) < 2 or n.level == "expressive":
             continue
         last = lines[-1]
         longest = max(line.rect.w for line in lines)
@@ -266,7 +268,7 @@ def widow(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
 def bad_rag(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """An uneven edge: in left/right-aligned text, a short non-final line breaks the shape."""
     for n in s.reading_text:
-        if n.align == "center" or len(n.lines) < 3:
+        if n.align == "center" or len(n.lines) < 3 or n.level == "expressive":
             continue
         longest = max(line.rect.w for line in n.lines)
         short = [line for line in n.lines[:-1] if line.rect.w < t["ragRatio"] * longest]

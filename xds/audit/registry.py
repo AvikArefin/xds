@@ -91,4 +91,4 @@ def catalog(guide: Any, overrides: dict[str, Any] | None = None) -> list[dict[st
 
 
 # Register every rule (each module's decorators run on import).
-from .rules import collision, composition, contrast, spacing, subject, typography  # noqa: E402,F401
+from .rules import collision, composition, contrast, expression, spacing, subject, typography  # noqa: E402,F401

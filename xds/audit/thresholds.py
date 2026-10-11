@@ -132,6 +132,19 @@ KEYS: list[Key] = [
         "read as text rather than texture.", "px"),
     Key("screen.texelRatio", _c(1.5), "Fewer than 1.5 texture pixels per slide pixel looks soft.",
         "ratio"),
+    # --- expression (design-rules §8) --------------------------------------------------------
+    Key("expression.maxTreatments", _c(2), "A slide carries at most two kinds of treatment (skew, "
+        "outline, extrusion, repeat, plate, rotation, ornaments); more reads as effects.", "count"),
+    Key("expression.angleTolerance", _c(3), "Rotations and skews within 3° are the same angle "
+        "(optical corrections); further apart they are two angles.", "°"),
+    Key("expression.extrudeTolerance", _c(10), "Extrusion directions within 10° read as one light; "
+        "further apart the shadows disagree.", "°"),
+    Key("expression.strokeStep", _c(0.25), "Stroke widths sit on a quarter-unit scale, so outlines "
+        "and ornaments share a visible line weight.", "u"),
+    Key("expression.motifTolerance", _c(2), "An ornament within 2 px of a multiple of u is on the "
+        "spacing scale (shapes round to whole pixels).", "px"),
+    Key("expression.cover", _c(30), "Expressive lettering with more than 30 % of its line area under "
+        "other text can no longer be read as a word.", "%"),
 ]
 
 # Per-level type bands (design-rules §1.2), overridable as "<level>.size" etc.

@@ -63,6 +63,7 @@ on the target device.
 
 | Level | Default | Min | Max | Line height | At 1080 × 1350 (default / min / max) |
 | --- | --- | --- | --- | --- | --- |
+| `expressive` | 0.160 s | 0.075 s | 0.50 s | 0.70–1.10 | 173 / 81 / 540 px |
 | `display` | 0.110 s | 0.075 s | 0.20 s | 0.90–1.10 | 119 / 81 / 216 px |
 | `headline` | 0.065 s | 0.050 s | 0.09 s | 1.00–1.20 | 70 / 54 / 97 px |
 | `subhead` | 0.042 s | 0.032 s | 0.05 s | 1.10–1.35 | 45 / 35 / 54 px |
@@ -74,7 +75,9 @@ A role (or a text block) says its size either in px (`size`) or as a factor of t
 keeps its hierarchy without touching the roles.
 
 The band defaults form a scale with a ratio of about 1.25–1.7 between neighbors, so the
-default hierarchy is always clear.
+default hierarchy is always clear. `expressive` is lettering treated as a graphic (a poster
+word, a wordmark): a wide band, tight leading, no measure and at most two lines. The measure
+and rag rules let it go, and the coherence rules in §8 take over.
 
 ### 1.3 `xds guide`
 
@@ -85,6 +88,7 @@ unit u       8 px      spacing scale: 8 16 24 32 48 64 96 128
 margin m     64 px     content area: x 64–1016, y 64–1286
 safe zones   none
 type         level     default  min  max   line-height  max lines  chars/line
+             expressive 173     81   540   0.70–1.10    2          —
              display   119      81   216   0.90–1.10    2          —
              headline  70       54   97    1.00–1.20    3          ≤ 24
              subhead   45       35   54    1.10–1.35    3          ≤ 40
@@ -93,10 +97,12 @@ type         level     default  min  max   line-height  max lines  chars/line
 budget       ≤ 35 words per slide · ≤ 2 font families · ≤ 4 distinct sizes · ≤ 7 blocks
 contrast     text size > 66.5 px: Lc ≥ 45 · 44.3–66.5 px: Lc ≥ 60 · < 44.3 px: Lc ≥ 75 (60 at weight ≥ 600) (= 16 and 24 px on screen)
 subject      height 30–75% of canvas · keep 1u clear of text
+expression   angles 12° · strokes 0.5u · ornaments star-4, star-8, sparkle · ≤ 2 treatments per slide
 ```
 
-`--json` gives the same data in machine-readable form (plus `aspect` and `contrast`, the Lc
-minimums with their size cutoffs). `--slide ID` adds that slide's current measured values next to
+The `expression` line appears when the brand declares its expression system (§8). `--json` gives
+the same data in machine-readable form (plus `aspect`, `contrast`, the Lc minimums with their
+size cutoffs, and `expression`). `--slide ID` adds that slide's current measured values next to
 the targets. The contrast line is in this format's own px, the unit `data.size` is written in: the
 cutoffs are displayed sizes (16 and 24 px on the phone) divided by the format's view scale `k`.
 
@@ -202,6 +208,11 @@ from `thresholds.py` and scale with the format.
 | `MARGINS_UNEVEN` | info | left/right (or top/bottom) content margins differ by 5–25 % | intentional asymmetry is bigger than that |
 
 ### 4.3 Typography (`type`)
+
+Decorative text is exempt from this family. `expressive` lettering is exempt from `LINE_LENGTH`,
+`WIDOW` and `BAD_RAG` (it has no measure and no rag), and `CENTERED_LONG_TEXT` only ever looked
+at body and caption text; the size, line-count, line-height and hierarchy rules still apply to
+it, with the expressive band (§1.2). The expression rules (§8) judge it from there.
 
 | Rule | Severity | Fires when | Principle |
 | --- | --- | --- | --- |
@@ -368,3 +379,71 @@ Composition rules belong to the slide rather than a node, so `Slide.exceptions` 
 too. A waived finding stays in the report with `status: "waived"` and the reason, so the choice
 is visible to the next person or agent. It does not block export. Structural rules can't be
 waived.
+
+---
+
+## 8. Expression and coherence
+
+A poster word set at half the canvas, skewed, outlined, extruded and repeated, with stars and
+rings around it, is not chaos when it is a system: one angle, one slant, one line weight, one
+light, one family of ornaments. That is what the rules can check. Whether the system is
+beautiful they cannot, and they do not try.
+
+The principle: **every expressive move is declared as a treatment**, with numbers, in the source.
+The renderer draws what is declared, and the rules reason about what is declared. The limit is
+never how wild a design is; it is how much of it is undeclared. A flattened PNG of the poster is
+not checkable, and the audit says so by treating it as an image.
+
+### 8.1 The vocabulary
+
+Treatments live on a text node ([data models §2.5d](./data-models.md#25d-expressive-treatments-typedata-and-shapes-shapedata)),
+each a small object with its numbers in `u` or degrees: `skew`, `fill: "none"` with a `stroke`
+(outline text), `extrude` (depth, angle), `repeat` (count, offset), `plate` (padding, radius,
+stroke), `fitWidth`, and the `expressive` type level (§1.2) that lets the size run free. Ornaments
+are `ShapeData` nodes on the 2D layer (stars, sparkles, rings, lenses, ellipses, arcs, rects,
+lines, pluses, grids) with a stroke in `u` and a fill token. Rotation stays on the box, for any
+2D node. Imported art (a hand-drawn glyph, a texture) enters as an image and is checked only for
+what touches it.
+
+### 8.2 The expression system: `brand.expression`
+
+The project declares the few values its treatments draw from, the way it declares colors and
+type roles:
+
+```json
+"expression": {
+  "angles": [12],              "skews": [12],
+  "strokeWidths": [0.5, 1],    "extrudeAngle": 135,
+  "radii": [1],                "ornaments": ["star-4", "star-8", "sparkle"],
+  "maxTreatments": 2
+}
+```
+
+Declared, every rule below checks each node against the system and the fix names the nearest
+declared value. Absent, each rule infers the system from the slide and flags a second value.
+`xds guide` prints the declared system on an `expression` line.
+
+### 8.3 Rules (`expression`)
+
+Thresholds: `expression.angleTolerance` (3°), `expression.extrudeTolerance` (10°),
+`expression.strokeStep` (0.25 u), `expression.motifTolerance` (2 px), `expression.maxTreatments`
+(2), `expression.cover` (30 %), all overridable in `project.rules.set` (§5). Hidden nodes carry
+no treatment.
+
+| Rule | Severity | Fires when | Principle |
+| --- | --- | --- | --- |
+| `ANGLE_OFF_SYSTEM` | warn | a rotated block's angle family (−a and right angles to a count as a) is not among `expression.angles`; without a system, more than two families on a slide | one angle family per design |
+| `SKEW_MIXED` | warn | a skew not in `expression.skews`; without a system, more than one skew on a slide | one slant |
+| `STROKE_OFF_SCALE` | warn | a text, plate or ornament stroke not in `expression.strokeWidths`; without a system, a width off the quarter-unit scale, or more than two widths on a slide | one line weight |
+| `EXTRUDE_DIRECTION_MIXED` | warn | extrusions and directed repeats differ from `expression.extrudeAngle` (or from each other) by more than 10° | one light |
+| `EXTRUDE_AGAINST_LIGHT` | info | on a slide with a lit subject, a clearly horizontal extrusion falls towards the side the key light comes from (`lighting.angle − camera.yaw`) | shadows agree |
+| `ORNAMENT_FAMILY_MIXED` | warn | a shape not in `expression.ornaments`; without a system, shapes from more than one family (stars · rings · grids) | one family of motifs |
+| `MOTIF_SCALE_OFF` | info | an ornament's larger side is not a multiple of `u` (± 2 px), or a slide uses more than three ornament sizes | motifs on the spacing scale |
+| `RADIUS_OFF_SYSTEM` | info | a plate or rect corner radius not in `expression.radii`; without a system, more than two radii on a slide | one corner |
+| `TOO_MANY_TREATMENTS` | warn | more treatment kinds on a slide (skew, outline, extrude, repeat, plate, rotation, ornaments) than `expression.maxTreatments` | a few moves, made well |
+| `EXPRESSIVE_UNREADABLE` | error | an `expressive` block that is not `decorative` has more than 30 % of its line area under other text, or a `repeat` step or `extrude` depth larger than its line height | lettering is still a message |
+
+The floors never move: the collision, contrast, safe-zone and clipping rules judge expressive
+work on its pixels like anything else. These rules add the middle tier, coherence, which is what
+separates a system from a scatter of effects. The deliberate break still gets an exception (§7)
+with a reason, next to the node.

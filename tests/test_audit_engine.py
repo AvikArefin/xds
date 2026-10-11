@@ -115,7 +115,7 @@ def test_registry_catalog_and_keys():
 
 def test_every_rule_family_documented():
     assert {s.family for s in registry.RULES.values()} == {
-        "collision", "spacing", "type", "contrast", "composition", "subject"}
+        "collision", "spacing", "type", "contrast", "composition", "subject", "expression"}
 
 
 @pytest.mark.parametrize(("text", "bg", "lc"), [

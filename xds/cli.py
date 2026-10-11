@@ -111,7 +111,11 @@ def cmd_guide(a: argparse.Namespace, out: Out) -> int:
     t = Thresholds(guide, sets)
     data: dict[str, Any] = {"guide": {**guide.to_json(), "aspect": formats.aspect_label(guide.width, guide.height),
                                       "contrast": t.contrast_bands()}}
-    text = formats.format_guide_text(guide, t.contrast_text())
+    expression = project.brand.expression
+    if expression is not None:
+        data["guide"]["expression"] = expression.model_dump(mode="json", by_alias=True, exclude_none=True)
+    text = formats.format_guide_text(guide, t.contrast_text(),
+                                     formats.expression_text(expression) if expression else None)
     if a.slide:
         measured = slide_measured(loaded.root, project, a.slide, guide, out)
         data["slide"] = measured

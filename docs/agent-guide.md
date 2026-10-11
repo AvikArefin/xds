@@ -84,6 +84,38 @@ The full schema is in [data models](./data-models.md). The most common edits:
 `box` values are percentages of the format. `xds guide --json` also gives the margin and unit
 as percentages, so you don't have to convert by hand.
 
+### 2.0 Expressive type
+
+A poster word (skewed, outlined, extruded, repeated, with ornaments around it) is written as
+**treatments on the node**, never baked into an image, so the renderer draws it and the audit
+can check it. Declare the project's expression system first, then draw from it:
+
+```jsonc
+// brand: the few values every treatment and ornament uses (design-rules §8)
+"expression": { "angles": [12], "skews": [12], "strokeWidths": [0.5], "extrudeAngle": 135,
+                "ornaments": ["star-4", "star-8", "sparkle"], "maxTreatments": 2 }
+
+// a role at the expressive level: a wide size band, tight leading, no measure
+"shout": { "level": "expressive", "font": "Satoshi", "weight": 900, "lineHeight": 0.85 }
+
+// the word: rotated and skewed on the system's angle, with a stacked extrusion behind it
+{ "id": "shift", "name": "Shift", "layer": "type",
+  "box": { "x": 5.93, "y": 8, "w": 88, "h": 22, "rotation": -12 },
+  "data": { "text": "SHIFT", "role": "shout", "skew": 12,
+            "extrude": { "depth": 2, "angle": 135 } } }
+
+// an ornament on the 2D layer, stroked at the system's width, 8u across
+{ "id": "star", "name": "Star", "layer": "image",
+  "box": { "x": 70, "y": 10, "w": 5.93, "h": 4.74 },
+  "data": { "shape": "star-8", "stroke": { "width": 0.5 } } }
+```
+
+The expression rules check **coherence, not taste**: a second angle, a second skew, a stroke off
+the scale, extrusions in two directions, mixed ornament families or too many treatments on one
+slide are findings with the nearest system value as the fix. An `expressive` block that is meant
+to be read still must not be covered by other text (`EXPRESSIVE_UNREADABLE`); mark it
+`decorative` when the word is a graphic. `xds guide` prints the declared system.
+
 ### 2.1 The brand logo
 
 The cortextech logos ship with xds in `xds/library/brands/cortextech/` as transparent SVGs. Like the library models, **a project references them and never copies
