@@ -38,10 +38,12 @@ Rules of the road:
 - To retarget a finished deck to another format, `xds reflow PROJECT --format PRESET` (boxes
   relative to the margins, sizes to the new bands), then audit: it keeps proportions, not line
   breaks.
-- Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin. Stack text
-  blocks (`data.stack`, [data models §2.5](./data-models.md#25-node-the-editable-unit)) instead of
-  computing their y, and check wrapping with `xds measure` before rendering: a wide display face
-  wraps earlier than it looks.
+- Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin. Say it with
+  relations rather than coordinates ([data models §2.5a](./data-models.md#25a-layout-relations-that-resolve-to-a-box)):
+  pin a block's edge to the margin, align it with another block, stack it a gap below (or beside)
+  another block, and fit a text box to its text. A related layout survives a format change and
+  can't miss the margin by a pixel. Check wrapping with `xds measure` before rendering: a wide
+  display face wraps earlier than it looks.
 - One message per slide: one top-level text block, one subject.
 - A clean audit is not a realistic product. The product checks catch clipped highlights,
   crushed shadows and a lost silhouette; a flat, washed-out or plastic-looking product passes.
@@ -66,10 +68,22 @@ The full schema is in [data models](./data-models.md). The most common edits:
   "box": { "x": 5.93, "y": 4.74, "w": 60, "h": 18 },
   "data": { "text": "Light that\nfollows you", "role": "headline", "group": "intro" } }
 
-// the subhead, 3 units under the headline's last line, wherever that ends up
+// the same headline pinned to the margin: it stays there in every format (box.x/y are then written by the layout)
+{ "id": "h1", "name": "Headline", "layer": "type",
+  "box": { "x": 5.93, "y": 4.74, "w": 60, "h": 18 },
+  "layout": { "pin": { "left": { "to": "margin" }, "top": { "to": "margin" } }, "fit": "text" },
+  "data": { "text": "Light that\nfollows you", "role": "headline", "group": "intro" } }
+
+// the subhead, 3 units under the headline's last line, wherever that ends up, left edges shared
 { "id": "sub", "name": "Subhead", "layer": "type",
   "box": { "x": 5.93, "y": 0, "w": 60, "h": 10 },
-  "data": { "text": "…", "role": "subhead", "group": "intro", "stack": { "below": "h1", "gap": 3 } } }
+  "layout": { "stack": { "below": "h1", "gap": 3 }, "align": [{ "node": "h1", "edge": "left" }] },
+  "data": { "text": "…", "role": "subhead", "group": "intro" } }
+
+// the logo 2 units right of the headline's ink, pinned to the margin's bottom edge
+{ "id": "logo", "layer": "image", "box": { "x": 0, "y": 0, "w": 12, "h": 6 },
+  "layout": { "stack": { "rightOf": "h1", "gap": 2 }, "pin": { "bottom": { "to": "margin" } } },
+  "data": { "asset": "logo" } }
 
 // the product, on the right third, a bit smaller
 "camera": { "mode": "frame", "x": 64, "y": 58, "height": 50 }

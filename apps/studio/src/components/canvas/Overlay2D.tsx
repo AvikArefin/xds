@@ -10,6 +10,7 @@ import type { Box, Layer, Node } from "@xds/protocol";
 import { pxRectToBox, rectsBounds, snapMove, snapResize, snapTargets, type PxRect, type SnapLine } from "@xds/editor-core";
 import { boxBoundsPx, boxPx, nodesOf, pointInBox, useActiveSlide, useStudio } from "../../store";
 import { SnapLinesOverlay } from "./Overlays";
+import { RelationsOverlay } from "./RelationsOverlay";
 
 type BoxNode = Exclude<Node, { layer: "render" }>;
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
@@ -295,6 +296,7 @@ export function Overlay2D({ layer, W, H, zoom }: { layer: Layer; W: number; H: n
       onPointerLeave={() => setHoverId(null)}
     >
       <SnapLinesOverlay lines={snapLines} W={W} H={H} zoom={z} />
+      {selected.length > 0 && <RelationsOverlay ids={selected.map((n) => n.id)} W={W} H={H} zoom={z} />}
       {hover && outline(hover, "hover-box", false)}
       {selected.map((n) =>
         outline(n, `sel-box${locked[n.id] ? " locked" : ""}`, selected.length === 1 && !readOnly && !locked[n.id]),

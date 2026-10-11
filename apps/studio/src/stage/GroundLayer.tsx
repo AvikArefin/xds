@@ -5,7 +5,7 @@
  */
 import { useMemo } from "react";
 import type { GroundNode, Project } from "@xds/protocol";
-import { boxToPx } from "@xds/editor-core";
+import { boxToPx, type LayoutPlacement } from "@xds/editor-core";
 import { fallbackSubject, resolveDesign, type SubjectLayout } from "../design/resolve";
 import type { DesignInfo } from "../types";
 import { useFailure, usePending } from "./readiness";
@@ -18,10 +18,13 @@ interface GroundBoxProps {
   subject: SubjectLayout | null | undefined;
   width: number;
   height: number;
+  /** The stage's resolved rect for this node, when a relation decided it. */
+  placement?: LayoutPlacement;
 }
 
-function GroundBox({ node, project, designs, subject, width, height }: GroundBoxProps) {
-  const b = boxToPx(node.box, { width, height });
+function GroundBox({ node, project, designs, subject, width, height, placement }: GroundBoxProps) {
+  const own = boxToPx(node.box, { width, height });
+  const b = placement ? { ...own, ...placement.rect } : own;
   const design = designs[node.data.design];
   const effective = subject ?? fallbackSubject(width, height);
   const local: SubjectLayout = {
@@ -78,12 +81,12 @@ function GroundBox({ node, project, designs, subject, width, height }: GroundBox
   );
 }
 
-export function GroundLayer(props: Omit<GroundBoxProps, "node"> & { nodes: GroundNode[] }) {
-  const { nodes, ...rest } = props;
+export function GroundLayer(props: Omit<GroundBoxProps, "node" | "placement"> & { nodes: GroundNode[]; placements?: Map<string, LayoutPlacement> }) {
+  const { nodes, placements, ...rest } = props;
   return (
     <>
       {nodes.map((n) => (
-        <GroundBox key={n.id} node={n} {...rest} />
+        <GroundBox key={n.id} node={n} placement={placements?.get(n.id)} {...rest} />
       ))}
     </>
   );

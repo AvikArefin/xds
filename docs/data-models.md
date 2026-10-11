@@ -652,10 +652,11 @@ A zustand store with the `zundo` middleware for undo and redo, split into slices
 | `jobs` | running/finished exports with their progress lines |
 
 Undo history covers `document.project` only. `dirty` is `project !== savedProject`.
-`stackLayout` holds where the active slide's stacked text blocks landed, as the type layer reports
-it; it is view state (never saved, not in undo). When it changes, the stacked nodes' `box.y` is
-updated in `project` and `savedProject` alike, without an undo step and without making the
-document dirty. There is no
+`layout` holds where the active slide's related nodes landed (pins, aligns, stacks, fit: every
+decided box field, with the line, anchor edge or stack base that decided it), as the stage reports
+it; it is view state (never saved, not in undo). When it changes, the decided fields of those nodes'
+`box` are updated in `project` and `savedProject` alike (`syncLayout`), without an undo step and
+without making the document dirty. There is no
 per-path pending-edit ledger and no three-way rebase (see [dataflow §2](./dataflow.md#2-input-an-agent-editing-files)): the file on disk is the
 truth, and an outside change simply reloads.
 

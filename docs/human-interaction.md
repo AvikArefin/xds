@@ -30,7 +30,7 @@ editor.
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
-| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields (Text adds **Wrap** and **Stack**). |
+| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (pins, align to, stack, fit to text) and its layer's fields (Text adds **Wrap**). |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
 layer on the canvas only, so you can work on what's under it; it is never saved, and exports
@@ -68,6 +68,7 @@ Shortcuts are ignored while typing in a field.
 | `Cmd/Ctrl + C` · `V` | copy the selection (or, with nothing selected, the slide) · paste |
 | arrows | nudge: 2D 1 px (`Shift`: `u`); 3D 1 cm (`Shift`: 10 cm) |
 | `Escape` | close the palette or a list; clear the selection |
+| drag a related block | edits its relation instead of its box: a stack's gap, a pin's or align's offset (whole units while Snap is on); a side the layout sizes snaps back |
 
 3D viewport: **left-drag** orbits (`yaw`/`pitch`), **right-drag** moves the product on the canvas
 (`x`/`y`), **scroll** resizes it (`height`), **`L` + drag** swings the light (`angle`/`elevation`),
@@ -108,10 +109,18 @@ reloads from disk. Undo has one step per drag or field change.
   then `2` → **+ New text…** → a role. Drag it, or type in the inspector; edges snap to the margin,
   the grid and other blocks. **Wrap**: Balance evens out a headline's lines, Pretty avoids a lone
   last word.
-- **Stack text**: Text inspector → **Stack** → *Below …* (or *Above …*) another block, and a
-  **Gap** in units. The block then follows that block's last line wherever it wraps. Dragging it
-  up or down, nudging it or typing its Y changes the gap instead (whole units while Snap is on).
-  **Free (box Y)** releases it where it is.
+- **Pin and align**: the inspector's **Layout** section ties a block's box to something that
+  survives a format change. **Pins** put an edge (or the center) on a line of the format: the
+  margin, the safe zone, the canvas edge, the center or a third, plus an offset in units; pin
+  both edges of an axis and the box is sized by them. **Align X / Y** shares an edge with another
+  block (its left, center or right; top, middle or bottom), with an offset. **Stack** places the
+  block a **Gap** in units *Below*, *Above*, *Right of* or *Left of* another block, ink to ink,
+  so it follows that block's last line wherever it wraps. **Fit to text** (Text only) makes the
+  box as tall as its lines. The canvas shows the selection's relations: a tick on the pinned
+  line, a dotted line to the aligned edge, a line to the stack anchor with the gap. Dragging,
+  nudging or typing a coordinate of a related block edits its gap or offset instead (whole units
+  while Snap is on); a side the layout sizes snaps back. **Free** drops a relation and leaves the
+  box where it is.
 - **Background**: there is no page color. Each slide's back Background node covers the canvas, and
   new slides copy the previous slide's. To change it: `5`, select it, change its design or knobs.
   **+ New background…** adds a project design or a starter on top. The audit reports

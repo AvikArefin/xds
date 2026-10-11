@@ -2,14 +2,15 @@
  * The type layer: plain DOM text with @font-face rules for the project's font files. Font
  * loading is awaited (`document.fonts.load`) and reported as pending ("fonts: Satoshi 700").
  *
- * Stacked blocks (`data.stack`) are placed after layout: each block's ink is measured relative to
- * its box, `resolveStacks` turns the stack gaps into tops, and the blocks are moved there before
- * the frame is painted. Until fonts have loaded and the tops are known, "layout: stacked text" is
- * pending, so a render never captures a block in its unstacked place.
+ * Layout relations (stacks, aligns, pins, fit) are resolved by the stage (`SlideStage`): this
+ * layer lays the text out at its placed rect, measures each block's ink relative to its box
+ * (and its content height) once the fonts are in, and reports it with `onInk`. While the slide
+ * has relations and the ink for the current layout has not been reported, "layout: relations"
+ * is pending, so a render never captures a block in an unresolved place.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { ImageNode, Project, TypeNode } from "@xds/protocol";
-import { boxToPx, resolveStacks, type StackItem, type StackPlacement } from "@xds/editor-core";
+import type { Project, TypeNode } from "@xds/protocol";
+import { boxToPx, type LayoutPlacement } from "@xds/editor-core";
 import { fileUrl } from "../api";
 import type { Guide } from "../types";
 import { inkExtent } from "./ink";
@@ -66,32 +67,36 @@ function FontLoad({ req }: { req: FontReq }) {
   return null;
 }
 
+/** What the stage needs from a laid-out text block to resolve relations. */
+export interface TextInk {
+  /** Ink extent relative to the box, px. */
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+  /** The laid-out text's height, px. */
+  contentHeight: number;
+}
+
 export interface TypeLayerProps {
   project: Project;
   nodes: TypeNode[];
-  /** The slide's visible image nodes: stack anchors (their box). */
-  images?: ImageNode[];
   background: string | null;
   guide?: Guide | null;
   width: number;
   height: number;
   overlay?: ReactNode;
-  /** Called with the resolved stacked blocks whenever they change (the editor's handles follow them). */
-  onLayout?: (placements: Map<string, StackPlacement>) => void;
+  /** The stage's resolved placements (every 2D node with a decided field). */
+  placements?: Map<string, LayoutPlacement>;
+  /** True when the slide has layout relations: the ink is measured and reported, and pending until it is. */
+  needsInk?: boolean;
+  /** Called with every text block's ink for the current layout, keyed by the layout key. */
+  onInk?: (ink: Map<string, TextInk>, key: string) => void;
 }
 
 /** The spacing unit stacks are measured in: the guide's, else the format's default (s / 135). */
 export function stackUnit(project: Project, guide?: Guide | null): number {
   return guide?.u ?? Math.max(4, Math.round(Math.min(project.format.width, project.format.height) / 135));
-}
-
-function samePlacements(a: Map<string, StackPlacement>, b: Map<string, StackPlacement>): boolean {
-  if (a.size !== b.size) return false;
-  for (const [id, p] of a) {
-    const q = b.get(id);
-    if (!q || Math.abs(q.top - p.top) > 0.01 || Math.abs(q.base - p.base) > 0.01 || q.dir !== p.dir) return false;
-  }
-  return true;
 }
 
 export function typeTextStyle(s: EffectiveTypeStyle, align: string | undefined): CSSProperties {
@@ -114,7 +119,12 @@ export function typeTextStyle(s: EffectiveTypeStyle, align: string | undefined):
   };
 }
 
-export function TypeLayer({ project, nodes, images, background, guide, width, height, onLayout }: TypeLayerProps) {
+/** The key of a text layout: what changes the ink of a block relative to its box (width, text, style). */
+export function textLayoutKey(nodes: TypeNode[], styles: EffectiveTypeStyle[], widths: number[]): string {
+  return JSON.stringify(nodes.map((n, i) => [n.id, widths[i], n.data.text, n.data.align, n.data.valign, styles[i]]));
+}
+
+export function TypeLayer({ project, nodes, background, guide, width, height, placements, needsInk, onInk }: TypeLayerProps) {
   const styled = useMemo(
     () => nodes.map((n) => ({ node: n, style: effectiveTypeStyle(n.data, project, background, guide) })),
     [nodes, project, background, guide],
@@ -132,59 +142,38 @@ export function TypeLayer({ project, nodes, images, background, guide, width, he
     return [...m.values()];
   }, [styled]);
 
-  // --- stacked blocks ---------------------------------------------------------------------
-  const els = useRef(new Map<string, HTMLDivElement>());
-  const u = stackUnit(project, guide);
-  const stacked = nodes.some((n) => n.data.stack);
-  const layoutKey = useMemo(
+  // --- placed rects and ink ---------------------------------------------------------------
+  const rects = useMemo(
     () =>
-      stacked
-        ? JSON.stringify([
-            styled.map(({ node, style }) => [node.id, node.box, node.data.text, node.data.stack, node.data.valign, style]),
-            (images ?? []).map((n) => [n.id, n.box]),
-            width,
-            height,
-            u,
-          ])
-        : "",
-    [stacked, styled, images, width, height, u],
+      nodes.map((n) => {
+        const b = boxToPx(n.box, { width, height });
+        const p = placements?.get(n.id);
+        return p ? { ...b, ...p.rect } : b;
+      }),
+    [nodes, placements, width, height],
   );
-  const [placements, setPlacements] = useState<Map<string, StackPlacement>>(() => new Map());
+  const els = useRef(new Map<string, HTMLDivElement>());
+  const measure = !!needsInk;
+  const layoutKey = useMemo(
+    () => (measure ? textLayoutKey(nodes, styled.map((s) => s.style), rects.map((r) => r.w)) : ""),
+    [measure, nodes, styled, rects],
+  );
   const [fontTick, setFontTick] = useState(0);
-  const [laidOut, setLaidOut] = useState<string | null>(null);
+  const [reported, setReported] = useState<string | null>(null);
   const key = `${layoutKey}|${fontTick}`;
-  usePending("layout:stack", "layout: stacked text", stacked && laidOut !== key);
+  usePending("layout:relations", "layout: relations", measure && reported !== key);
 
   useEffect(() => {
-    if (!stacked) return;
+    if (!measure) return;
     const bump = () => setFontTick((t) => t + 1);
     document.fonts.addEventListener("loadingdone", bump);
     return () => document.fonts.removeEventListener("loadingdone", bump);
-  }, [stacked]);
+  }, [measure]);
 
-  const onLayoutRef = useRef(onLayout);
-  onLayoutRef.current = onLayout;
+  const onInkRef = useRef(onInk);
+  onInkRef.current = onInk;
   useLayoutEffect(() => {
-    if (!stacked) {
-      if (placements.size) {
-        setPlacements(new Map());
-        onLayoutRef.current?.(new Map());
-      }
-      return;
-    }
-    const items: StackItem[] = [];
-    for (const { node } of styled) {
-      const el = els.current.get(node.id);
-      if (!el) continue;
-      const scale = el.getBoundingClientRect().width / Math.max(1e-6, el.offsetWidth) || 1;
-      const ink = inkExtent(el, scale);
-      const b = boxToPx(node.box, { width, height });
-      items.push({ id: node.id, top: b.y, inkTop: ink?.top ?? 0, inkBottom: ink?.bottom ?? b.h, stack: node.data.stack });
-    }
-    for (const n of images ?? []) {
-      const b = boxToPx(n.box, { width, height });
-      items.push({ id: n.id, top: b.y, inkTop: 0, inkBottom: b.h });
-    }
+    if (!measure) return;
     // Reading the layout starts any font loads; measure again once they're done.
     if (document.fonts.status === "loading") {
       let alive = true;
@@ -193,10 +182,24 @@ export function TypeLayer({ project, nodes, images, background, guide, width, he
         alive = false;
       };
     }
-    const next = resolveStacks(items, u);
-    setPlacements((prev) => (samePlacements(prev, next) ? prev : next));
-    onLayoutRef.current?.(next);
-    setLaidOut(key);
+    const ink = new Map<string, TextInk>();
+    for (const { node } of styled) {
+      const el = els.current.get(node.id);
+      if (!el) continue;
+      const scale = el.getBoundingClientRect().width / Math.max(1e-6, el.offsetWidth) || 1;
+      const ext = inkExtent(el, scale);
+      const textEl = (el.querySelector("[data-xds-text]") as HTMLElement) ?? el;
+      const b = rects[nodes.indexOf(node)];
+      ink.set(node.id, {
+        top: ext?.top ?? 0,
+        bottom: ext?.bottom ?? b.h,
+        left: ext?.left ?? 0,
+        right: ext?.right ?? b.w,
+        contentHeight: textEl.offsetHeight,
+      });
+    }
+    onInkRef.current?.(ink, key);
+    setReported(key);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -204,10 +207,9 @@ export function TypeLayer({ project, nodes, images, background, guide, width, he
       {fonts.map((f) => (
         <FontLoad key={`${f.family}|${f.weight}|${f.italic}`} req={f} />
       ))}
-      {styled.map(({ node, style }) => {
-        const b = boxToPx(node.box, { width, height });
+      {styled.map(({ node, style }, i) => {
+        const b = rects[i];
         const v = node.data.valign ?? "top";
-        const placed = placements.get(node.id);
         return (
           <div
             key={node.id}
@@ -220,7 +222,7 @@ export function TypeLayer({ project, nodes, images, background, guide, width, he
             style={{
               position: "absolute",
               left: b.x,
-              top: placed ? placed.top : b.y,
+              top: b.y,
               width: b.w,
               height: b.h,
               transform: b.rotation ? `rotate(${b.rotation}deg)` : undefined,

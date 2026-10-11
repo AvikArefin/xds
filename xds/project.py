@@ -351,7 +351,7 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
 
     for si, slide in enumerate(p.slides):
         sp = f"slides[{si}]"
-        out += _check_stacks(slide, sp)
+        out += _check_layout(slide, sp)
         if slide.lighting:
             color(slide.lighting.tint, f"{sp}.lighting.tint", slide_id=slide.id)
         exceptions(slide.exceptions, f"{sp}.exceptions", slide_id=slide.id)
@@ -397,38 +397,83 @@ def check_references(root: Path, p: Project, *, deep: bool = True) -> list[Findi
     return out
 
 
-def _check_stacks(slide: Any, sp: str) -> list[Finding]:
-    """`data.stack` anchors: a text or image node on the same slide, and no cycles."""
+def _check_layout(slide: Any, sp: str) -> list[Finding]:
+    """Layout relations (data-models §2.5a): stack and align anchors are 2D nodes on the same
+    slide (STACK_ANCHOR, ALIGN_TARGET), they don't loop (STACK_CYCLE), a node doesn't both stack
+    and align on one axis (LAYOUT_CONFLICT), and `layout.group` names one of the slide's groups
+    (GROUP_UNKNOWN)."""
     out: list[Finding] = []
     by_id = {n.id: n for n in slide.nodes}
-    anchors: dict[str, str] = {}
+    two_d = (TypeNode, ImageNode, GroundNode)
+    # every relation that makes `a` depend on `b`, for the cycle check
+    edges: dict[str, set[str]] = {}
     for ni, node in enumerate(slide.nodes):
-        stack = node.data.stack if isinstance(node, TypeNode) else None
-        if stack is None:
+        if isinstance(node, RenderNode):
             continue
+        layout = node.layout
+        stack = (layout.stack if layout and layout.stack else None) or (node.data.stack if isinstance(node, TypeNode) else None)
+        stack_path = (f"{sp}.nodes[{ni}].layout.stack" if layout and layout.stack else f"{sp}.nodes[{ni}].data.stack")
         kw = {"nodes": [node.id], "slide_id": slide.id}
-        target = by_id.get(stack.anchor)
-        key = "below" if stack.below else "above"
-        candidates = ", ".join(n.id for n in slide.nodes
-                               if n.id != node.id and isinstance(n, (TypeNode, ImageNode))) or "(none)"
-        if target is None or target is node or not isinstance(target, (TypeNode, ImageNode)):
-            why = ("is itself" if target is node else f"is a {target.layer} node" if target is not None
-                   else "is not on this slide")
-            out.append(_f("STACK_ANCHOR", f"{sp}.nodes[{ni}].data.stack.{key}",
-                          f"'{node.id}' stacks {key} '{stack.anchor}', which {why}.",
-                          f"Anchor it to a text or image node on this slide: {candidates}.", **kw))
-            continue
-        anchors[node.id] = stack.anchor
-    for start in anchors:
-        seen, cur = [start], anchors[start]
-        while cur in anchors and cur not in seen:
-            seen.append(cur)
-            cur = anchors[cur]
-        if cur == start and start == min(seen):  # report each cycle once
-            out.append(_f("STACK_CYCLE", f"{sp}.nodes", "Stacked blocks anchor to each other in a "
-                          f"circle: {' → '.join(seen + [start])}.",
-                          "Give one of them a fixed position: remove its data.stack and set box.y.",
-                          nodes=seen, slide_id=slide.id))
+        candidates = ", ".join(n.id for n in slide.nodes if n.id != node.id and isinstance(n, two_d)) or "(none)"
+
+        def bad_target(target_id: str) -> str | None:
+            target = by_id.get(target_id)
+            if target is node:
+                return "is itself"
+            if target is None:
+                return "is not on this slide"
+            if not isinstance(target, two_d):
+                return f"is a {target.layer} node"
+            return None
+
+        if stack is not None:
+            key = "below" if stack.below else "above" if stack.above else "rightOf" if stack.right_of else "leftOf"
+            why = bad_target(stack.anchor)
+            if why:
+                out.append(_f("STACK_ANCHOR", f"{stack_path}.{key}",
+                              f"'{node.id}' stacks {key} '{stack.anchor}', which {why}.",
+                              f"Anchor it to a text, image or background node on this slide: {candidates}.", **kw))
+            else:
+                edges.setdefault(node.id, set()).add(stack.anchor)
+        if layout and layout.align:
+            for ai, al in enumerate(layout.align):
+                why = bad_target(al.node)
+                if why:
+                    out.append(_f("ALIGN_TARGET", f"{sp}.nodes[{ni}].layout.align[{ai}].node",
+                                  f"'{node.id}' aligns its {al.edge} with '{al.node}', which {why}.",
+                                  f"Align it with a text, image or background node on this slide: {candidates}.", **kw))
+                    continue
+                edges.setdefault(node.id, set()).add(al.node)
+                if stack is not None:
+                    axis = "x" if al.edge in ("left", "center", "right") else "y"
+                    if axis == stack.axis:
+                        out.append(_f("LAYOUT_CONFLICT", f"{sp}.nodes[{ni}].layout.align[{ai}]",
+                                      f"'{node.id}' both stacks and aligns on the {axis} axis; the stack wins.",
+                                      "Keep one: remove the align on that axis, or the stack.", **kw))
+        if layout and layout.group and layout.group not in (slide.groups or {}):
+            names = ", ".join(sorted(slide.groups or {})) or "(none declared)"
+            out.append(_f("GROUP_UNKNOWN", f"{sp}.nodes[{ni}].layout.group",
+                          f"'{node.id}' joins group '{layout.group}', which this slide does not declare.",
+                          f"Declare it in the slide's `groups`, or pick one of: {names}.", **kw))
+    reported: set[frozenset[str]] = set()
+    for start in edges:
+        path, cur = [start], start
+        while True:
+            nexts = edges.get(cur)
+            if not nexts:
+                break
+            cur = min(nexts)
+            if cur in path:
+                cycle = path[path.index(cur):]
+                key = frozenset(cycle)
+                if key not in reported:
+                    reported.add(key)
+                    out.append(_f("STACK_CYCLE", f"{sp}.nodes", "Related blocks anchor to each other in a "
+                                  f"circle: {' → '.join(cycle + [cur])}.",
+                                  "Give one of them a fixed position: remove its stack or align and set its box.",
+                                  nodes=cycle, slide_id=slide.id))
+                break
+            path.append(cur)
     return out
 
 

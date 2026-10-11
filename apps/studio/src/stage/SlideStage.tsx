@@ -8,7 +8,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { ThreeEvent } from "@react-three/fiber";
 import type { GroundNode, ImageNode, Layer, Project, RenderNode, TypeNode } from "@xds/protocol";
 import { DEFAULT_LAYER_ORDER } from "@xds/protocol";
-import type { StackPlacement } from "@xds/editor-core";
+import {
+  boxToPx,
+  fallbackGuide,
+  hasRelations,
+  layoutSpecOf,
+  resolveLayout,
+  type LayoutGuide,
+  type LayoutItem,
+  type LayoutPlacement,
+} from "@xds/editor-core";
 import type { SubjectLayout } from "../design/resolve";
 import type { SceneApi } from "../scene/SceneRoot";
 import type { DesignInfo, Guide } from "../types";
@@ -16,8 +25,15 @@ import { GroundLayer } from "./GroundLayer";
 import { ImageLayer } from "./ImageLayer";
 import { Readiness, ReadinessProvider, useFailure } from "./readiness";
 import { RenderLayer } from "./RenderLayer";
-import { ProjectFonts, TypeLayer } from "./TypeLayer";
+import { ProjectFonts, TypeLayer, type TextInk } from "./TypeLayer";
 import { slideBaseColor } from "./typeStyle";
+
+/** The engine's view of the format: the guide from the server, else derived from the size. */
+export function layoutGuide(project: Project, guide?: Guide | null): LayoutGuide {
+  const { width, height } = project.format;
+  if (!guide) return fallbackGuide(width, height);
+  return { width, height, u: guide.u, margins: guide.margins, safeZones: guide.safe_zones ?? [] };
+}
 
 export interface StageStatus {
   /** Nothing pending and no error. */
@@ -50,8 +66,8 @@ export interface SlideStageProps {
   visibleLayers?: Layer[];
   /** Layers to mount at all (default: all). `xds measure` mounts only "type": no 3D, no backgrounds. */
   mountLayers?: Layer[];
-  /** The resolved stacked text blocks (`data.stack`), whenever they change. */
-  onLayout?: (placements: Map<string, StackPlacement>) => void;
+  /** The resolved layout relations (every 2D node a pin, align, stack or fit decided), whenever they change. */
+  onLayout?: (placements: Map<string, LayoutPlacement>) => void;
   /** The slide's flat background fill (default true). */
   showBackground?: boolean;
   /** The contact/soft shadow in the 3D layer (default true). */
@@ -109,6 +125,33 @@ export function SlideStage(props: SlideStageProps) {
   useEffect(() => {
     if (byLayer.render.length === 0) setSubject(null);
   }, [byLayer.render.length]);
+
+  // --- layout relations: pins, aligns, stacks, fit (editor-core `resolveLayout`) -------------
+  const flat = useMemo(() => [...byLayer.ground, ...byLayer.image, ...byLayer.type], [byLayer]);
+  const needsInk = useMemo(() => flat.some((n) => hasRelations(layoutSpecOf(n))), [flat]);
+  const [ink, setInk] = useState<Map<string, TextInk>>(() => new Map());
+  const onInk = useCallback((m: Map<string, TextInk>) => setInk(m), []);
+  const lg = useMemo(() => layoutGuide(project, props.guide), [project, props.guide]);
+  const placements = useMemo(() => {
+    if (!needsInk) return new Map<string, LayoutPlacement>();
+    const items: LayoutItem[] = flat.map((n) => {
+      const r = boxToPx(n.box, { width, height });
+      const i = ink.get(n.id);
+      return {
+        id: n.id,
+        rect: { x: r.x, y: r.y, w: r.w, h: r.h },
+        ink: i ? { top: i.top, bottom: i.bottom, left: i.left, right: i.right } : null,
+        contentHeight: i?.contentHeight ?? null,
+        layout: layoutSpecOf(n),
+      };
+    });
+    return resolveLayout(items, lg);
+  }, [needsInk, flat, ink, lg, width, height]);
+  const onLayoutRef = useRef(props.onLayout);
+  onLayoutRef.current = props.onLayout;
+  useEffect(() => {
+    onLayoutRef.current?.(placements);
+  }, [placements]);
 
   const onSubject = useCallback((s: SubjectLayout | null) => setSubject(s), []);
 
@@ -183,19 +226,28 @@ export function SlideStage(props: SlideStageProps) {
                 }}
               >
                 {!mounted.has(layer) ? null : layer === "ground" ? (
-                  <GroundLayer nodes={byLayer.ground} project={project} designs={designs} subject={subject} width={width} height={height} />
+                  <GroundLayer
+                    nodes={byLayer.ground}
+                    project={project}
+                    designs={designs}
+                    subject={subject}
+                    width={width}
+                    height={height}
+                    placements={placements}
+                  />
                 ) : layer === "image" ? (
-                  <ImageLayer nodes={byLayer.image} project={project} hash={props.hash} width={width} height={height} />
+                  <ImageLayer nodes={byLayer.image} project={project} hash={props.hash} width={width} height={height} placements={placements} />
                 ) : layer === "type" ? (
                   <TypeLayer
                     nodes={byLayer.type}
-                    images={byLayer.image}
                     project={project}
                     background={bg}
                     guide={props.guide}
                     width={width}
                     height={height}
-                    onLayout={props.onLayout}
+                    placements={placements}
+                    needsInk={needsInk}
+                    onInk={onInk}
                   />
                 ) : (
                   <RenderLayer

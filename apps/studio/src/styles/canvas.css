@@ -247,6 +247,40 @@
   border: 1px solid var(--accent);
   background: rgba(76, 154, 255, 0.1);
 }
+
+/* layout relations of the selection (pins, aligns, stacks) */
+.overlay.relations line {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.overlay.relations .rel-pin {
+  stroke-width: 2;
+  opacity: 0.9;
+}
+.overlay.relations .rel-align {
+  stroke-dasharray: 3 3;
+  opacity: 0.8;
+}
+.overlay.relations .rel-stack {
+  stroke-width: 1.5;
+  opacity: 0.9;
+}
+.overlay.relations .rel-offset {
+  stroke-dasharray: 2 2;
+  opacity: 0.6;
+}
+.overlay.relations .rel-label {
+  fill: var(--accent);
+  font-family: var(--mono);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+}
+.layout-align {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .handle {
   position: absolute;
   width: 9px;

@@ -132,10 +132,12 @@ One component for every pick-one-of-many, including brand colors (`ColorTokenSel
   outside undo, and never reach `project.json`. Say so in the control's `title`.
 - **Read-only** (a project with structural errors) disables every editing control: pass
   `disabled={readOnly}`.
-- **Positions the layout decides** (a stacked text block's Y, `data.stack`) are shown as laid out:
-  the store keeps the node's `box.y` equal to the resolved position (`syncStackLayout`, no undo
-  step, not dirty), so the canvas handles, snapping and the Transform fields need no special case.
-  An edit that moves such a node is turned into the knob that controls it (the stack `gap`) in the
-  store's `commit`, never in the component.
+- **Fields the layout decides** (a pinned edge, an aligned edge, a stacked block's position, a
+  fitted height: `layout`, data-models §2.5a) are shown as laid out: the store keeps those `box`
+  fields equal to the resolved values (`syncLayout`, no undo step, not dirty), so the canvas
+  handles, snapping and the Transform fields need no special case. An edit that moves or resizes
+  such a node is turned into the knob that controls it (the stack `gap`, a pin or align `offset`)
+  in the store's `commit`, never in the component; a field the layout sizes snaps back. The
+  **Free** actions in the Layout section (`detachLayout`) drop a relation and leave the box.
 - **Every UI change updates [human interaction](./human-interaction.md)** (where it is on screen) and,
   for a new or changed building block, this page (how it is built).

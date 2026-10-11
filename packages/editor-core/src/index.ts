@@ -5,6 +5,7 @@ export * from "./snap";
 export * from "./align";
 export * from "./nodes";
 export * from "./stack";
+export * from "./layout";
 export * from "./place";
 export * from "./typeSize";
 export * from "./edits";

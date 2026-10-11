@@ -84,13 +84,15 @@ export function measureLines(textEl: HTMLElement, origin: { left: number; top: n
   return out;
 }
 
-/** A text block's ink extent relative to its box top (the element carrying `data-node-id`), px. */
-export function inkExtent(el: HTMLElement, scale = 1): { top: number; bottom: number } | null {
+/** A text block's ink extent relative to its box (the element carrying `data-node-id`), px. */
+export function inkExtent(el: HTMLElement, scale = 1): { top: number; bottom: number; left: number; right: number } | null {
   const textEl = (el.querySelector("[data-xds-text]") as HTMLElement) ?? el;
   const lines = measureLines(textEl, el.getBoundingClientRect(), scale);
   if (!lines.length) return null;
   return {
     top: Math.min(...lines.map((l) => l.rect.y)),
     bottom: Math.max(...lines.map((l) => l.rect.y + l.rect.h)),
+    left: Math.min(...lines.map((l) => l.rect.x)),
+    right: Math.max(...lines.map((l) => l.rect.x + l.rect.w)),
   };
 }

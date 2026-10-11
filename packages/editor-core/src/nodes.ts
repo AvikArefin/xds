@@ -13,6 +13,7 @@ import type {
   RenderNode,
   SceneObject,
   Slide,
+  Stack,
   Vec3,
 } from "@xds/protocol";
 
@@ -243,15 +244,38 @@ export function cloneNodes(nodes: Node[], taken: Set<string>, onSlide: Set<strin
     const copy = structuredClone(n) as Node;
     copy.id = map.get(n.id)!;
     delete copy.exceptions;
-    if (copy.layer === "type" && copy.data.stack) {
-      const stack = { ...copy.data.stack };
-      for (const key of ["below", "above"] as const) {
-        const anchor = stack[key];
+    /** Remap a stack's anchor; null when the anchor is neither copied nor on the slide. */
+    const remapStack = (stack: Stack): Stack | null => {
+      const out = { ...stack };
+      for (const key of ["below", "above", "rightOf", "leftOf"] as const) {
+        const anchor = out[key];
         if (!anchor) continue;
-        if (map.has(anchor)) stack[key] = map.get(anchor);
-        else if (!onSlide.has(anchor)) delete copy.data.stack;
+        if (map.has(anchor)) out[key] = map.get(anchor);
+        else if (!onSlide.has(anchor)) return null;
       }
-      if (copy.data.stack) copy.data.stack = stack;
+      return out;
+    };
+    if (copy.layer === "type" && copy.data.stack) {
+      const stack = remapStack(copy.data.stack);
+      if (stack) copy.data.stack = stack;
+      else delete copy.data.stack;
+    }
+    if (copy.layer !== "render" && copy.layout) {
+      const layout = { ...copy.layout };
+      if (layout.stack) {
+        const stack = remapStack(layout.stack);
+        if (stack) layout.stack = stack;
+        else delete layout.stack;
+      }
+      if (layout.align) {
+        const align = layout.align
+          .filter((a) => map.has(a.node) || onSlide.has(a.node))
+          .map((a) => (map.has(a.node) ? { ...a, node: map.get(a.node)! } : a));
+        if (align.length) layout.align = align as typeof layout.align;
+        else delete layout.align;
+      }
+      if (Object.keys(layout).length) copy.layout = layout;
+      else delete copy.layout;
     }
     return copy;
   });

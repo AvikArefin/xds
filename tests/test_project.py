@@ -149,13 +149,54 @@ def test_stack_anchors_and_cycles(blank):
                                   _text("b", stack={"below": "s1-background"}),
                                   _text("c", stack={"below": "c"})]))
     found = [f for f in proj.load(blank).findings if f.rule == "STACK_ANCHOR"]
-    assert sorted(f.nodes[0] for f in found) == ["a", "b", "c"]
+    assert sorted(f.nodes[0] for f in found) == ["a", "c"]  # a background is a fine anchor (2D node)
     assert "is not on this slide" in found[0].message and found[0].path.endswith("data.stack.below")
 
     edit(blank, lambda d: add(d, [_text("p", stack={"below": "q"}), _text("q", stack={"below": "r"}),
                                   _text("r", stack={"below": "p"})]))
     cycles = [f for f in proj.load(blank).findings if f.rule == "STACK_CYCLE"]
     assert len(cycles) == 1 and "p → q → r → p" in cycles[0].message
+
+
+def test_layout_relations_gate(blank):
+    """`layout`: stacks on either axis (from layout or the older data.stack), align targets, cycles
+    across both, stack-vs-align conflicts and unknown groups."""
+    def add(d, nodes, groups=None):
+        d["brand"]["typography"]["body"] = {"level": "body", "font": "Satoshi"}
+        d["fonts"] = [{"family": "Satoshi", "path": "xds:fonts/Satoshi/x.woff2"}]
+        d["slides"][0]["nodes"] = d["slides"][0]["nodes"][:1] + nodes
+        if groups is not None:
+            d["slides"][0]["groups"] = groups
+
+    def node(i, **layout):
+        n = _text(i)
+        if layout:
+            n["layout"] = layout
+        return n
+
+    good = [node("h1", pin={"left": {"to": "margin"}, "top": {"to": "margin", "offset": 2}}),
+            node("sub", stack={"below": "h1", "gap": 3}, align=[{"node": "h1", "edge": "left"}]),
+            node("logo", stack={"rightOf": "h1"}),
+            node("cta", align=[{"node": "s1-background", "edge": "bottom", "offset": -4}], fit="text",
+                 group="intro")]
+    edit(blank, lambda d: add(d, good, {"intro": {"direction": "column", "gap": 2}}))
+    loaded = proj.load(blank)
+    assert {"STACK_ANCHOR", "ALIGN_TARGET", "STACK_CYCLE", "LAYOUT_CONFLICT", "GROUP_UNKNOWN"}.isdisjoint(codes(loaded)), loaded.findings
+
+    bad = [node("a", stack={"leftOf": "gone"}),
+           node("b", align=[{"node": "nope", "edge": "top"}]),
+           node("c", stack={"below": "d"}, align=[{"node": "d", "edge": "bottom"}]),
+           node("d", align=[{"node": "c", "edge": "left"}]),
+           node("e", group="missing")]
+    edit(blank, lambda d: add(d, bad, {}))
+    found = proj.load(blank).findings
+    by = {f.rule: f for f in found}
+    assert by["STACK_ANCHOR"].path.endswith("layout.stack.leftOf") and "is not on this slide" in by["STACK_ANCHOR"].message
+    assert by["ALIGN_TARGET"].nodes == ["b"] and by["ALIGN_TARGET"].path.endswith("layout.align[0].node")
+    assert by["LAYOUT_CONFLICT"].nodes == ["c"] and "y axis" in by["LAYOUT_CONFLICT"].message
+    assert sorted(by["STACK_CYCLE"].nodes) == ["c", "d"]
+    assert by["GROUP_UNKNOWN"].nodes == ["e"] and "(none declared)" in by["GROUP_UNKNOWN"].fix
+    assert [f.rule for f in found].count("STACK_CYCLE") == 1
 
 
 def test_a_stack_names_exactly_one_anchor(blank):

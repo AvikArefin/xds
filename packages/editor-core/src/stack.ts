@@ -7,6 +7,8 @@
  * is missing (or hidden), or that is part of a cycle, keeps its own `box.y`.
  */
 
+import { fallbackGuide, resolveLayout } from "./layout";
+
 export interface StackSpec {
   below?: string | null;
   above?: string | null;
@@ -37,35 +39,23 @@ export function stackAnchor(s: StackSpec | null | undefined): string | null {
   return s?.below || s?.above || null;
 }
 
-/** Resolve the tops of every stacked item whose anchor is present. */
+/** Resolve the tops of every stacked item whose anchor is present (the vertical case of `resolveLayout`). */
 export function resolveStacks(items: StackItem[], u: number): Map<string, StackPlacement> {
-  const byId = new Map(items.map((i) => [i.id, i]));
+  const laid = resolveLayout(
+    items.map((i) => ({
+      id: i.id,
+      rect: { x: 0, y: i.top, w: 1, h: Math.max(1, i.inkBottom) },
+      ink: { top: i.inkTop, bottom: i.inkBottom },
+      layout: i.stack
+        ? { stack: { below: i.stack.below ?? undefined, above: i.stack.above ?? undefined, gap: i.stack.gap ?? 0 } }
+        : null,
+    })),
+    { ...fallbackGuide(1000, 1000), u },
+  );
   const out = new Map<string, StackPlacement>();
-  const tops = new Map<string, number>();
-  const visiting = new Set<string>();
-
-  const topOf = (item: StackItem): number => {
-    const known = tops.get(item.id);
-    if (known !== undefined) return known;
-    const anchorId = stackAnchor(item.stack);
-    const anchor = anchorId ? byId.get(anchorId) : undefined;
-    if (!anchor || anchor === item || visiting.has(item.id)) {
-      tops.set(item.id, item.top);
-      return item.top;
-    }
-    visiting.add(item.id);
-    const anchorTop = topOf(anchor);
-    visiting.delete(item.id);
-    if (tops.has(item.id)) return tops.get(item.id)!; // resolved as part of a cycle
-    const dir: 1 | -1 = item.stack?.below ? 1 : -1;
-    const base = dir === 1 ? anchorTop + anchor.inkBottom - item.inkTop : anchorTop + anchor.inkTop - item.inkBottom;
-    const top = base + dir * (item.stack?.gap ?? 0) * u;
-    tops.set(item.id, top);
-    out.set(item.id, { top, base, dir, anchor: anchor.id });
-    return top;
-  };
-
-  for (const item of items) topOf(item);
+  for (const [id, p] of laid) {
+    if (p.stack?.axis === "y") out.set(id, { top: p.rect.y, base: p.stack.base, dir: p.stack.dir, anchor: p.stack.anchor });
+  }
   return out;
 }
 

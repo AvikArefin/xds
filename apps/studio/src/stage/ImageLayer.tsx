@@ -1,11 +1,21 @@
 /** The 2D image layer: images and SVG assets placed by box, with fit, rotation and opacity. */
 import { useState } from "react";
 import { isAsset, type ImageNode, type Project } from "@xds/protocol";
-import { boxToPx } from "@xds/editor-core";
+import { boxToPx, type LayoutPlacement } from "@xds/editor-core";
 import { fileUrl } from "../api";
 import { useFailure, usePending } from "./readiness";
 
-function ImageBox({ node, project, hash, width, height }: { node: ImageNode; project: Project; hash?: string; width: number; height: number }) {
+interface ImageBoxProps {
+  node: ImageNode;
+  project: Project;
+  hash?: string;
+  width: number;
+  height: number;
+  /** The stage's resolved rect for this node, when a relation decided it. */
+  placement?: LayoutPlacement;
+}
+
+function ImageBox({ node, project, hash, width, height, placement }: ImageBoxProps) {
   const data = isAsset(node.data) ? node.data : null;
   const assetId = data?.asset ?? "";
   const asset = project.assets?.find((a) => a.id === assetId);
@@ -17,7 +27,8 @@ function ImageBox({ node, project, hash, width, height }: { node: ImageNode; pro
     `image:${node.id}`,
     data && !asset ? `image node '${node.id}': unknown asset '${assetId}'` : status === "error" ? `image '${assetId}' failed to load` : null,
   );
-  const b = boxToPx(node.box, { width, height });
+  const own = boxToPx(node.box, { width, height });
+  const b = placement ? { ...own, ...placement.rect } : own;
   return (
     <div
       data-node-id={node.id}
@@ -47,11 +58,26 @@ function ImageBox({ node, project, hash, width, height }: { node: ImageNode; pro
   );
 }
 
-export function ImageLayer(props: { project: Project; nodes: ImageNode[]; hash?: string; width: number; height: number }) {
+export function ImageLayer(props: {
+  project: Project;
+  nodes: ImageNode[];
+  hash?: string;
+  width: number;
+  height: number;
+  placements?: Map<string, LayoutPlacement>;
+}) {
   return (
     <>
       {props.nodes.map((n) => (
-        <ImageBox key={n.id} node={n} project={props.project} hash={props.hash} width={props.width} height={props.height} />
+        <ImageBox
+          key={n.id}
+          node={n}
+          project={props.project}
+          hash={props.hash}
+          width={props.width}
+          height={props.height}
+          placement={props.placements?.get(n.id)}
+        />
       ))}
     </>
   );

@@ -19,6 +19,7 @@ import type {
   Format,
   ImageNode,
   Layer,
+  Layout,
   Lighting,
   Node,
   Pose,
@@ -39,7 +40,10 @@ import {
   duplicateNodes,
   duplicateSlide as duplicateSlideCore,
   freshId,
-  gapForTop,
+  gapForPosition,
+  layoutSpecOf,
+  offsetFor,
+  pinnedEdgeValue,
   moveSlide as moveSlideCore,
   nudgeNodes,
   nudgePose,
@@ -52,7 +56,8 @@ import {
   updateSlide,
   type AlignHow,
   type ReorderTo,
-  type StackPlacement,
+  type Edge as PinEdge,
+  type LayoutPlacement,
 } from "@xds/editor-core";
 import type { LibraryLogo } from "../api";
 import { ServerError, server, subscribeEvents } from "./server";
@@ -105,8 +110,8 @@ export interface StudioState {
   transformSpace: "world" | "local";
   /** Editor-only locks (not saved: the schema has no lock field). */
   locked: Record<string, boolean>;
-  /** Where the active slide's stacked text blocks landed (from the type layer). Not saved, not in undo. */
-  stackLayout: Record<string, StackPlacement>;
+  /** Where the active slide's related nodes (pins, aligns, stacks, fit) landed, from the stage. Not saved, not in undo. */
+  layout: Record<string, LayoutPlacement>;
   /** What Copy took: nodes of one layer, or a whole slide. Editor-only, cleared when another project opens. */
   clipboard: Clipboard | null;
 
@@ -162,8 +167,12 @@ export interface StudioActions {
   setTransformMode(m: StudioState["transformMode"]): void;
   setTransformSpace(s: StudioState["transformSpace"]): void;
   toggleLock(id: string): void;
-  /** The type layer laid out stacked blocks: keep their box.y in step (no undo step, not dirty). */
-  syncStackLayout(placements: Map<string, StackPlacement>): void;
+  /** The stage resolved the layout relations: keep every decided box field in step (no undo step, not dirty). */
+  syncLayout(placements: Map<string, LayoutPlacement>): void;
+  /** Edit the selected nodes' `layout` (one undo step). `fn` returns the new layout, or undefined to clear it. */
+  patchLayout(ids: string[], fn: (layout: Layout | undefined, node: Node) => Layout | undefined): void;
+  /** Remove a relation and leave the box where the layout put it (one undo step). */
+  detachLayout(ids: string[], which: "pin" | "align" | "stack" | "fit" | "all"): void;
 
   setZoom(z: number | "fit"): void;
   zoomBy(f: number): void;
@@ -258,7 +267,7 @@ const initial: StudioState = {
   transformMode: "translate",
   transformSpace: "world",
   locked: {},
-  stackLayout: {},
+  layout: {},
   clipboard: null,
   zoom: "fit",
   fitZoom: 0.5,
@@ -328,35 +337,83 @@ export const useStudio = create<Studio>()(
       };
 
       /**
-       * A stacked block's box.y follows its layout (see syncStackLayout), so an edit that moves it
-       * (drag, nudge, align, the Y field) is turned into a new stack gap. When its anchor moved
-       * in the same edit, only the difference counts: blocks moved together keep their gap.
-       * With snapping on, gaps are whole units.
+       * A node with a layout relation has its box written by the layout (see syncLayout), so an
+       * edit that moves or resizes it (drag, nudge, align, a Transform field) is turned into the
+       * relation's knob: a stack gap, a pin offset or an align offset, in u (whole units while
+       * Snap is on). When its anchor moved in the same edit, only the difference counts: blocks
+       * moved together keep their gap. A field the layout sizes (both edges pinned, fit to text)
+       * snaps back; detach the relation to size it by hand.
        */
-      const withStackGaps = (prev: Project | null, next: Project): Project => {
+      const withRelations = (prev: Project | null, next: Project): Project => {
         const s = get();
         const before = getSlide(prev, s.activeSlideId);
         const after = getSlide(next, s.activeSlideId);
         if (!before || !after || before === after) return next;
+        const W = next.format.width;
         const H = next.format.height;
-        const u = s.guide?.u ?? Math.max(4, Math.round(Math.min(next.format.width, H) / 135));
+        const u = s.guide?.u ?? Math.max(4, Math.round(Math.min(W, H) / 135));
+        const round = s.snap ? 1 : 0;
         const old = new Map(nodesOf(before).map((n) => [n.id, n]));
-        const shift = (id: string): number => {
+        const shift = (id: string, axis: "x" | "y"): number => {
           const a = old.get(id);
           const b = nodesOf(after).find((n) => n.id === id);
-          return a && b && a.layer !== "render" && b.layer !== "render" ? ((b.box.y - a.box.y) / 100) * H : 0;
+          if (!a || !b || a.layer === "render" || b.layer === "render") return 0;
+          return axis === "x" ? ((b.box.x - a.box.x) / 100) * W : ((b.box.y - a.box.y) / 100) * H;
         };
+        const edgeOf = (r: { x: number; y: number; w: number; h: number }, edge: string) =>
+          edge === "left" ? r.x : edge === "center" ? r.x + r.w / 2 : edge === "right" ? r.x + r.w : edge === "top" ? r.y : edge === "middle" ? r.y + r.h / 2 : r.y + r.h;
         let changed = false;
         const nodes = nodesOf(after).map((n) => {
           const was = old.get(n.id);
-          const place = s.stackLayout[n.id];
-          if (n.layer !== "type" || !n.data.stack || !place || was?.layer !== "type" || !was.data.stack) return n;
-          if (n.box.y === was.box.y || JSON.stringify(n.data.stack) !== JSON.stringify(was.data.stack)) return n;
-          const top = (n.box.y / 100) * H - shift(place.anchor);
-          const gap = gapForTop(place, top, u, s.snap ? 1 : 0);
-          if (gap === n.data.stack.gap) return n;
+          const place = s.layout[n.id];
+          if (n.layer === "render" || !was || was.layer === "render" || !place) return n;
+          const spec = layoutSpecOf(n);
+          if (!spec || JSON.stringify(spec) !== JSON.stringify(layoutSpecOf(was))) return n; // the relation itself was edited
+          const r0 = boxPx(was.box, W, H);
+          const r1 = boxPx(n.box, W, H);
+          if (r0.x === r1.x && r0.y === r1.y && r0.w === r1.w && r0.h === r1.h) return n;
+          let out: Node = n;
+          const box: Box = { ...n.box };
+          const layout = (): Layout => ({ ...((out as Exclude<Node, RenderNode>).layout ?? {}) });
+          for (const axis of ["x", "y"] as const) {
+            const size = axis === "x" ? "w" : "h";
+            const moved = r1[axis] !== r0[axis];
+            const d = place.decided[axis];
+            if (d === "stack" && place.stack?.axis === axis && moved) {
+              const gap = gapForPosition(place.stack, r1[axis] - shift(place.stack.anchor, axis), u, round);
+              const stack = spec.stack!;
+              if (gap !== (stack.gap ?? 2)) {
+                const t = out as TypeNode;
+                if (out.layer === "type" && t.data.stack && !t.layout?.stack)
+                  out = { ...t, data: { ...t.data, stack: { ...t.data.stack, gap } } };
+                else out = { ...out, layout: { ...layout(), stack: { ...stack, gap } } } as Node;
+              }
+            } else if (d === "align" && place.align?.[axis] && moved) {
+              const al = place.align[axis]!;
+              const offset = offsetFor(edgeOf(r1, al.edge) - shift(al.anchor, axis), al.at, u, round);
+              const align = (spec.align ?? []).map((a) => (a.node === al.anchor && a.edge === al.edge ? { ...a, offset } : a));
+              out = { ...out, layout: { ...layout(), align } } as Node;
+            } else if (d === "pin") {
+              if (place.decided[size] === "pin") {
+                box[axis] = was.box[axis];
+                box[size] = was.box[size];
+              } else if (moved && place.pins) {
+                const edge = (axis === "x" ? ["left", "right", "cx"] : ["top", "bottom", "cy"]).find(
+                  (e) => place.pins![e as PinEdge] !== undefined,
+                ) as PinEdge | undefined;
+                const pin = edge && spec.pin?.[edge];
+                if (edge && pin) {
+                  const offset = offsetFor(pinnedEdgeValue(r1, edge), place.pins[edge]!, u, round);
+                  out = { ...out, layout: { ...layout(), pin: { ...spec.pin, [edge]: { ...pin, offset } } } } as Node;
+                }
+              }
+            }
+            if (place.decided[size] === "fit" && r1[size] !== r0[size]) box[size] = was.box[size];
+          }
+          out = { ...out, box } as Node;
+          if (out === n) return n;
           changed = true;
-          return { ...n, data: { ...n.data, stack: { ...n.data.stack, gap } } } as Node;
+          return out;
         });
         return changed ? updateSlide(next, after.id, (sl) => ({ ...sl, nodes: nodes as Slide["nodes"] })) : next;
       };
@@ -364,7 +421,7 @@ export const useStudio = create<Studio>()(
       /** Replace the project (one undo step unless inside a gesture). */
       const commit = (project: Project, extra: Partial<StudioState> = {}) => {
         if (project === get().project && !Object.keys(extra).length) return;
-        set({ project: project ? withStackGaps(get().project, project) : project, ...extra });
+        set({ project: project ? withRelations(get().project, project) : project, ...extra });
       };
 
       const slideOf = () => getSlide(get().project, get().activeSlideId);
@@ -545,22 +602,31 @@ export const useStudio = create<Studio>()(
           t.redo();
           fixSelectionAfterHistory();
         },
-        syncStackLayout: (placements) => {
+        syncLayout: (placements) => {
           const s = get();
-          set({ stackLayout: Object.fromEntries(placements) });
+          set({ layout: Object.fromEntries(placements) });
           if (!s.project) return;
-          const H = s.project.format.height;
+          const { width: W, height: H } = s.project.format;
+          const pct = (v: number, size: number) => Math.round((v / size) * 100 * 1000) / 1000;
           const sync = (p: Project | null): Project | null => {
             const slide = getSlide(p, s.activeSlideId);
             if (!p || !slide) return p;
             let changed = false;
             const nodes = nodesOf(slide).map((n) => {
               const place = placements.get(n.id);
-              if (n.layer !== "type" || !n.data.stack || !place) return n;
-              const y = Math.round((place.top / H) * 100 * 1000) / 1000;
-              if (Math.abs(n.box.y - y) < 0.0005) return n;
+              if (n.layer === "render" || !place) return n;
+              const box: Box = { ...n.box };
+              let touched = false;
+              for (const key of ["x", "y", "w", "h"] as const) {
+                if (!place.decided[key]) continue;
+                const v = pct(place.rect[key], key === "x" || key === "w" ? W : H);
+                if (Math.abs(box[key] - v) < 0.0005) continue;
+                box[key] = v;
+                touched = true;
+              }
+              if (!touched) return n;
               changed = true;
-              return { ...n, box: { ...n.box, y } } as Node;
+              return { ...n, box } as Node;
             });
             return changed ? updateSlide(p, slide.id, (sl) => ({ ...sl, nodes: nodes as Slide["nodes"] })) : p;
           };
@@ -683,6 +749,39 @@ export const useStudio = create<Studio>()(
             }
             for (const k of remove) if (!forbidden.includes(k)) delete data[k];
             return { ...n, data } as unknown as Node;
+          });
+        },
+        patchLayout: (ids, fn) => {
+          get().editNodes(ids, (n) => {
+            if (n.layer === "render") return n;
+            const next = fn(n.layout, n);
+            const out = { ...n } as Exclude<Node, RenderNode>;
+            const clean = next && Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined && v !== null));
+            if (clean && Object.keys(clean).length) out.layout = clean as Layout;
+            else delete out.layout;
+            return out;
+          });
+        },
+        detachLayout: (ids, which) => {
+          get().editNodes(ids, (n) => {
+            if (n.layer === "render") return n;
+            const out = { ...n } as Exclude<Node, RenderNode>;
+            const layout = { ...(n.layout ?? {}) } as Layout;
+            const drop = (k: keyof Layout) => delete layout[k];
+            if (which === "pin" || which === "all") drop("pin");
+            if (which === "align" || which === "all") drop("align");
+            if (which === "fit" || which === "all") drop("fit");
+            if (which === "stack" || which === "all") {
+              drop("stack");
+              if (out.layer === "type" && out.data.stack) {
+                const data = { ...out.data };
+                delete data.stack;
+                out.data = data;
+              }
+            }
+            if (Object.keys(layout).length) out.layout = layout;
+            else delete out.layout;
+            return out;
           });
         },
         renameNode: (id, name) =>

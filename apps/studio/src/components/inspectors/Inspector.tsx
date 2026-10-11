@@ -3,6 +3,7 @@ import { LAYER_LABELS } from "@xds/protocol";
 import { nodeLabel, nodesOf, useActiveSlide, useStudio } from "../../store";
 import { TextField } from "../ui";
 import { BrandInspector } from "./BrandInspector";
+import { LayoutInspector } from "./LayoutInspector";
 import { GroundInspector, ImageInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
 import { SceneInspector } from "./SceneInspector";
 
@@ -50,6 +51,7 @@ export function Inspector() {
         <div className="inspector-body">
           {nodes.length === 1 && <NodeHeader id={nodes[0].id} />}
           <TransformInspector nodes={boxNodes} />
+          <LayoutInspector nodes={boxNodes} />
           {mode === "type" && <TypeInspector nodes={nodes as TypeNode[]} />}
           {mode === "image" && <ImageInspector nodes={nodes as ImageNode[]} />}
           {mode === "ground" && <GroundInspector nodes={nodes as GroundNode[]} />}

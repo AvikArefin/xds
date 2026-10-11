@@ -196,9 +196,11 @@ other dirs in `cache/` (`slide-keys/`, `grid/`) are kept. Headless Chromium draw
 without a GPU (CI); it is ~10x slower and differs slightly at anti-aliased edges. There, a hidden 3D
 layer on the render page stops drawing frames, because SwiftShader replays every frame drawn while
 hidden. The ground resolves after the render layer reports subject bounds, so a spotlight
-background lands behind the product in the same frame. Stacked text (`data.stack`) is placed after
-the fonts load: the type layer measures each block's ink, resolves the stacks and moves the
-blocks before it reports ready, so a screenshot never shows a block in its unstacked place.
+background lands behind the product in the same frame. Layout relations (`layout`: pins, aligns, stacks,
+fit) are resolved after the fonts load: the type layer measures each block's ink and content
+height, the stage resolves every 2D node's rect (`@xds/editor-core` `resolveLayout`) and the
+layers draw at those rects before the stage reports ready, so a screenshot never shows a block
+in an unresolved place.
 
 ---
 
