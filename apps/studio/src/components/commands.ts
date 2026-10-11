@@ -2,7 +2,7 @@
  * Commands that change project files on the server (designs/add, models/import, fonts/fetch).
  * They need a saved document: save first, run, then reload from disk.
  */
-import { api, type LibraryModel } from "../api";
+import { api, type LayoutMode, type LibraryModel } from "../api";
 import { useStudio } from "../store";
 
 export async function serverCommand<T>(what: string, run: () => Promise<T>): Promise<T | null> {
@@ -20,6 +20,26 @@ export async function serverCommand<T>(what: string, run: () => Promise<T>): Pro
     useStudio.getState().notify("error", `${what} failed: ${(e as Error).message}`);
     return null;
   }
+}
+
+/** Apply a library layout to the active slide (docs/layouts.md): saves, applies on the server, reloads. */
+export async function applyLayout(id: string, mode: LayoutMode) {
+  const st = useStudio.getState();
+  const slide = st.activeSlideId;
+  const r = await serverCommand("Applying a layout", () => api.applyLayout({ id, slide, mode, addRoles: true }));
+  if (!r) return;
+  const s = useStudio.getState();
+  const rep = r.report;
+  if (rep.slide !== slide) s.setActiveSlide(rep.slide);
+  const roles = Object.keys(rep.addedRoles ?? {});
+  const parts = [
+    `Applied ${id} (${mode})`,
+    rep.filled.length ? `${rep.filled.length} re-placed` : "",
+    rep.added.length ? `${rep.added.length} added` : "",
+    rep.kept.length ? `${rep.kept.length} kept as they were` : "",
+    roles.length ? `roles added: ${roles.join(", ")}` : "",
+  ].filter(Boolean);
+  s.notify(rep.notes.length ? "warning" : "success", `${parts.join(" · ")}.${rep.notes.length ? ` ${rep.notes[0]}` : ""}`);
 }
 
 export async function addStarterBackground(starter: string) {

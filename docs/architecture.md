@@ -63,7 +63,9 @@ xds/
 │   ├── models3d.py                #   GLB inspection, .gltf/.dae → .glb conversion, normalizing, `xds model add`
 │   ├── library.py                 #   the shipped models and logos (`xds:` asset paths)
 │   ├── library/models/<id>/       #   library models: model.glb + model.json
-│   ├── library/brands/<id>/       #   brand logos: SVGs + brand.json   
+│   ├── library/brands/<id>/       #   brand logos: SVGs + brand.json
+│   ├── library/layouts/<id>.json  #   slide layouts in relations (scripts/build_library_layouts.py)
+│   ├── layouts.py                 #   `xds layout`: list, show, apply a layout to a slide
 │   ├── library/fonts/<Family>/    #   font library: Fontshare downloads + family.json (not committed)
 │   ├── screens.py                 #   device-screen pages: Tailwind compile, render to texture PNG
 │   ├── browser.py                 #   Playwright: render slides, collect measurements
@@ -257,6 +259,8 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | GET | `/api/library` · POST `/api/models/library` | the shipped models and logos, and adding a model by reference (`xds model add --library`) |
 | POST | `/api/fonts/fetch` | runs `xds fonts fetch` |
 | POST | `/api/reflow` | reflow a document `{ project, format }` to another format; returns `{ project, report }`, writes nothing |
+| GET | `/api/layouts` | the shipped layouts with their intent |
+| POST | `/api/layouts/apply` | `xds layout apply` on the active project `{ id, slide?, mode?, addRoles? }` (needs a saved document) |
 | GET · POST | `/api/snapshots` | list the snapshots (and migrate backups); take one `{ label? }` |
 | POST | `/api/snapshots/restore` | put one back `{ id }`, after snapshotting the current state |
 | DELETE | `/api/snapshots/{id}` | delete one (never a migrate backup) |
@@ -302,6 +306,9 @@ xds grid PROJECT FILE [--step PCT]        # an image with a labeled % grid → c
 xds formats
 xds schema --emit-types | --check        # xds development; --emit-types only inside the checkout
 xds reflow PROJECT (--format PRESET | --size WxH) [--dry-run]   # retarget: boxes relative to the margins, sizes to the bands
+xds layout list | show ID                 # the shipped slide layouts (docs/layouts.md)
+xds layout apply PROJECT ID [--slide ID] [--mode fill|replace|new] [--add-roles] [--dry-run]
+xds init PROJECT --layout ID              # seed the first slide from a layout
 xds snapshot PROJECT [--label TEXT]       # copy project.json, designs/, screens/ → .snapshots/
 xds snapshot PROJECT --list | --delete ID
 xds restore PROJECT ID                    # put a snapshot back (the current state is snapshotted first)

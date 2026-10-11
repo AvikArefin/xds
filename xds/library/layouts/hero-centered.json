@@ -1,0 +1,133 @@
+{
+  "id": "hero-centered",
+  "name": "Hero, centered",
+  "description": "Headline and subhead centered as a column on the top margin; the product below them; the call to action on the bottom margin.",
+  "intent": "One statement over the product, everything on the center line.",
+  "slots": [
+    "headline",
+    "subhead",
+    "cta",
+    "subject"
+  ],
+  "groups": {
+    "intro": {
+      "direction": "column",
+      "gap": 2,
+      "align": "center",
+      "pin": {
+        "cx": {
+          "to": "center"
+        },
+        "top": {
+          "to": "margin"
+        }
+      }
+    }
+  },
+  "subject": {
+    "place": {
+      "x": 50,
+      "y": 62,
+      "height": 46
+    },
+    "variants": {
+      "landscape": {
+        "place": {
+          "x": 50,
+          "y": 60,
+          "height": 52
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 60,
+          "height": 36
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 18
+      },
+      "layout": {
+        "group": "intro",
+        "fit": "text"
+      },
+      "data": {
+        "align": "center",
+        "wrap": "balance"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "subhead",
+      "slot": "subhead",
+      "level": "subhead",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 10
+      },
+      "layout": {
+        "group": "intro",
+        "fit": "text"
+      },
+      "data": {
+        "align": "center",
+        "wrap": "pretty"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 50
+          }
+        }
+      }
+    },
+    {
+      "id": "cta",
+      "slot": "cta",
+      "level": "body",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 6
+      },
+      "layout": {
+        "pin": {
+          "cx": {
+            "to": "center"
+          },
+          "bottom": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "align": "center",
+        "weight": 700
+      }
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "id": "stacked-centered",
+  "name": "Stacked, centered",
+  "description": "The headline on the top margin, the product centered, the call to action on the bottom margin, all on the center line.",
+  "intent": "Headline above, product in the middle, action below: the classic product post.",
+  "slots": [
+    "headline",
+    "cta",
+    "subject"
+  ],
+  "subject": {
+    "place": {
+      "x": 50,
+      "y": 52,
+      "height": 42
+    },
+    "variants": {
+      "landscape": {
+        "place": {
+          "x": 50,
+          "y": 56,
+          "height": 52
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 52,
+          "height": 34
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 16
+      },
+      "layout": {
+        "pin": {
+          "cx": {
+            "to": "center"
+          },
+          "top": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "align": "center",
+        "wrap": "balance"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "cta",
+      "slot": "cta",
+      "level": "body",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 6
+      },
+      "layout": {
+        "pin": {
+          "cx": {
+            "to": "center"
+          },
+          "bottom": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "align": "center",
+        "weight": 700
+      }
+    }
+  ]
+}

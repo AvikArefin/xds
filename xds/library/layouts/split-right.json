@@ -1,0 +1,136 @@
+{
+  "id": "split-right",
+  "name": "Split, text right",
+  "description": "A column of headline, subhead and call to action pinned to the right margin and centered vertically; the product fills the left half.",
+  "intent": "Text on the right, the product on the left: a feature or comparison slide.",
+  "slots": [
+    "headline",
+    "subhead",
+    "cta",
+    "subject"
+  ],
+  "groups": {
+    "copy": {
+      "direction": "column",
+      "gap": 3,
+      "align": "end",
+      "pin": {
+        "right": {
+          "to": "margin"
+        },
+        "cy": {
+          "to": "center"
+        }
+      }
+    }
+  },
+  "subject": {
+    "place": {
+      "x": 27,
+      "y": 55,
+      "height": 66
+    },
+    "variants": {
+      "landscape": {
+        "place": {
+          "x": 27,
+          "y": 55,
+          "height": 80
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 70,
+          "height": 40
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 42,
+        "h": 18
+      },
+      "layout": {
+        "group": "copy",
+        "fit": "text"
+      },
+      "data": {
+        "align": "right",
+        "wrap": "balance"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 40
+          }
+        },
+        "story": {
+          "box": {
+            "w": 80
+          }
+        }
+      }
+    },
+    {
+      "id": "subhead",
+      "slot": "subhead",
+      "level": "subhead",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 10
+      },
+      "layout": {
+        "group": "copy",
+        "fit": "text"
+      },
+      "data": {
+        "align": "right",
+        "wrap": "pretty"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 36
+          }
+        },
+        "story": {
+          "box": {
+            "w": 70
+          }
+        }
+      }
+    },
+    {
+      "id": "cta",
+      "slot": "cta",
+      "level": "body",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 36,
+        "h": 6
+      },
+      "layout": {
+        "group": "copy",
+        "fit": "text"
+      },
+      "data": {
+        "align": "right",
+        "weight": 700
+      }
+    }
+  ]
+}

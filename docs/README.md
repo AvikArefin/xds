@@ -13,6 +13,8 @@ design-rule audit.
   auto-framing, and how product-showcase backgrounds are built.
 - **[Design rules](./design-rules.md)**: the numbers derived from a format, the audit, every rule,
   and deliberate exceptions.
+- **[Layouts](./layouts.md)**: slide layouts written in relations (no coordinates), the slot
+  vocabulary, how `fill` / `replace` / `new` apply one, the shipped layouts, authoring.
 - **[Agent guide](./agent-guide.md)**: the file-and-CLI loop for agents, and bringing in 3D
   models (e.g. from Blender).
 - **[Human interaction](./human-interaction.md)**: the editor screen, modes, shortcuts and

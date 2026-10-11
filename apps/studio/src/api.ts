@@ -111,6 +111,9 @@ export const api = {
     ),
   /** Reflow a document to another format (pure: nothing is written; the caller commits it). */
   reflow: (project: Project, format: Format) => request<ReflowResponse>("POST", "/api/reflow", { project, format }),
+  layouts: () => request<{ layouts: LayoutSummary[] }>("GET", "/api/layouts"),
+  applyLayout: (body: { id: string; slide: string; mode: LayoutMode; addRoles?: boolean }) =>
+    request<{ report: LayoutReport }>("POST", "/api/layouts/apply", body),
   snapshots: () => request<{ snapshots: Snapshot[] }>("GET", "/api/snapshots"),
   takeSnapshot: (label?: string) => request<{ snapshot: Snapshot }>("POST", "/api/snapshots", { label }),
   restoreSnapshot: (id: string) => request<{ restored: Snapshot; safety: Snapshot; files: number }>("POST", "/api/snapshots/restore", { id }),
@@ -122,6 +125,32 @@ export const api = {
 };
 
 /** A device model that ships with xds; projects reference it by `path` (`xds:…`), never copy it. */
+export type LayoutMode = "fill" | "replace" | "new";
+
+/** A shipped slide layout (docs/layouts.md), as `GET /api/layouts` lists it. */
+export interface LayoutSummary {
+  id: string;
+  name: string;
+  intent: string;
+  description: string;
+  slots: string[];
+}
+
+export interface LayoutReport {
+  layout: string;
+  mode: LayoutMode;
+  orientation: string;
+  slide: string;
+  added: string[];
+  filled: { node: string; slot: string }[];
+  replaced: string[];
+  kept: string[];
+  addedRoles: Record<string, { level: string; font: string }>;
+  notes: string[];
+  subject?: { node: string; place: { x: number; y: number; height: number } };
+  written: boolean;
+}
+
 export interface LibraryModel {
   id: string;
   path: string;

@@ -1,0 +1,138 @@
+{
+  "id": "carousel-page",
+  "name": "Carousel page",
+  "description": "The page number on the top-right margin; the headline on the top-left margin with the body a gap below it, left edges shared; the swipe cue on the bottom-left margin.",
+  "intent": "One page of a LinkedIn document carousel: a page number, a headline, a paragraph, a swipe cue.",
+  "slots": [
+    "headline",
+    "body",
+    "caption"
+  ],
+  "nodes": [
+    {
+      "id": "page",
+      "slot": "caption",
+      "level": "caption",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 4
+      },
+      "layout": {
+        "pin": {
+          "right": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "text": "01",
+        "align": "right",
+        "uppercase": true,
+        "letterSpacing": 0.08
+      }
+    },
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 16
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "wrap": "balance"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 60
+          }
+        }
+      }
+    },
+    {
+      "id": "body",
+      "slot": "body",
+      "level": "body",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 24
+      },
+      "layout": {
+        "stack": {
+          "below": "headline",
+          "gap": 3
+        },
+        "align": [
+          {
+            "node": "headline",
+            "edge": "left"
+          }
+        ],
+        "fit": "text"
+      },
+      "data": {
+        "wrap": "pretty"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 56
+          }
+        }
+      }
+    },
+    {
+      "id": "swipe",
+      "slot": "caption",
+      "level": "caption",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 30,
+        "h": 4
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "bottom": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "text": "Swipe →",
+        "uppercase": true,
+        "letterSpacing": 0.08
+      }
+    }
+  ]
+}

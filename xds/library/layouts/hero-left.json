@@ -1,0 +1,161 @@
+{
+  "id": "hero-left",
+  "name": "Hero, left",
+  "description": "A kicker, headline and subhead flow as a column pinned to the top-left margin; the call to action sits on the bottom margin; the product takes the right half.",
+  "intent": "A launch post: one message top-left, the product on the right, a call to action at the foot.",
+  "slots": [
+    "kicker",
+    "headline",
+    "subhead",
+    "cta",
+    "subject"
+  ],
+  "groups": {
+    "intro": {
+      "direction": "column",
+      "gap": 3,
+      "align": "start",
+      "pin": {
+        "left": {
+          "to": "margin"
+        },
+        "top": {
+          "to": "margin"
+        }
+      }
+    }
+  },
+  "subject": {
+    "place": {
+      "x": 72,
+      "y": 58,
+      "height": 55
+    },
+    "variants": {
+      "landscape": {
+        "place": {
+          "x": 74,
+          "y": 55,
+          "height": 72
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 64,
+          "height": 40
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "kicker",
+      "slot": "kicker",
+      "level": "caption",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 4
+      },
+      "layout": {
+        "group": "intro",
+        "fit": "text"
+      },
+      "data": {
+        "uppercase": true,
+        "letterSpacing": 0.08
+      }
+    },
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 58,
+        "h": 18
+      },
+      "layout": {
+        "group": "intro",
+        "fit": "text"
+      },
+      "data": {
+        "wrap": "balance"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 44
+          }
+        },
+        "story": {
+          "box": {
+            "w": 80
+          }
+        }
+      }
+    },
+    {
+      "id": "subhead",
+      "slot": "subhead",
+      "level": "subhead",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 10
+      },
+      "layout": {
+        "group": "intro",
+        "fit": "text"
+      },
+      "data": {
+        "wrap": "pretty"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 40
+          }
+        },
+        "story": {
+          "box": {
+            "w": 70
+          }
+        }
+      }
+    },
+    {
+      "id": "cta",
+      "slot": "cta",
+      "level": "body",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 6
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "bottom": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "weight": 700
+      }
+    }
+  ]
+}

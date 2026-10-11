@@ -319,6 +319,24 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
         new, report = await run_in_threadpool(reflow.reflow, body["project"], target)
         return ok(project=new, report=report)
 
+    @app.get("/api/layouts")
+    async def get_layouts() -> dict[str, Any]:
+        from . import layouts
+
+        return ok(layouts=layouts.list_layouts())
+
+    @app.post("/api/layouts/apply")
+    async def apply_layout(body: dict[str, Any]) -> dict[str, Any]:
+        """`xds layout apply` for the active project (the editor saves first, then reloads)."""
+        from . import layouts
+
+        if not body.get("id"):
+            raise XdsError("BAD_REQUEST", "body needs { id, slide?, mode?, addRoles? }", status=422)
+        report = await run_in_threadpool(
+            layouts.apply_project, state.require_root(), body["id"], slide=body.get("slide"),
+            mode=body.get("mode", "fill"), add_roles=bool(body.get("addRoles", True)))
+        return ok(report=report)
+
     @app.get("/api/snapshots")
     async def list_snapshots() -> dict[str, Any]:
         from . import snapshots

@@ -1,0 +1,142 @@
+{
+  "id": "thumbnail",
+  "name": "Thumbnail",
+  "description": "A kicker on the top-left margin; the headline from the left margin to the two-thirds line, centered vertically, as big as the band allows; the product on the right third; nothing in the bottom-right corner.",
+  "intent": "A YouTube thumbnail: a huge headline on the left two thirds, the product on the right, the duration badge's corner left clear.",
+  "slots": [
+    "kicker",
+    "headline",
+    "subject"
+  ],
+  "subject": {
+    "place": {
+      "x": 83,
+      "y": 52,
+      "height": 78
+    },
+    "variants": {
+      "portrait": {
+        "place": {
+          "x": 50,
+          "y": 70,
+          "height": 44
+        }
+      },
+      "square": {
+        "place": {
+          "x": 72,
+          "y": 60,
+          "height": 60
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 70,
+          "height": 40
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "kicker",
+      "slot": "kicker",
+      "level": "caption",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 4
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "uppercase": true,
+        "letterSpacing": 0.08
+      }
+    },
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 60,
+        "h": 40
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "right": {
+            "to": "two-thirds"
+          },
+          "cy": {
+            "to": "center"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "scale": 1.4,
+        "uppercase": true,
+        "wrap": "balance",
+        "lineHeight": 0.95
+      },
+      "variants": {
+        "portrait": {
+          "layout": {
+            "pin": {
+              "left": {
+                "to": "margin"
+              },
+              "right": {
+                "to": "margin"
+              },
+              "top": {
+                "to": "margin",
+                "offset": 6
+              }
+            }
+          },
+          "data": {
+            "scale": 1.1
+          }
+        },
+        "story": {
+          "layout": {
+            "pin": {
+              "left": {
+                "to": "margin"
+              },
+              "right": {
+                "to": "margin"
+              },
+              "top": {
+                "to": "safe",
+                "offset": 2
+              }
+            }
+          },
+          "data": {
+            "scale": 1.0
+          }
+        }
+      }
+    }
+  ]
+}

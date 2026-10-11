@@ -1,0 +1,111 @@
+{
+  "id": "caption-bottom",
+  "name": "Caption at the bottom",
+  "description": "The product fills the slide; a headline on a plate and a body line flow as a column pinned to the bottom safe zone and the left margin.",
+  "intent": "A full-bleed product shot with the message on a plate at the foot, clear of the platform's UI.",
+  "slots": [
+    "headline",
+    "body",
+    "subject"
+  ],
+  "groups": {
+    "caption": {
+      "direction": "column",
+      "gap": 2,
+      "align": "start",
+      "pin": {
+        "left": {
+          "to": "margin"
+        },
+        "bottom": {
+          "to": "safe",
+          "offset": 2
+        }
+      }
+    }
+  },
+  "subject": {
+    "place": {
+      "x": 50,
+      "y": 42,
+      "height": 70
+    },
+    "variants": {
+      "landscape": {
+        "place": {
+          "x": 62,
+          "y": 50,
+          "height": 86
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 40,
+          "height": 50
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 70,
+        "h": 14
+      },
+      "layout": {
+        "group": "caption",
+        "fit": "text"
+      },
+      "data": {
+        "wrap": "balance",
+        "plate": {
+          "padding": 2,
+          "radius": 1,
+          "stroke": {
+            "width": 0.25
+          }
+        }
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 48
+          }
+        }
+      }
+    },
+    {
+      "id": "body",
+      "slot": "body",
+      "level": "body",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 70,
+        "h": 8
+      },
+      "layout": {
+        "group": "caption",
+        "fit": "text"
+      },
+      "data": {
+        "wrap": "pretty"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 44
+          }
+        }
+      }
+    }
+  ]
+}

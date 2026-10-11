@@ -72,9 +72,22 @@ def cmd_init(a: argparse.Namespace, out: Out) -> int:
             raise XdsError("USAGE", str(e), status=2) from e
     root = proj.init(a.project, name=a.name, preset=a.format or "instagram-portrait", size=size)
     fmt = proj.read_raw(root)["format"]
-    out.emit({"root": str(root), "format": fmt},
-             f"created {root} ({fmt.get('preset') or 'custom'} {fmt['width']}×{fmt['height']}, "
-             f"{formats.aspect_label(fmt['width'], fmt['height'])})")
+    text = (f"created {root} ({fmt.get('preset') or 'custom'} {fmt['width']}×{fmt['height']}, "
+            f"{formats.aspect_label(fmt['width'], fmt['height'])})")
+    data: dict[str, Any] = {"root": str(root), "format": fmt}
+    if a.layout:
+        from . import fonts, layouts
+
+        # The template has no font. A family already in the font library is registered offline;
+        # otherwise the new roles name Satoshi and the report says to fetch it.
+        known = next(iter(fonts.library_families().values()), None)
+        if known:
+            fonts.fetch(root, known["name"])
+        report = layouts.apply_project(root, a.layout, slide="s1", mode="replace", add_roles=True,
+                                       font_fallback="Satoshi")
+        data["layout"] = report
+        text += "\n" + layouts.report_text(report)
+    out.emit(data, text)
     return 0
 
 
@@ -446,6 +459,23 @@ def cmd_reflow(a: argparse.Namespace, out: Out) -> int:
     return 0
 
 
+def cmd_layout(a: argparse.Namespace, out: Out) -> int:
+    from . import layouts
+
+    if a.layout_cmd == "list":
+        items = layouts.list_layouts()
+        out.emit({"layouts": items}, "\n".join(f"{i['id']:<20} {i['name']:<24} {i['intent']}" for i in items))
+        return 0
+    if a.layout_cmd == "show":
+        d = layouts.load_layout(a.id)
+        out.emit({"layout": d}, layouts.layout_text(d))
+        return 0
+    report = layouts.apply_project(proj.find_root(a.project), a.id, slide=a.slide, mode=a.mode,
+                                   add_roles=a.add_roles, dry_run=a.dry_run)
+    out.emit(report, layouts.report_text(report))
+    return 0
+
+
 def cmd_snapshot(a: argparse.Namespace, out: Out) -> int:
     from . import snapshots
 
@@ -560,6 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--format", choices=sorted(formats.CATALOG),
                     help="a preset from `xds formats` (default instagram-portrait)")
     sp.add_argument("--size", metavar="WxH", help="a custom size with no platform preset, e.g. 1440x1080")
+    sp.add_argument("--layout", metavar="ID", help="seed the first slide from a library layout (`xds layout list`)")
 
     sp = add("open", cmd_open, "open the studio editor")
     sp.add_argument("project", nargs="?")
@@ -695,6 +726,22 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--format", choices=sorted(formats.CATALOG), help="a preset from `xds formats`")
     sp.add_argument("--size", metavar="WxH", help="a custom size, e.g. 1440x1080")
     sp.add_argument("--dry-run", action="store_true", help="report what would move without writing")
+
+    sp = add("layout", cmd_layout, "slide layouts written in relations: list, show, apply to a slide")
+    lsub = sp.add_subparsers(dest="layout_cmd", required=True)
+    lsub.add_parser("list", parents=[common], help="the layouts xds ships, with their intent")
+    l = lsub.add_parser("show", parents=[common], help="a layout's slots, relations and variants")
+    l.add_argument("id")
+    l = lsub.add_parser("apply", parents=[common],
+                        help="apply a layout to a slide (fill: re-place its text by level; replace: its 2D nodes; "
+                             "new: a slide after it)")
+    l.add_argument("project")
+    l.add_argument("id")
+    l.add_argument("--slide", help="the slide (default: the first)")
+    l.add_argument("--mode", choices=("fill", "replace", "new"), default="fill")
+    l.add_argument("--add-roles", action="store_true",
+                   help="add a type role for each level the layout needs and the brand lacks")
+    l.add_argument("--dry-run", action="store_true", help="report without writing")
 
     sp = add("snapshot", cmd_snapshot, "save a snapshot of the project's sources into .snapshots/")
     sp.add_argument("project")

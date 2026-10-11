@@ -1,0 +1,117 @@
+{
+  "id": "quote",
+  "name": "Quote",
+  "description": "An expressive quote spanning margin to margin, centered vertically; the attribution a gap below it, left edges shared; a small plus mark on the top-left margin.",
+  "intent": "One big quote, an attribution, a mark: a testimonial or a statement slide.",
+  "slots": [
+    "headline",
+    "caption",
+    "ornament"
+  ],
+  "nodes": [
+    {
+      "id": "mark",
+      "slot": "ornament",
+      "layer": "image",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin"
+          }
+        }
+      },
+      "data": {
+        "shape": "plus",
+        "stroke": {
+          "width": 0.5
+        }
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 2.5,
+            "h": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "quote",
+      "slot": "headline",
+      "level": "expressive",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 88,
+        "h": 40
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "right": {
+            "to": "margin"
+          },
+          "cy": {
+            "to": "center"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "text": "“Design is\nwhat holds it\ntogether.”",
+        "scale": 0.55,
+        "wrap": "balance",
+        "lineHeight": 1.0
+      },
+      "variants": {
+        "landscape": {
+          "data": {
+            "scale": 0.5
+          }
+        }
+      }
+    },
+    {
+      "id": "attribution",
+      "slot": "caption",
+      "level": "caption",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 60,
+        "h": 5
+      },
+      "layout": {
+        "stack": {
+          "below": "quote",
+          "gap": 4
+        },
+        "align": [
+          {
+            "node": "quote",
+            "edge": "left"
+          }
+        ],
+        "fit": "text"
+      },
+      "data": {
+        "text": "— A customer, somewhere",
+        "uppercase": true,
+        "letterSpacing": 0.08
+      }
+    }
+  ]
+}

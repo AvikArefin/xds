@@ -1,0 +1,103 @@
+{
+  "id": "product-spotlight",
+  "name": "Product spotlight",
+  "description": "The product fills the middle; a small headline sits on the top-left margin and the logo on the bottom-right margin.",
+  "intent": "The product as big as it goes; a small headline and the logo stay out of its way.",
+  "slots": [
+    "headline",
+    "logo",
+    "subject"
+  ],
+  "subject": {
+    "place": {
+      "x": 50,
+      "y": 56,
+      "height": 70
+    },
+    "variants": {
+      "landscape": {
+        "place": {
+          "x": 55,
+          "y": 55,
+          "height": 86
+        }
+      },
+      "story": {
+        "place": {
+          "x": 50,
+          "y": 54,
+          "height": 50
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "headline",
+      "slot": "headline",
+      "level": "headline",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 46,
+        "h": 12
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "scale": 0.8,
+        "wrap": "balance"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 30
+          }
+        }
+      }
+    },
+    {
+      "id": "logo",
+      "slot": "logo",
+      "layer": "image",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 6
+      },
+      "layout": {
+        "pin": {
+          "right": {
+            "to": "margin"
+          },
+          "bottom": {
+            "to": "margin"
+          }
+        }
+      },
+      "data": {
+        "asset": "@logo",
+        "fit": "contain"
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 9,
+            "h": 8
+          }
+        }
+      }
+    }
+  ]
+}

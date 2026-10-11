@@ -14,6 +14,8 @@ editor. Everything here goes through files and the `xds` CLI. Every command take
 
 ```text
 xds guide PROJECT --json      know the numbers for this format before designing
+xds layout list --json        start a slide from a layout written in relations (no coordinates)
+xds layout apply PROJECT ID --mode new|fill|replace --json
 edit project.json             (and designs/*.svg, assets/)
 xds check PROJECT --json      fast: schema, references, design manifests; no browser
 xds measure PROJECT --json    seconds: real line breaks, heights and stacks, text-only rules; no 3D
@@ -33,6 +35,9 @@ Rules of the road:
   real photos (the product, and anything a screen shows).
 - Read [design rules](./design-rules.md) once. `xds guide` gives the numbers, and `xds rules`
   gives every rule's principle.
+- Start each slide from a layout ([layouts](./layouts.md)): `xds layout list` for the intents,
+  `xds layout apply PROJECT hero-left --mode new` for a slide after the current one, `--mode
+  fill` to re-place the text you already wrote by level. Then change words, not coordinates.
 - Pick type sizes from the band defaults first. Change them only for a reason, and prefer a
   `scale` (a factor of the band default) over a px `size`: it holds in every format.
 - To retarget a finished deck to another format, `xds reflow PROJECT --format PRESET` (boxes
@@ -98,6 +103,9 @@ The full schema is in [data models](./data-models.md). The most common edits:
     "layout": { "pin": { "right": { "to": "margin" }, "bottom": { "to": "margin" } } },
     "data": { "asset": "logo" } } ] }
 // a slide without it: "master": false   (or the ids to leave off: "master": ["logo"])
+
+// a whole slide from a layout: `xds layout apply . split-left --mode new --json` writes the column,
+// its group, the subject's `place` and the roles it needs; `xds layout show split-left` prints them
 
 // the product, on the right third, a bit smaller
 "camera": { "mode": "frame", "x": 64, "y": 58, "height": 50 }

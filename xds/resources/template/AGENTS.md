@@ -45,6 +45,8 @@ answer so a quick "yes" is enough:
 
 ```bash
 xds guide . --json      # the numbers for this format: margin, spacing unit, type sizes. Read first.
+xds layout list --json  # slide layouts written in relations (no coordinates); `xds layout show ID` for one
+xds layout apply . ID --mode new --json   # a slide after the first from it (fill: re-place your text by level)
 # edit project.json / designs / screens
 xds check . --json      # fast: schema, references, designs, model parts (no browser)
 xds measure . --json    # seconds, no 3D: where each text block lands (lines, heights, stacks) + text checks

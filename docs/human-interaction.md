@@ -96,6 +96,12 @@ reloads from disk. Undo has one step per drag or field change.
 - **New project**: `Cmd/Ctrl + O` → **New project** → name, folder, format → **Create**. (Terminal:
   `xds init ~/xd-projects/launch --name "Launch"`.) It starts with one slide on a `solid`
   background, a one-color brand, and an `AGENTS.md` for AI agents.
+- **Start from a layout**: `Cmd/Ctrl + K` → **Apply layout…** → a layout (its intent is the
+  hint) → **Fill this slide** (your text blocks keep their words and take the layout's places by
+  level), **Replace this slide's text and 2D** (the background and 3D stay) or **New slide after
+  this one**. The editor saves, applies and reloads; roles the layout needs are added. Layouts
+  are written in relations, so the slide survives a format change. (Terminal: `xds layout list`,
+  `xds layout apply . ID --mode new`; see [layouts](./layouts.md).)
 - **Restore**: the rail's clock icon (or `Cmd/Ctrl + O` → **Restore**) lists the project's
   snapshots, newest first: the ones you took (**Snapshot now…**, with a label), the ones taken
   automatically before a big save (a format change, a slide added or removed, more than a quarter

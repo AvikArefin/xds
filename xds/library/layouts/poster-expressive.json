@@ -1,0 +1,339 @@
+{
+  "id": "poster-expressive",
+  "name": "Poster, expressive",
+  "description": "Three expressive words fill the width, each a tight gap under the last (the middle one indented), the third on a plate; a star, rings and a lens sit on the margins; a label plate in the bottom-right corner. The brand gets an expression system (one angle family, one skew, one extrusion direction) if it has none.",
+  "intent": "Three words as a graphic: skewed, extruded, stacked tight, with ornaments and a plate label. Declared, so the audit can keep it coherent.",
+  "slots": [
+    "headline",
+    "caption",
+    "ornament"
+  ],
+  "expression": {
+    "angles": [
+      8
+    ],
+    "skews": [
+      -12
+    ],
+    "strokeWidths": [
+      0.25,
+      0.5
+    ],
+    "extrudeAngle": 135,
+    "radii": [
+      1
+    ],
+    "ornaments": [
+      "star-4",
+      "sparkle",
+      "rings",
+      "lens"
+    ],
+    "maxTreatments": 4
+  },
+  "nodes": [
+    {
+      "id": "word1",
+      "slot": "headline",
+      "level": "expressive",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 18
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin",
+            "offset": 2
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "text": "SHIFT",
+        "fitWidth": true,
+        "skew": -12,
+        "uppercase": true,
+        "lineHeight": 0.85,
+        "extrude": {
+          "depth": 1.5,
+          "angle": 135
+        }
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 46
+          }
+        }
+      }
+    },
+    {
+      "id": "word2",
+      "slot": "headline",
+      "level": "expressive",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 62,
+        "h": 18
+      },
+      "layout": {
+        "stack": {
+          "below": "word1",
+          "gap": -1
+        },
+        "align": [
+          {
+            "node": "word1",
+            "edge": "left",
+            "offset": 8
+          }
+        ],
+        "fit": "text"
+      },
+      "data": {
+        "text": "YOUR",
+        "fitWidth": true,
+        "skew": -12,
+        "uppercase": true,
+        "lineHeight": 0.85
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 34
+          }
+        }
+      }
+    },
+    {
+      "id": "word3",
+      "slot": "headline",
+      "level": "expressive",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 86,
+        "h": 18
+      },
+      "layout": {
+        "stack": {
+          "below": "word2",
+          "gap": 2
+        },
+        "pin": {
+          "left": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "text": "PERSPECTIVE",
+        "fitWidth": true,
+        "uppercase": true,
+        "lineHeight": 0.85,
+        "scale": 0.6,
+        "plate": {
+          "padding": 2,
+          "radius": 1,
+          "stroke": {
+            "width": 0.5
+          }
+        },
+        "extrude": {
+          "depth": 1,
+          "angle": 135
+        }
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 50
+          }
+        }
+      }
+    },
+    {
+      "id": "star-top",
+      "slot": "ornament",
+      "layer": "image",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "layout": {
+        "pin": {
+          "right": {
+            "to": "margin"
+          },
+          "top": {
+            "to": "margin"
+          }
+        }
+      },
+      "data": {
+        "shape": "star-4",
+        "stroke": {
+          "width": 0.25
+        }
+      }
+    },
+    {
+      "id": "rings",
+      "slot": "ornament",
+      "layer": "image",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+      },
+      "layout": {
+        "pin": {
+          "left": {
+            "to": "margin"
+          },
+          "cy": {
+            "to": "center",
+            "offset": 6
+          }
+        }
+      },
+      "data": {
+        "shape": "rings",
+        "stroke": {
+          "width": 0.25
+        },
+        "params": {
+          "count": 3,
+          "spread": 0.5,
+          "angle": 90
+        }
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 16,
+            "h": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "lens",
+      "slot": "ornament",
+      "layer": "image",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 30,
+        "h": 10
+      },
+      "layout": {
+        "pin": {
+          "right": {
+            "to": "margin"
+          },
+          "cy": {
+            "to": "two-thirds",
+            "offset": 2
+          }
+        }
+      },
+      "data": {
+        "shape": "lens",
+        "stroke": {
+          "width": 0.25
+        },
+        "params": {
+          "count": 3
+        }
+      },
+      "variants": {
+        "landscape": {
+          "box": {
+            "w": 20,
+            "h": 12
+          }
+        }
+      }
+    },
+    {
+      "id": "spark",
+      "slot": "ornament",
+      "layer": "image",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 2.4
+      },
+      "layout": {
+        "pin": {
+          "right": {
+            "to": "margin",
+            "offset": -6
+          },
+          "bottom": {
+            "to": "margin",
+            "offset": -10
+          }
+        }
+      },
+      "data": {
+        "shape": "sparkle",
+        "stroke": {
+          "width": 0.25
+        }
+      }
+    },
+    {
+      "id": "label",
+      "slot": "caption",
+      "level": "caption",
+      "layer": "type",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "layout": {
+        "pin": {
+          "right": {
+            "to": "margin"
+          },
+          "bottom": {
+            "to": "margin"
+          }
+        },
+        "fit": "text"
+      },
+      "data": {
+        "text": "SKEW-0003",
+        "align": "right",
+        "uppercase": true,
+        "letterSpacing": 0.08,
+        "plate": {
+          "padding": 1.5,
+          "radius": 1,
+          "stroke": {
+            "width": 0.25
+          }
+        }
+      }
+    }
+  ]
+}

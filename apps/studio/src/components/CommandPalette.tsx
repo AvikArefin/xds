@@ -3,7 +3,7 @@ import type { Lighting } from "@xds/protocol";
 import { api } from "../api";
 import { SHAPES, SHAPE_LABELS } from "../stage/shapes";
 import { useStudio } from "../store";
-import { addStarterBackground } from "./commands";
+import { addStarterBackground, applyLayout } from "./commands";
 
 interface Command {
   id: string;
@@ -73,6 +73,31 @@ function baseCommands(): Command[] {
             useStudio.getState().addShapeNode(shape);
           },
         })),
+    },
+    {
+      id: "layout",
+      label: "Apply layout…",
+      hint: "a slide layout from the library",
+      run: () => {},
+      sub: async () => {
+        let layouts: { id: string; name: string; intent: string }[] = [];
+        try {
+          layouts = (await api.layouts()).layouts;
+        } catch {
+          /* offline */
+        }
+        return layouts.map((l) => ({
+          id: `layout-${l.id}`,
+          label: l.name,
+          hint: l.intent,
+          run: () => {},
+          sub: () => [
+            { id: `layout-${l.id}-fill`, label: "Fill this slide", hint: "re-place its text by level, keep the words", run: () => applyLayout(l.id, "fill") },
+            { id: `layout-${l.id}-replace`, label: "Replace this slide's text and 2D", hint: "the background and 3D stay", run: () => applyLayout(l.id, "replace") },
+            { id: `layout-${l.id}-new`, label: "New slide after this one", run: () => applyLayout(l.id, "new") },
+          ],
+        }));
+      },
     },
     {
       id: "design",

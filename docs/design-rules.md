@@ -9,6 +9,10 @@ XDS includes a set of layout and typography rules as code. They work in two dire
   measures what was drawn, and runs every rule. Each finding says what was measured, what was
   expected, and the concrete fix.
 
+Before the first number is typed, a slide can start from a [layout](./layouts.md): a composition
+written in relations (pins, stacks, aligns, groups, scales) that is right in every format, so
+the rules below have little left to catch.
+
 Rules are not a substitute for taste. They catch the mistakes that are almost always mistakes,
 such as overlapping text, unreadable contrast, text under the platform's UI, or two sizes that are
 nearly but not quite the same. They also flag *ambiguity*: things that look accidental rather than
