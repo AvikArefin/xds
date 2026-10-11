@@ -45,6 +45,8 @@ def test_margin_override():
 def test_three_by_four_and_four_by_three_presets():
     assert (formats.CATALOG["instagram-portrait-3x4"].width, formats.CATALOG["instagram-portrait-3x4"].height) == (1080, 1440)
     assert (formats.CATALOG["linkedin-document-4x3"].width, formats.CATALOG["linkedin-document-4x3"].height) == (1440, 1080)
+    assert (formats.CATALOG["freelancer-portfolio-4x3"].width, formats.CATALOG["freelancer-portfolio-4x3"].height) == (1600, 1200)
+    assert formats.CATALOG["freelancer-portfolio-4x3"].view_width == 800
     assert formats.CATALOG["presentation-4x3"].group == "Screen"
     assert {f["key"]: f["aspect"] for f in formats.catalog_json()}["instagram-portrait-3x4"] == "3:4 portrait"
 

@@ -45,6 +45,7 @@ Everything scales from the format, so the same rules work for a 1080 px post and
 | `linkedin-landscape` | 1200 × 627 | 552 | none |
 | `linkedin-document-4x3` | 1440 × 1080 | 552 | none (a PDF carousel page) |
 | `x-landscape` | 1600 × 900 | 390 | none |
+| `freelancer-portfolio-4x3` | 1600 × 1200 | 800 (the portfolio showcase lightbox) | none |
 | `youtube-thumbnail` | 1280 × 720 | 360 | bottom-right 220 × 90 (duration badge) |
 | `presentation-4x3` / `presentation-16x9` | 1440 × 1080 / 1920 × 1080 | 1440 (a laptop screen) | none |
 | `print-a3` / `print-a4` | 300 dpi | n/a: print uses minimum point sizes | 3 mm bleed, 5 mm trim-safe |

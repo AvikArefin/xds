@@ -57,6 +57,8 @@ CATALOG: dict[str, Profile] = {
         Profile("linkedin-document-4x3", "LinkedIn document 4:3 (PDF carousel)", "Social", 1440, 1080,
                 552),
         Profile("x-landscape", "X landscape", "Social", 1600, 900, 390),
+        Profile("freelancer-portfolio-4x3", "Freelancer.com portfolio 4:3", "Social", 1600, 1200,
+                800),
         Profile("youtube-thumbnail", "YouTube thumbnail", "Video", 1280, 720, 360,
                 corner_zones=(("duration badge", "bottom-right", 220, 90),)),
         Profile("presentation-4x3", "Presentation 4:3", "Screen", 1440, 1080, 1440),
