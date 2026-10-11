@@ -16,6 +16,7 @@ from PIL import Image
 
 from ..models import (
     FRAME_DEFAULTS,
+    Edit,
     FrameCamera,
     MeasuredNode,
     Project,
@@ -250,11 +251,18 @@ class MeasuredSlide:
         """A concrete edit that moves a node by (dx, dy) px: its box.x/box.y, or camera.x/y."""
         src = self.source(node_id)
         if src is not None and getattr(src, "box", None) is not None:
-            stack = getattr(src.data, "stack", None)
-            parts = [f"box.x to {src.box.x + 100 * dx / self.width:.1f}"] if dx else []
-            if dy and stack is not None:  # a stacked block's y comes from its gap
+            where = self._stack_of(src)
+            stack = where[1] if where else None
+            axis = stack.axis if stack is not None else None
+            parts = []
+            if dx and axis == "x":  # a stacked block's position along its axis comes from its gap
+                gap = stack.gap + (dx if stack.right_of else -dx) / self.guide.u
+                parts.append(f"{where[0]}.gap to {round(gap * 4) / 4:g} (u)")
+            elif dx:
+                parts.append(f"box.x to {src.box.x + 100 * dx / self.width:.1f}")
+            if dy and axis == "y":
                 gap = stack.gap + (dy if stack.below else -dy) / self.guide.u
-                parts.append(f"data.stack.gap to {round(gap * 4) / 4:g} (u)")
+                parts.append(f"{where[0]}.gap to {round(gap * 4) / 4:g} (u)")
             elif dy:
                 parts.append(f"box.y to {src.box.y + 100 * dy / self.height:.1f}")
             return f"Set '{self.name(node_id)}' " + " and ".join(parts) if parts else "No move needed"
@@ -270,3 +278,51 @@ class MeasuredSlide:
         if cam is None:
             return "switch to camera.mode 'frame' and set camera.height"
         return f"camera.height to {max(1.0, min(200.0, cam['height'] * factor)):.0f}"
+
+    # --- structured fixes (the same values as the texts above, as `Edit`s) ------------------
+    def _stack_of(self, src: Any) -> tuple[str, Any] | None:
+        """Where the node's stack is written (`layout.stack` wins over `data.stack`) and the stack."""
+        layout = getattr(src, "layout", None)
+        if layout is not None and getattr(layout, "stack", None) is not None:
+            return "layout.stack", layout.stack
+        stack = getattr(getattr(src, "data", None), "stack", None)
+        return ("data.stack", stack) if stack is not None else None
+
+    def move_edits(self, node_id: str, dx: float = 0.0, dy: float = 0.0) -> list[Edit]:
+        """The edits behind `move_fix`: box.x / box.y (a stacked block's gap along its stack axis),
+        or camera.x / camera.y for the subject. Values match the text to the same rounding."""
+        src = self.source(node_id)
+        edits: list[Edit] = []
+        if src is not None and getattr(src, "box", None) is not None:
+            where = self._stack_of(src)
+            stack = where[1] if where else None
+            axis = stack.axis if stack is not None else None
+            if dx and axis == "x":
+                sign = 1 if stack.right_of else -1
+                gap = stack.gap + sign * dx / self.guide.u
+                edits.append(Edit(node_id=node_id, path=f"{where[0]}.gap", value=round(gap * 4) / 4))
+            elif dx:
+                edits.append(Edit(node_id=node_id, path="box.x", value=round(src.box.x + 100 * dx / self.width, 1)))
+            if dy and axis == "y":
+                gap = stack.gap + (dy if stack.below else -dy) / self.guide.u
+                edits.append(Edit(node_id=node_id, path=f"{where[0]}.gap", value=round(gap * 4) / 4))
+            elif dy:
+                edits.append(Edit(node_id=node_id, path="box.y", value=round(src.box.y + 100 * dy / self.height, 1)))
+            return edits
+        cam = self.camera()
+        if cam is None:
+            return []
+        for axis, d, size in (("x", dx, self.width), ("y", dy, self.height)):
+            if d:
+                edits.append(Edit(path=f"camera.{axis}", value=round(cam[axis] + 100 * d / size, 1)))
+        return edits
+
+    def camera_height_edits(self, factor: float) -> list[Edit]:
+        cam = self.camera()
+        if cam is None:
+            return []
+        return [Edit(path="camera.height", value=float(f"{max(1.0, min(200.0, cam['height'] * factor)):.0f}"))]
+
+    def lighting_edits(self, delta: float) -> list[Edit]:
+        b = self.project.slide_lighting(self.slide).brightness
+        return [Edit(path="lighting.brightness", value=round(max(-1.0, min(1.0, b + delta)), 1))]

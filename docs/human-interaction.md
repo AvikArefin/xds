@@ -27,7 +27,7 @@ editor.
 
 | Area | Contents |
 | --- | --- |
-| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
+| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields (Text adds **Wrap** and **Stack**). |
@@ -137,8 +137,13 @@ reloads from disk. Undo has one step per drag or field change.
 - **Text size that holds in every format**: give a role (Present → Typography) or a text block a
   **Scale** instead of a px **Size**: 1.2 means 1.2 × the level's band default for whatever format
   the project is in. A px size wins over a scale on the same role or block.
-- **Audit**: `A` or **Run audit** (saves first). Click a finding to select its node. **Mark as
-  intentional…** records an exception with your reason.
+- **Audit**: `A` or **Run audit** (saves first). Click a finding to select its node. A finding
+  whose fix is one value (a position, a size, a gap, the camera height) shows **Fix**: one click
+  applies it as one undo step, switches to the node's layer and selects it. **Fix all on this
+  slide** applies every error's and warning's fix on the active slide (it asks first past five)
+  and audits again; `info` findings are left to you. **Mark as intentional…** records an
+  exception with your reason. (Terminal: `xds fix .`, see
+  [design rules §6.1](./design-rules.md#61-applying-fixes).)
 - **Export**: in the Present panel (`1`), **PNG** writes a PNG per slide and **PDF** the deck as
   one PDF, ready to upload as a LinkedIn carousel (a document post). Save first. Both are also
   in the command palette. It stops on open audit errors;

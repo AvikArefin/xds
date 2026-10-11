@@ -13,6 +13,7 @@ import numpy as np
 
 from ..contrast import line_score, oklab_l
 from ..geometry import R
+from ...models import Edit
 from ..registry import Hit, rule
 
 if TYPE_CHECKING:
@@ -53,9 +54,9 @@ def _better_color(s: MeasuredSlide, t: Thresholds, patch: np.ndarray, current: s
     return max(scored, key=lambda x: x[1]) if scored else None
 
 
-def _larger_size(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, lc: float) -> str | None:
+def _larger_size(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, lc: float) -> tuple[str, int] | None:
     """The smallest data.size, within the level's band, at which `lc` already passes: the next
-    size band up has a lower minimum."""
+    size band up has a lower minimum. Returns the fix text and the size."""
     small, large = t["contrast.sizes"]
     k = s.guide.k or 1
     band = t.band(n.level)
@@ -65,28 +66,32 @@ def _larger_size(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, lc: float) ->
             continue
         need, name = t.lc_band(size * k, n.style.weight)
         if lc >= need + t["contrast.marginal"]:
-            return f"set data.size to {size} ({name}: Lc ≥ {need:g})"
+            return f"set data.size to {size} ({name}: Lc ≥ {need:g})", size
     return None
 
 
 def _contrast_hit(s: MeasuredSlide, t: Thresholds, n: MeasuredNode, w: dict[str, Any],
                   severity: str) -> Hit:
     alt = _better_color(s, t, w["patch"], n.style.color)
+    edits: list[Edit] = []
     if alt and alt[1] >= w["lcMin"]:
         fix = f"Set data.color to '{alt[0]}' (Lc {alt[1]:.0f} here)"
+        edits = [Edit(node_id=n.id, path="data.color", value=alt[0])]
     else:
         fix = "Put a scrim behind the text, or move the block to a calmer, more contrasting part of the background"
         if alt:
             fix = f"Set data.color to '{alt[0]}' (Lc {alt[1]:.0f} here) and add a scrim, or move the block"
     if bigger := _larger_size(s, t, n, w["lc"]):
-        fix += f", or {bigger}"
+        fix += f", or {bigger[0]}"
+        if not edits:  # a passing color is the lighter edit; the size only when no color passes
+            edits = [Edit(node_id=n.id, path="data.size", value=bigger[1])]
     return Hit(
         severity=severity, nodes=[n.id], region=w["rect"],
         message=(f"'{s.name(n.id)}' reads at Lc {w['lc']:.0f} over its background; at {n.style.size:g} px "
                  f"({w['band']}, {w['displayedPx']:g} px on screen) text needs Lc ≥ {w['lcMin']:.0f}."),
         measured={"lc": round(w["lc"], 1), "wcag": round(w["wcag"], 2), "displayedPx": w["displayedPx"]},
         expected={"lcMin": w["lcMin"], "sizeBand": w["band"]},
-        fix=fix,
+        fix=fix, edits=edits,
     )
 
 

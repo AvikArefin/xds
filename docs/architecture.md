@@ -281,6 +281,7 @@ xds rules                                 # every audit rule with principle + th
 xds measure PROJECT [--slide ID]…        # text only (no 3D): lines, heights, stacks, text rules
 xds render PROJECT [--slide ID]           # slide PNGs + contact sheet → cache/<hash>/
 xds audit PROJECT [--slide ID]            # render + measure + rules → audit.json + annotated PNGs
+xds fix PROJECT [--slide ID]… [--rule R]… [--severity S] [--dry-run]   # apply the findings' edits
 xds export PROJECT [--out DIR] [--force] [--pdf]  # audit gate → export/<stamp>/
 xds migrate [PROJECT | --all] [--dry-run] [--conform]
 xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace]   # .glb, .gltf, .dae

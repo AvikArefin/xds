@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Iterator
 import numpy as np
 
 from ..geometry import R, union_all
+from ...models import Edit
 from ..registry import Hit, rule
 
 if TYPE_CHECKING:
@@ -29,12 +30,16 @@ def _bbox(mask: np.ndarray) -> R | None:
     return R.from_edges(xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
 
 
-def _clear_of(s: MeasuredSlide, node_id: str, ink: R, obstacle: R, gap: float) -> str:
-    """A move that puts `ink` above or below `obstacle` (whichever is shorter), as a fix."""
+def _clear_dy(ink: R, obstacle: R, gap: float) -> float:
+    """The shorter move that puts `ink` above or below `obstacle`."""
     up = obstacle.y - gap - ink.y1
     down = obstacle.y1 + gap - ink.y
-    dy = up if abs(up) <= abs(down) else down
-    return s.move_fix(node_id, dy=dy)
+    return up if abs(up) <= abs(down) else down
+
+
+def _clear_of(s: MeasuredSlide, node_id: str, ink: R, obstacle: R, gap: float) -> str:
+    """A move that puts `ink` above or below `obstacle` (whichever is shorter), as a fix."""
+    return s.move_fix(node_id, dy=_clear_dy(ink, obstacle, gap))
 
 
 @rule("TEXT_OVERLAP", family=FAMILY, severity="error")
@@ -57,6 +62,7 @@ def text_overlap(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             measured={"overlapPx": round(sum(h.area for h in hits))},
             expected={"overlapPx": 0, "gapPx": t.u},
             fix=_clear_of(s, b.id, ib, ia, t.u) + f" (clear of '{s.name(a.id)}' by {t.u}px)",
+            edits=s.move_edits(b.id, dy=_clear_dy(ib, ia, t.u)),
         )
 
 
@@ -84,6 +90,7 @@ def text_crowded(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"'{s.name(a.id)}' and '{s.name(b.id)}' are {gap:.0f}px apart, which reads as touching.",
             measured={"gapPx": round(gap, 1)}, expected={"gapPxMin": round(need, 1)},
             fix=s.move_fix(second.id, dx=dx, dy=dy) + f" (gap ≥ {need:.0f}px), or group them tighter on purpose",
+            edits=s.move_edits(second.id, dx=dx, dy=dy),
         )
 
 
@@ -199,6 +206,7 @@ def subject_cropped(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         expected={"cropPct": f"0 or ≥ {t['subjectCrop']}"},
         fix=(f"Bring it fully into frame: set {s.camera_height_fix(0.85)}" if small
              else "Crop is large enough to read as deliberate; record an exception if intended"),
+        edits=s.camera_height_edits(0.85) if small else [],
     )
 
 
@@ -218,9 +226,11 @@ def text_clipped(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         has_box = src is not None and hasattr(src, "box")
         need = 100 * (n.content_height + 1) / s.height if n.content_height else None
         taller = has_box and need is not None and need > src.box.h + 0.05
+        edits = [Edit(node_id=n.id, path="box.h", value=round(min(100.0, need), 1))] if taller else []
         if out:
             fix = "Move the block inside the canvas" + (f" and set box.h to {min(100.0, need):.1f}"
                                                         if taller else "") + ", or shorten the text"
+            edits = []  # a move inside the canvas is a design choice, not one value
         elif taller:
             fix = f"Set box.h to {min(100.0, need):.1f}, shorten the text, or lower data.size"
         elif has_box and need is not None:
@@ -233,7 +243,7 @@ def text_clipped(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"'{s.name(n.id)}' doesn't fit: its text is cut off.",
             measured={"overflow": bool(n.overflow), "linesOffCanvas": len(out)},
             expected={"overflow": False},
-            fix=fix,
+            fix=fix, edits=edits,
         )
 
 
@@ -255,6 +265,7 @@ def in_safe_zone(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                 message=f"'{s.name(n.id)}' sits under the {z.name} safe zone, which the app covers.",
                 measured={"zone": z.name, "overlapPx": round(hit.area)}, expected={"overlapPx": 0},
                 fix=_clear_of(s, n.id, ink, zone, t.u),
+                edits=s.move_edits(n.id, dy=_clear_dy(ink, zone, t.u)),
             )
         sub = s.subject_mask
         if sub is not None and s.subject_block is not None:
@@ -267,6 +278,7 @@ def in_safe_zone(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                     expected={"overlapPx": 0},
                     fix=_clear_of(s, "subject", s.subject_block.rect, zone, t.u)
                     + f", or set {s.camera_height_fix(0.85)}",
+                    edits=s.move_edits("subject", dy=_clear_dy(s.subject_block.rect, zone, t.u)),
                 )
 
 
@@ -296,6 +308,7 @@ def outside_margin(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"'{b.name}' extends {max(abs(dx), abs(dy)):.0f}px past the {s.guide.m}px margin.",
             measured={"outsidePx": round(max(abs(dx), abs(dy)), 1)}, expected={"marginPx": s.guide.margins},
             fix=s.move_fix(b.id, dx=dx, dy=dy) + " (or narrow its box)",
+            edits=s.move_edits(b.id, dx=dx, dy=dy),
         )
 
 
@@ -323,4 +336,5 @@ def edges_kissing(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             measured={"gapPx": round(gap, 1)}, expected={"gapPx": f"0 (overlap) or ≥ {t.u}"},
             fix=s.move_fix(second.id, dx=push if horizontal else 0, dy=0 if horizontal else push)
             + f" (≥ {t.u}px apart), or overlap them deliberately",
+            edits=s.move_edits(second.id, dx=push if horizontal else 0, dy=0 if horizontal else push),
         )

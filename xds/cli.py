@@ -204,6 +204,15 @@ def cmd_audit(a: argparse.Namespace, out: Out) -> int:
     return 1 if export.open_errors(report) else 0
 
 
+def cmd_fix(a: argparse.Namespace, out: Out) -> int:
+    from . import fix
+
+    r = fix.run(a.project, slide_ids=a.slide or None, rules=a.rule or None, severity=a.severity,
+                dry_run=a.dry_run, progress=out.line)
+    out.emit(r, fix.text(r))
+    return 0 if r["applied"] else 1
+
+
 def cmd_export(a: argparse.Namespace, out: Out) -> int:
     from . import export
 
@@ -575,6 +584,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("audit", cmd_audit, "render + measure + rules → audit.json + annotated PNGs")
     sp.add_argument("project")
     sp.add_argument("--slide")
+
+    sp = add("fix", cmd_fix, "apply the audit's structured fixes (findings' `edits`) to project.json")
+    sp.add_argument("project")
+    sp.add_argument("--slide", action="append", help="only this slide (repeatable)")
+    sp.add_argument("--rule", action="append", help="only this rule (repeatable)")
+    sp.add_argument("--severity", choices=["error", "warn", "info"], default="warn",
+                    help="apply findings of this severity and above (default warn: errors and warnings)")
+    sp.add_argument("--dry-run", action="store_true", help="show the edits without writing")
 
     sp = add("export", cmd_export, "audit gate → export/<stamp>/")
     sp.add_argument("project")

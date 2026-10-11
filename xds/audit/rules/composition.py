@@ -147,6 +147,7 @@ def hierarchy_order(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             measured={"before": n.id}, expected={"first": top.id},
             fix=s.move_fix(n.id, dy=ti.y1 + t.u * 2 - ni.y) + f" (below '{s.name(top.id)}'), "
                 "or place it directly above as a kicker",
+            edits=s.move_edits(n.id, dy=ti.y1 + t.u * 2 - ni.y),
         )
 
 
@@ -175,6 +176,7 @@ def position_near_miss(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                     expected={"offsetPx": f"0 or > {hi:.0f}"},
                     fix=s.move_fix(b.id, dx=d if axis == "x" else 0, dy=d if axis == "y" else 0)
                     + f" to sit on the {name}",
+                    edits=s.move_edits(b.id, dx=d if axis == "x" else 0, dy=d if axis == "y" else 0),
                 )
                 break
 

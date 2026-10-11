@@ -8,8 +8,11 @@ const SEV_ICON = { error: "error", warn: "warn", info: "info" } as const;
 
 export function FindingItem({ f, onClick, compact }: { f: Finding; onClick?: () => void; compact?: boolean }) {
   const markIntentional = useStudio((s) => s.markIntentional);
+  const applyEdits = useStudio((s) => s.applyEdits);
+  const readOnly = useStudio((s) => s.readOnly);
   const structural = f.family === "check" || !!f.path;
   const waived = f.status === "waived";
+  const fixable = !waived && !!f.edits?.length && !readOnly;
   return (
     <li className={`finding sev-${f.severity}${waived ? " waived" : ""}`}>
       <button type="button" className="finding-main" onClick={onClick} title={f.fix ? `Fix: ${f.fix}` : undefined}>
@@ -25,10 +28,27 @@ export function FindingItem({ f, onClick, compact }: { f: Finding; onClick?: () 
           {waived && f.waiver?.reason && <span className="finding-fix">Intentional: {f.waiver.reason}</span>}
         </span>
       </button>
-      {!structural && !waived && !compact && (
-        <button type="button" className="link-btn" onClick={() => markIntentional(f)}>
-          Mark as intentional…
-        </button>
+      {!compact && (fixable || (!structural && !waived)) && (
+        <span className="finding-actions">
+          {fixable && (
+            <button
+              type="button"
+              className="link-btn"
+              title={f.edits!.map((e) => `${e.nodeId ?? e.slideId ?? "project"}: ${e.path} → ${JSON.stringify(e.value ?? null)}`).join("\n")}
+              onClick={() => {
+                const n = applyEdits(f.edits!);
+                if (n) useStudio.getState().notify("success", `Applied: ${f.fix}`);
+              }}
+            >
+              Fix
+            </button>
+          )}
+          {!structural && !waived && (
+            <button type="button" className="link-btn" onClick={() => markIntentional(f)}>
+              Mark as intentional…
+            </button>
+          )}
+        </span>
       )}
     </li>
   );
@@ -46,6 +66,7 @@ export function AuditPanel() {
   const activeSlideId = useStudio((s) => s.activeSlideId);
   const showAudit = useStudio((s) => s.showAudit);
   const toggleAudit = useStudio((s) => s.toggleAudit);
+  const fixAll = useStudio((s) => s.fixAll);
   const [scope, setScope] = useState<"slide" | "all">("all");
   const [showWaived, setShowWaived] = useState(false);
 
@@ -54,6 +75,9 @@ export function AuditPanel() {
     (f) => (showWaived || f.status !== "waived") && (scope === "all" || !f.slideId || f.slideId === activeSlideId),
   );
   const sum = report?.summary;
+  const fixable = (report?.findings ?? []).filter(
+    (f) => f.status === "open" && f.severity !== "info" && f.edits?.length && (!f.slideId || f.slideId === activeSlideId),
+  ).length;
 
   return (
     <div className="audit-panel">
@@ -107,6 +131,13 @@ export function AuditPanel() {
             />
           </div>
           {stale && <div className="muted small pad">Edited since this audit. Run it again to update.</div>}
+          {!stale && fixable > 0 && !readOnly && (
+            <div className="audit-fixall">
+              <button type="button" className="btn small" onClick={() => void fixAll()} title="Apply every error's and warning's structured fix on this slide (one undo step), then audit again">
+                Fix all on this slide ({fixable})
+              </button>
+            </div>
+          )}
           <ul className="findings">
             {findings.map((f, i) => (
               <FindingItem key={`${f.rule}-${i}`} f={f} onClick={() => focusFinding(f)} />

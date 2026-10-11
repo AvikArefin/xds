@@ -19,7 +19,8 @@ xds check PROJECT --json      fast: schema, references, design manifests; no bro
 xds measure PROJECT --json    seconds: real line breaks, heights and stacks, text-only rules; no 3D
 xds audit PROJECT --json      render + measure + rules → findings with fixes
   look at cache/<hash>/annotated/*.png and contact-sheet.png
-  apply each finding's `fix`, or record a deliberate exception with a reason
+xds fix PROJECT --json        apply the findings' structured fixes (`edits`); then read what is left
+  apply each remaining finding's `fix` by hand, or record a deliberate exception with a reason
 repeat until no errors, then review the warnings
 xds export PROJECT --json     writes export/<stamp>/*.png (--pdf: one PDF)
 ```
@@ -401,8 +402,11 @@ you do not need to edit the background.
   "message": "'Price' reads at Lc 38 over the gradient; headline-sized text needs Lc ≥ 45.",
   "measured": { "lc": 38.2, "displayedPx": 25 }, "expected": { "lcMin": 45 },
   "fix": "Set data.color to 'ink' (Lc 71 here), or move the block to y ≤ 40 % where the wall is lighter.",
+  "edits": [{ "slideId": "s2", "nodeId": "price", "path": "data.color", "value": "ink" }],
   "principle": "Text must stand out from the pixels behind it, at its weakest point." }
 ```
 
-Apply the fix and re-run `xds audit`. Don't chase `info` findings unless the slide is otherwise
-done.
+`edits` is the fix as field writes, when the fix is one value: `xds fix . --json` applies them all
+(errors and warnings; `--dry-run` to look first, `--rule` or `--slide` to narrow), validates, and
+writes project.json once. A finding without `edits` is advice: apply it by hand. Then re-run
+`xds audit`. Don't chase `info` findings unless the slide is otherwise done.

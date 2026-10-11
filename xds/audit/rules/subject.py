@@ -13,6 +13,7 @@ import numpy as np
 from ..contrast import apca_lc_y, apca_y
 from ..geometry import R
 from ..measured import dilate
+from ...models import Edit
 from ..registry import Hit, rule
 
 if TYPE_CHECKING:
@@ -63,6 +64,7 @@ def _subject_height(s: MeasuredSlide, t: Thresholds, *, small: bool) -> Iterator
         message=f"The subject '{s.subject_block.name}' is {pct:.0f} % of the canvas height.",
         measured={"heightPct": round(pct, 1)}, expected={"heightPct": [lo, hi]},
         fix=f"Set {s.camera_height_fix(goal / pct)}",
+        edits=s.camera_height_edits(goal / pct),
     )
 
 
@@ -81,7 +83,7 @@ def subject_overexposed(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         nodes=s.subject_block.ids, region=s.subject_block.rect,
         message=f"{pct:.0f} % of '{s.subject_block.name}' is blown out to white.",
         measured={"clippedPct": round(pct, 1)}, expected={"clippedPctMax": t["subject.overexposed"]},
-        fix=_lighting_fix(s, -0.3, "contrast"),
+        fix=_lighting_fix(s, -0.3, "contrast"), edits=s.lighting_edits(-0.3),
     )
 
 
@@ -102,7 +104,7 @@ def subject_underexposed(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         message=f"'{s.subject_block.name}' is underexposed: median lightness {median:.2f}, {black:.0f} % crushed.",
         measured={"medianL": round(median, 3), "crushedPct": round(black, 1)},
         expected={"medianLMin": t["subject.darkMedian"], "crushedPctMax": t["subject.blackShare"]},
-        fix=_lighting_fix(s, 0.3, "rim"),
+        fix=_lighting_fix(s, 0.3, "rim"), edits=s.lighting_edits(0.3),
     )
 
 
@@ -172,6 +174,7 @@ def subject_close_to_text(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"'{s.name(n.id)}' comes within {gap}px of the subject.",
             measured={"withinPx": gap}, expected={"gapPxMin": gap},
             fix=s.move_fix(n.id, dy=dy) + f", or set {s.camera_height_fix(0.9)}",
+            edits=s.move_edits(n.id, dy=dy),
         )
 
 
@@ -224,4 +227,5 @@ def screen_low_res(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             measured={"texelRatio": round(ratio, 2), "scale": scale},
             expected={"texelRatioMin": t["screen.texelRatio"]},
             fix=f"Set screens[{idx}].scale to {new:g}",
+            edits=[Edit(path=f"screens.{idx}.scale", value=new)],
         )

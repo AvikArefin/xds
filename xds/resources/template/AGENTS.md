@@ -51,6 +51,7 @@ xds measure . --json    # seconds, no 3D: where each text block lands (lines, he
 xds render . --json     # slide PNGs + cache/<hash>/contact-sheet.png. Look at them.
 xds audit . --json      # render + measure + design rules → findings, each with a `fix`
 #   look at cache/<hash>/annotated/*.png
+xds fix . --json        # apply the findings' structured fixes (`edits`: positions, sizes, gaps, camera); --dry-run to look first
 xds export . --json     # writes export/<stamp>/*.png (refuses while audit errors are open)
 xds export . --pdf --json   # the deck as one PDF instead, a page per slide (LinkedIn carousel)
 xds snapshot . --label "before the rewrite" --json   # a restorable copy of the sources (.snapshots/)

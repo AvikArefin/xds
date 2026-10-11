@@ -771,15 +771,18 @@ class SlideMeasure(Model):
 Severity = Literal["error", "warn", "info"]
 
 
+EditValue = Union[bool, int, float, str, list[Any], dict[str, Any]]
+
+
 class Edit(Model):
     """One field written by a fix: a dotted path on the node (`box.y`, `data.size`,
     `layout.stack.gap`), on the slide when `node_id` is absent (`camera.height`), or on the
-    project when both are (`brand.typography.body.size`). `value` replaces; None deletes."""
+    project when both are (`brand.typography.body.size`). `value` replaces; absent deletes."""
 
     slide_id: str | None = None
     node_id: str | None = None
     path: str = Field(min_length=1)
-    value: Any = None
+    value: EditValue | None = None
 
 
 class Finding(Model):

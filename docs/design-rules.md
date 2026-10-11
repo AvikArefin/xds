@@ -310,16 +310,46 @@ AuditReport = {
     measured: Record<string, unknown>;         // e.g. { lc: 38.2, sizePx: 30 }
     expected: Record<string, unknown>;         // e.g. { lcMin: 45 }
     fix: string;                               // a concrete edit: field and value
+    edits?: Edit[];                            // the same edit as field writes (§6.1), when it is one
     principle: string;                         // why the rule exists
     waiver?: { reason: string };
   }[];
 }
+Edit = { slideId?: string; nodeId?: string; path: string; value?: unknown };
 ```
 
 `cache/<hash>/annotated/<n>-<slide>.png` draws every finding's region in its severity color, with
 its number, together with the margin, the safe zones and the third lines. A multimodal agent can
 look at the annotated image and the JSON together. The Studio draws the same overlay on the
 canvas (see [human interaction §4](./human-interaction.md#4-walkthroughs)).
+
+### 6.1 Applying fixes
+
+A finding whose fix is one concrete value carries it twice: as the `fix` sentence a person
+reads, and as `edits`, the same value as field writes a program applies. An edit's `path` is
+dotted, in JSON keys, from the node when `nodeId` is set (`box.y`, `data.size`,
+`layout.stack.gap`: a stacked block moves by its gap, never by `box.y`), from the slide when only
+`slideId` is (`camera.height`, `lighting.brightness`), else from the project
+(`screens.0.scale`). A missing `value` deletes the key. Advice (`shorten the text`, `add a
+scrim`) has no `edits`.
+
+```text
+xds fix PROJECT [--slide ID]… [--rule RULE]… [--severity error|warn|info] [--dry-run]
+```
+
+`xds fix` takes the audit report for the current source (running the audit when there is none),
+applies every open finding's edits (errors and warnings by default; `--severity info` adds the
+infos) in report order, validates the result and writes it once, after the big-save snapshot
+([human interaction §4](./human-interaction.md#4-walkthroughs), Restore). It prints each write as
+`rule node path old → new`, lists the findings it skipped (a node that is gone) and how many have
+no structured fix, and returns 1 when nothing was applied. `--dry-run` prints without writing.
+In the Studio every fixable finding has a **Fix** link (one undo step; the node's layer becomes
+the mode and the node is selected), and the audit panel's **Fix all on this slide** applies every
+error's and warning's edits on the active slide and audits again.
+
+Fixes are literal: they move a block onto the margin or set the size the rule asked for, nothing
+more. Two findings that pull the same field in different directions apply in report order, so
+run the audit again after fixing and read what remains.
 
 ---
 

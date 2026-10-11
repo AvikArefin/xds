@@ -864,7 +864,7 @@ export interface Finding {
 /**
  * One field written by a fix: a dotted path on the node (`box.y`, `data.size`,
  * `layout.stack.gap`), on the slide when `node_id` is absent (`camera.height`), or on the
- * project when both are (`brand.typography.body.size`). `value` replaces; None deletes.
+ * project when both are (`brand.typography.body.size`). `value` replaces; absent deletes.
  *
  * This interface was referenced by `XdsSchema`'s JSON-Schema
  * via the `definition` "Edit".
@@ -873,9 +873,14 @@ export interface Edit {
   slideId?: string;
   nodeId?: string;
   path: string;
-  value?: {
-    [k: string]: unknown;
-  };
+  value?:
+    | boolean
+    | number
+    | string
+    | unknown[]
+    | {
+        [k: string]: unknown;
+      };
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema

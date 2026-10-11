@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Iterator
 from ...models import LEVELS
 from ..geometry import R, union_all
 from ..measured import LEVEL_RANK
+from ...models import Edit
 from ..registry import Hit, rule
 
 if TYPE_CHECKING:
@@ -53,6 +54,7 @@ def text_too_small(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                 measured={"sizePx": n.style.size, "displayedPx": round(n.style.size * s.guide.k, 1)},
                 expected={"sizePxMin": band.min},
                 fix=f"Set data.size to {band.min:.0f} ({n.level} min)",
+                edits=[Edit(node_id=n.id, path="data.size", value=float(f"{band.min:.0f}"))],
             )
 
 
@@ -69,6 +71,7 @@ def text_too_large(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                 message=f"'{s.name(n.id)}' is {n.style.size:.0f}px, above the {n.level} maximum of {band.max:.0f}px.",
                 measured={"sizePx": n.style.size}, expected={"sizePxMax": band.max},
                 fix=f"Set data.size to {band.max:.0f} ({n.level} max){alt}",
+                edits=[Edit(node_id=n.id, path="data.size", value=float(f"{band.max:.0f}"))],
             )
 
 
@@ -88,14 +91,16 @@ def hierarchy_weak(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
         band = t.band(bn[0].level)
         if band and up <= band.max:
             fix = f"Set data.size of {_names(s, bn)} to {up:.0f}"
+            edits = [Edit(node_id=n.id, path="data.size", value=float(f"{up:.0f}")) for n in bn]
         else:
             fix = f"Set data.size of {_names(s, sn)} to {big / t['hierarchyRatio']:.0f}"
+            edits = [Edit(node_id=n.id, path="data.size", value=float(f"{big / t['hierarchyRatio']:.0f}")) for n in sn]
         yield Hit(
             nodes=[n.id for n in sn + bn], region=_region(s, sn + bn),
             message=f"{_names(s, bn)} ({big:.0f}px) and {_names(s, sn)} ({small:.0f}px) differ by only ×{ratio:.2f}.",
             measured={"ratio": round(ratio, 3), "sizesPx": [small, big]},
             expected={"ratioMin": t["hierarchyRatio"]},
-            fix=fix + f" (ratio ≥ {t['hierarchyRatio']})",
+            fix=fix + f" (ratio ≥ {t['hierarchyRatio']})", edits=edits,
         )
 
 
@@ -117,6 +122,7 @@ def size_near_miss(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             measured={"sizesPx": [small, big], "diffPct": round(pct, 1)},
             expected={"diffPct": f"0 or ≥ {t['sizeNearMiss']}"},
             fix=f"Set data.size of {_names(s, change)} to {keep[0].style.size:.0f} to match",
+            edits=[Edit(node_id=n.id, path="data.size", value=float(f"{keep[0].style.size:.0f}")) for n in change],
         )
 
 
@@ -220,6 +226,7 @@ def line_height(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"'{s.name(n.id)}' is set at line height {ratio:.2f}; {n.level} wants {lo:.2f}–{hi:.2f}.",
             measured={"lineHeight": round(ratio, 3)}, expected={"lineHeight": [lo, hi]},
             fix=f"Set data.lineHeight to {target:.2f}",
+            edits=[Edit(node_id=n.id, path="data.lineHeight", value=round(target, 2))],
         )
 
 
@@ -283,6 +290,7 @@ def centered_long_text(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                 message=f"'{s.name(n.id)}' is {len(n.lines)} lines of centered {n.level} text.",
                 measured={"lines": len(n.lines)}, expected={"linesMax": t["centeredLines"]},
                 fix="Set data.align to 'left'",
+                edits=[Edit(node_id=n.id, path="data.align", value="left")],
             )
 
 
@@ -297,6 +305,7 @@ def caps_untracked(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                 message=f"'{s.name(n.id)}' is set in capitals with {st.letter_spacing:.2f} em letter spacing.",
                 measured={"letterSpacing": st.letter_spacing}, expected={"letterSpacingMin": t["capsTracking"]},
                 fix=f"Set data.letterSpacing to {max(0.05, t['capsTracking']):.2f}",
+                edits=[Edit(node_id=n.id, path="data.letterSpacing", value=round(max(0.05, t["capsTracking"]), 2))],
             )
 
 

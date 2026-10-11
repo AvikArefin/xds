@@ -12,6 +12,7 @@ import { temporal } from "zundo";
 import type {
   AuditReport,
   Box,
+  Edit,
   FrameCamera,
   FreeCamera,
   Finding,
@@ -31,6 +32,7 @@ import type {
 import {
   addNode,
   addSlide as addSlideCore,
+  applyEdits as applyEditsCore,
   alignRects,
   deleteSlide as deleteSlideCore,
   distributeRects,
@@ -215,6 +217,14 @@ export interface StudioActions {
   renameSlide(id: string, name: string): void;
 
   runAudit(): Promise<void>;
+  /**
+   * Apply a finding's structured fixes (design-rules §6.1): one undo step, from any mode. The
+   * mode switches to the first edited node's layer and that node is selected. Locked nodes
+   * are skipped. Returns how many edits were applied.
+   */
+  applyEdits(edits: Edit[], opts?: { quiet?: boolean }): number;
+  /** Apply every open error's and warning's edits on the active slide, then audit again. */
+  fixAll(): Promise<void>;
   focusFinding(f: Finding): void;
   setHoverFinding(f: Finding | null): void;
   markIntentional(f: Finding): Promise<void>;
@@ -1016,6 +1026,52 @@ export const useStudio = create<Studio>()(
             set({ auditing: false });
             job("audit", { running: false });
           }
+        },
+        applyEdits: (edits, opts = {}) => {
+          const s = get();
+          if (!canEditDoc(opts.quiet) || !s.project) return 0;
+          const lockedHit = edits.filter((e) => e.nodeId && s.locked[e.nodeId]).map((e) => e.nodeId);
+          const todo = edits.filter((e) => !(e.nodeId && s.locked[e.nodeId]));
+          const r = applyEditsCore(s.project, todo);
+          if (lockedHit.length && !opts.quiet) notify("info", `Skipped ${lockedHit.length} edit(s) on locked nodes.`);
+          if (r.skipped.length && !opts.quiet) notify("warning", `${r.skipped.length} fix(es) point at nodes that are gone.`);
+          const applied = todo.length - r.skipped.length;
+          if (!applied) return 0;
+          const extra: Partial<StudioState> = {};
+          const slideId = todo.find((e) => e.slideId)?.slideId;
+          if (slideId && slideId !== s.activeSlideId && getSlide(r.project, slideId)) extra.activeSlideId = slideId;
+          const first = r.nodeIds[0];
+          const node = first ? nodesOf(getSlide(r.project, extra.activeSlideId ?? s.activeSlideId)).find((n) => n.id === first) : undefined;
+          if (node) {
+            extra.mode = node.layer;
+            extra.selectedIds = r.nodeIds.filter((id) =>
+              nodesOf(getSlide(r.project, extra.activeSlideId ?? s.activeSlideId)).some((n) => n.id === id && n.layer === node.layer),
+            );
+          }
+          commit(r.project, extra);
+          return applied;
+        },
+        fixAll: async () => {
+          const s = get();
+          if (!canEditDoc() || !s.project || !s.report) return;
+          const open = s.report.findings.filter(
+            (f) => f.status === "open" && f.severity !== "info" && f.edits?.length && (!f.slideId || f.slideId === s.activeSlideId),
+          );
+          const edits = open.flatMap((f) => f.edits ?? []);
+          if (!edits.length) return notify("info", "No structured fixes on this slide. Read the findings' fix text.");
+          if (open.length > 5) {
+            const ok = await get().ask({
+              title: `Fix ${open.length} findings?`,
+              message: `${edits.length} field edits on this slide, one undo step. The audit runs again afterwards.`,
+              input: false,
+              confirm: "Fix all",
+            });
+            if (ok === null) return;
+          }
+          const n = get().applyEdits(edits);
+          if (!n) return;
+          notify("success", `Applied ${n} fix(es) from ${open.length} finding(s).`);
+          await get().runAudit();
         },
         focusFinding: (f) => {
           const s = get();

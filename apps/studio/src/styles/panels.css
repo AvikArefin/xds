@@ -236,8 +236,13 @@
   color: var(--text-dim);
   font-size: 11px;
 }
-.finding > .link-btn {
+.finding-actions {
+  display: flex;
+  gap: 10px;
   margin-left: 24px;
+}
+.finding-actions .link-btn,
+.finding > .link-btn {
   font-size: 10px;
 }
 

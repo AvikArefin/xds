@@ -94,6 +94,7 @@ def align_near_miss(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"The {edge} edges of '{a.name}' and '{b.name}' miss alignment by {abs(d):.1f}px.",
             measured={"edge": edge, "offsetPx": round(abs(d), 1)}, expected={"offsetPx": f"0 or > {hi}"},
             fix=s.move_fix(b.id, dx=-d) + f" to align its {edge} edge with '{a.name}'",
+            edits=s.move_edits(b.id, dx=-d),
         )
 
 
@@ -116,6 +117,7 @@ def margin_near_miss(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
                     measured={"side": side, "offsetPx": round(abs(d), 1)}, expected={"offsetPx": 0},
                     fix=s.move_fix(b.id, dx=d if axis == "x" else 0, dy=d if axis == "y" else 0)
                     + " to sit on the margin",
+                    edits=s.move_edits(b.id, dx=d if axis == "x" else 0, dy=d if axis == "y" else 0),
                 )
                 break
 
@@ -171,6 +173,7 @@ def spacing_inconsistent(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             measured={"gapsPx": [round(g, 1) for g in gaps]},
             expected={"maxVariation": t["spacingVariation"]},
             fix=f"Use one gap ({target}px) between all blocks; e.g. " + s.move_fix(b.id, dy=target - gap),
+            edits=s.move_edits(b.id, dy=target - gap),
         )
 
 
@@ -193,6 +196,7 @@ def spacing_off_scale(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
             message=f"The {gap:.0f}px gap between '{a.name}' and '{b.name}' is off the {t.u}px scale.",
             measured={"gapPx": round(gap, 1)}, expected={"gapPx": nearest},
             fix=s.move_fix(b.id, dy=nearest - gap) + f" (gap {nearest}px)",
+            edits=s.move_edits(b.id, dy=nearest - gap),
         )
 
 

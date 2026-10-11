@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterator
 
+from ..models import Edit
 from .geometry import R
 
 Severity = str  # "error" | "warn" | "info"
@@ -28,6 +29,8 @@ class Hit:
     measured: dict[str, Any] = field(default_factory=dict)
     expected: dict[str, Any] = field(default_factory=dict)
     severity: Severity | None = None  # required for rules with tiers ("warn/error")
+    # The fix as field edits, when the fix is a concrete value (design-rules §6.1); else empty.
+    edits: list[Edit] = field(default_factory=list)
 
 
 @dataclass

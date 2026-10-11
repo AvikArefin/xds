@@ -57,6 +57,7 @@ def audit_slide(ms: MeasuredSlide, t: Thresholds, off: set[str]) -> list[Finding
                 region=hit.region.to_model() if hit.region else None,
                 message=hit.message, measured=_plain(hit.measured), expected=_plain(hit.expected),
                 fix=hit.fix, principle=spec.principle,
+                edits=[e.model_copy(update={"slide_id": ms.id}) for e in hit.edits] or None,
             )
             reason = _waivers(ms.slide, f)
             if reason:

@@ -348,3 +348,47 @@ def test_text_clipped_gives_the_box_height_the_text_needs(tmp_path):
     c.measured[-1]["contentHeight"] = 200.0
     f = rules_of(c.run())["TEXT_CLIPPED"][0]
     assert f"Set box.h to {100 * 201 / 1350:.1f}" in f.fix
+
+
+# --- structured fixes (design-rules §6.1) -------------------------------------------------------
+
+def test_edits_mirror_the_fix_text(tmp_path):
+    c = Case(tmp_path)
+    c.text("title", 20, 300, ["Edge"], size=72, widths=[200])
+    c.text("tiny", 64, 600, ["Fine print"], size=20, level="body", widths=[200], weight=400)
+    found = rules_of(c.run())
+    f = found["OUTSIDE_MARGIN"][0]
+    (e,) = f.edits
+    assert (e.slide_id, e.node_id, e.path) == ("s1", "title", "box.x") and f"box.x to {e.value}" in f.fix
+    f = found["TEXT_TOO_SMALL"][0]
+    (e,) = f.edits
+    assert (e.node_id, e.path, e.value) == ("tiny", "data.size", 33.0) and "to 33" in f.fix
+
+
+def test_stacked_block_edit_is_its_gap(tmp_path):
+    c = Case(tmp_path)
+    c.text("a", 64, 200, ["Top line"], size=72, widths=[400], group="g")
+    c.text("b", 64, 200 + 79 + 21, ["Below"], size=40, level="subhead", widths=[300], weight=500, group="g")
+    c.nodes[-1]["layout"] = {"stack": {"below": "a", "gap": 2.5}}
+    f = rules_of(c.run())["SPACING_OFF_SCALE"][0]
+    (e,) = f.edits
+    assert e.node_id == "b" and e.path == "layout.stack.gap" and "layout.stack.gap to" in f.fix
+    assert abs(e.value - 3) < 1e-9  # 24 px = 3u
+
+
+def test_subject_and_lighting_edits_are_slide_level(tmp_path):
+    c = Case(tmp_path)
+    c.product(480, 600, 120, 300)  # 22 % of the height: SUBJECT_TOO_SMALL
+    f = rules_of(c.run())["SUBJECT_TOO_SMALL"][0]
+    (e,) = f.edits
+    assert e.node_id is None and e.slide_id == "s1" and e.path == "camera.height"
+    assert f"camera.height to {e.value:.0f}" in f.fix
+
+
+def test_advice_only_fixes_have_no_edits(tmp_path):
+    c = Case(tmp_path)
+    words = "word " * 40
+    c.text("body", 64, 300, [words[i * 60:(i + 1) * 60] for i in range(4)], size=37, level="body",
+           widths=[900] * 4, source=words)
+    f = rules_of(c.run())["TOO_MANY_WORDS"][0]
+    assert f.edits is None

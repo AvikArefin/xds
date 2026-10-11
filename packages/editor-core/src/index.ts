@@ -7,3 +7,4 @@ export * from "./nodes";
 export * from "./stack";
 export * from "./place";
 export * from "./typeSize";
+export * from "./edits";
