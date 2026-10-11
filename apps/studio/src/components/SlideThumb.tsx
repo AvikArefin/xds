@@ -5,8 +5,9 @@
  */
 import { memo, useState } from "react";
 import { isAsset, type Asset, type Node, type Project, type Slide, type TypeNode } from "@xds/protocol";
+import { effectiveSize } from "@xds/editor-core";
 import { fileUrl } from "../api";
-import { slideBaseColor } from "../stage/typeStyle";
+import { bandFor, slideBaseColor } from "../stage/typeStyle";
 import { colorHex, effectiveCamera, layerOrder } from "../store";
 
 export const SlideThumb = memo(function SlideThumb({
@@ -78,7 +79,7 @@ export const SlideThumb = memo(function SlideThumb({
         }
         const t = n as TypeNode;
         const role = project.brand.typography?.[t.data.role];
-        const size = (t.data.size ?? role?.size ?? 40) * scale;
+        const size = effectiveSize(t.data, role, bandFor(role?.level ?? "body", project).default) * scale;
         return (
           <div
             key={n.id}

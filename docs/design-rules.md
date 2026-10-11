@@ -69,6 +69,10 @@ on the target device.
 | `body` | 0.034 s | `readable(12)` | 0.04 s | 1.30–1.60 | 37 / 33 / 43 px |
 | `caption` | 0.029 s | `readable(10)` | 0.032 s | 1.30–1.60 | 31 / 28 / 35 px |
 
+A role (or a text block) says its size either in px (`size`) or as a factor of the band default
+(`scale`, 1 = the default). A factor holds in every format, so a deck retargeted with `xds reflow`
+keeps its hierarchy without touching the roles.
+
 The band defaults form a scale with a ratio of about 1.25–1.7 between neighbors, so the
 default hierarchy is always clear.
 
@@ -96,7 +100,19 @@ minimums with their size cutoffs). `--slide ID` adds that slide's current measur
 the targets. The contrast line is in this format's own px, the unit `data.size` is written in: the
 cutoffs are displayed sizes (16 and 24 px on the phone) divided by the format's view scale `k`.
 
-### 1.4 `xds measure`
+### 1.4 `xds reflow`
+
+A format change on its own stretches every percent box sideways and leaves px type sizes out of
+their new bands. `xds reflow PROJECT --format PRESET` (or `--size WxH`; `--dry-run` reports only)
+retargets a project the way a designer would: each 2D box is placed again **relative to the
+content area** of the new format (a block on the margin stays on the margin), images and shapes
+keep their aspect ratio, and explicit px type sizes are multiplied by the ratio of the new level
+band default to the old. Values that are already format-relative are left alone: `scale` factors
+(§1.2: a role's `scale` is a factor of its band default), stack gaps (in u), pins, `place`, the
+camera, rotation. The editor's **Format** selector does the same through `/api/reflow` and asks
+first. Audit afterwards: reflow keeps proportions, not line breaks.
+
+### 1.5 `xds measure`
 
 Text layout without a render: headless Chromium mounts only the type layer of each slide
 (no 3D, backgrounds or images), which takes a few seconds for a whole deck. For each text block it

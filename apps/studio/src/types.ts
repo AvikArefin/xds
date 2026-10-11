@@ -1,5 +1,5 @@
 /** Response shapes of the local HTTP API (xds/api.py). The project schema itself is @xds/protocol. */
-import type { AuditReport, DesignManifest, ExportRecord, Finding } from "@xds/protocol";
+import type { AuditReport, Box, DesignManifest, ExportRecord, Finding, Format, Project } from "@xds/protocol";
 
 export type Level = "expressive" | "display" | "headline" | "subhead" | "body" | "caption";
 
@@ -91,6 +91,20 @@ export interface FormatProfile {
 export interface FormatsResponse {
   catalog: FormatProfile[];
   guide: Guide | null;
+}
+
+export interface ReflowReport {
+  from: Format;
+  to: Format;
+  boxes: { slide: string; node: string; box: [Box, Box] }[];
+  sizes: { slide: string; node: string; size: [number, number] }[];
+  roles: { role: string; size: [number, number] }[];
+  summary: { boxes: number; sizes: number; roles: number };
+}
+
+export interface ReflowResponse {
+  project: Project;
+  report: ReflowReport;
 }
 
 export interface Snapshot {

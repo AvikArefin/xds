@@ -308,6 +308,17 @@ def create_app(root: str | Path | None = None, *, watch: bool = True, serve_stud
                                              replace=replace)
         return ok(result=result)
 
+    @app.post("/api/reflow")
+    async def reflow_doc(body: dict[str, Any]) -> dict[str, Any]:
+        """Reflow a document (not the file) to another format; the editor commits the result."""
+        from . import reflow
+
+        if "project" not in body or "format" not in body:
+            raise XdsError("BAD_REQUEST", "body needs { project, format }", status=422)
+        target = Format.model_validate(body["format"])
+        new, report = await run_in_threadpool(reflow.reflow, body["project"], target)
+        return ok(project=new, report=report)
+
     @app.get("/api/snapshots")
     async def list_snapshots() -> dict[str, Any]:
         from . import snapshots

@@ -1,11 +1,12 @@
 /**
  * Effective type style (CONTRACTS.md, data-models §2.5):
  * `node.data.<field> ?? brand.typography[role].<field> ?? band default for the level`.
- * Size from the band default, lineHeight = midpoint of the band's line-height range, weight 400,
+ * Size: `effectiveSize` (a px size, or a scale of the role's size / the band default);
+ * lineHeight = midpoint of the band's line-height range, weight 400,
  * letterSpacing 0; color: node/role color → the brand color named "ink" → the brand color with
  * the best contrast against the slide background.
  */
-import { slideBackground } from "@xds/editor-core";
+import { effectiveSize, slideBackground } from "@xds/editor-core";
 import type { Project, Slide, TypeData, TypeRole } from "@xds/protocol";
 import { contrastRatio } from "../design/color";
 import type { Guide, GuideBand, Level } from "../types";
@@ -91,7 +92,7 @@ export function effectiveTypeStyle(
     tokenHex(project, data.color) ?? tokenHex(project, role.color) ?? defaultTextColor(project, slideBackground);
   return {
     family: role.font ?? null,
-    size: data.size ?? role.size ?? band.default,
+    size: effectiveSize(data, role, band.default),
     weight: data.weight ?? role.weight ?? 400,
     italic: data.italic ?? role.italic ?? false,
     lineHeight: data.lineHeight ?? role.lineHeight ?? (band.line_height[0] + band.line_height[1]) / 2,

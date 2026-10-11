@@ -2,7 +2,7 @@
  * Typed client for the local HTTP API (xds/api.py). Every call returns the payload of
  * `{ ok: true, ...payload }` or throws an `ApiError`.
  */
-import type { Project } from "@xds/protocol";
+import type { Format, Project } from "@xds/protocol";
 import type {
   AuditResponse,
   ExportEntry,
@@ -11,6 +11,7 @@ import type {
   ModelImportResult,
   ProjectResponse,
   ProjectsResponse,
+  ReflowResponse,
   SaveResponse,
   ServerEvent,
   Snapshot,
@@ -108,6 +109,8 @@ export const api = {
       "POST",
       "/api/migrate",
     ),
+  /** Reflow a document to another format (pure: nothing is written; the caller commits it). */
+  reflow: (project: Project, format: Format) => request<ReflowResponse>("POST", "/api/reflow", { project, format }),
   snapshots: () => request<{ snapshots: Snapshot[] }>("GET", "/api/snapshots"),
   takeSnapshot: (label?: string) => request<{ snapshot: Snapshot }>("POST", "/api/snapshots", { label }),
   restoreSnapshot: (id: string) => request<{ restored: Snapshot; safety: Snapshot; files: number }>("POST", "/api/snapshots/restore", { id }),

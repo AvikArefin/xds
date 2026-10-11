@@ -129,8 +129,14 @@ reloads from disk. Undo has one step per drag or field change.
   (dial), Elevation, Shadow, Brightness, Tint. **Use for all slides** makes it the project default.
 - **Fonts**: Present → Typography header → download button → a Fontshare family. It's fetched once
   into the xds font library and shared by every project.
-- **Format**: the rail's **Format** selector. Boxes are percentages, so the layout reflows; audit
-  afterwards.
+- **Format**: the rail's **Format** selector. Picking another preset (or typing a custom size)
+  asks to **Reflow**: every box is laid out again relative to the new margins (images keep their
+  aspect), px type sizes are rescaled to the new size bands, and scales, stack gaps, pins and the
+  camera are kept. One undo step. Audit afterwards. (Terminal: `xds reflow . --format PRESET`,
+  `--dry-run` to see what would move.)
+- **Text size that holds in every format**: give a role (Present → Typography) or a text block a
+  **Scale** instead of a px **Size**: 1.2 means 1.2 × the level's band default for whatever format
+  the project is in. A px size wins over a scale on the same role or block.
 - **Audit**: `A` or **Run audit** (saves first). Click a finding to select its node. **Mark as
   intentional…** records an exception with your reason.
 - **Export**: in the Present panel (`1`), **PNG** writes a PNG per slide and **PDF** the deck as

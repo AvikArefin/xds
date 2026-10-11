@@ -12,6 +12,7 @@ import type {
   TypeNode,
 } from "@xds/protocol";
 import { DEFAULT_LAYER_ORDER, isShape } from "@xds/protocol";
+import { effectiveSize } from "@xds/editor-core";
 import type { GuideJson, Level } from "./types";
 
 export const LIGHTING_DEFAULTS: Required<Omit<Lighting, "tint">> & { tint?: string } = {
@@ -81,7 +82,7 @@ export function typeStyle(p: Project, n: TypeNode, guide: GuideJson | null) {
     level,
     band,
     font: role?.font ?? "",
-    size: n.data.size ?? role?.size ?? band?.default ?? 40,
+    size: effectiveSize(n.data, role, band?.default ?? 40),
     weight: n.data.weight ?? role?.weight ?? 400,
     lineHeight: n.data.lineHeight ?? role?.lineHeight ?? lhMid,
     letterSpacing: n.data.letterSpacing ?? role?.letterSpacing ?? 0,

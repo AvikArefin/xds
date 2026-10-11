@@ -182,8 +182,22 @@ export function TypeInspector({ nodes }: { nodes: TypeNode[] }) {
           unit="px"
           min={1}
           disabled={readOnly}
-          title="Empty = the role's size (or the band default)"
-          onChange={(v) => set("size", v)}
+          title="Empty = Scale × the role's size (or the band default)"
+          onChange={(v) => (v === undefined ? set("size", undefined) : patchData(ids, { size: v }, ["scale"]))}
+        />
+        <NumberField
+          label="Scale"
+          value={d("scale") as number | undefined | typeof MIXED}
+          placeholder={1}
+          step={0.05}
+          min={0.1}
+          max={10}
+          track={false}
+          range={[0.5, 2]}
+          rangeLabel={false}
+          disabled={readOnly}
+          title="× the role's size; it holds in every format (a Size in px wins)"
+          onChange={(v) => (v === undefined ? set("scale", undefined) : patchData(ids, { scale: v }, ["size"]))}
         />
         <NumberField
           label="Weight"

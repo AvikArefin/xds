@@ -156,15 +156,30 @@ export function BrandInspector() {
                 <NumberField
                   label="Size"
                   value={role.size}
-                  placeholder={band?.default}
+                  placeholder={band ? Math.round(band.default * (role.scale ?? 1)) : undefined}
                   range={band ? [band.min, band.max] : undefined}
                   rangeLabel={false}
                   min={1}
                   unit="px"
                   disabled={readOnly}
-                  onChange={(size) => patchRole(name, { size })}
+                  title="A px size for this format. Empty = Scale × the band default."
+                  onChange={(size) => patchRole(name, { size, scale: size === undefined ? role.scale : undefined })}
                 />
               </div>
+              <Row label="Scale" hint="× the band default; it holds in every format (a Size in px wins)">
+                <NumberField
+                  value={role.scale}
+                  placeholder={1}
+                  step={0.05}
+                  min={0.1}
+                  max={10}
+                  track={false}
+                  range={[0.5, 2]}
+                  rangeLabel={false}
+                  disabled={readOnly}
+                  onChange={(scale) => patchRole(name, { scale, size: scale === undefined ? role.size : undefined })}
+                />
+              </Row>
               <Row label="Color">
                 <ColorTokenSelect project={project} value={role.color} allowNone noneLabel="Auto" disabled={readOnly} onChange={(color) => patchRole(name, { color })} />
               </Row>

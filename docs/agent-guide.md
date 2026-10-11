@@ -32,7 +32,11 @@ Rules of the road:
   real photos (the product, and anything a screen shows).
 - Read [design rules](./design-rules.md) once. `xds guide` gives the numbers, and `xds rules`
   gives every rule's principle.
-- Pick type sizes from the band defaults first. Change them only for a reason.
+- Pick type sizes from the band defaults first. Change them only for a reason, and prefer a
+  `scale` (a factor of the band default) over a px `size`: it holds in every format.
+- To retarget a finished deck to another format, `xds reflow PROJECT --format PRESET` (boxes
+  relative to the margins, sizes to the new bands), then audit: it keeps proportions, not line
+  breaks.
 - Put spacing on the unit scale (`u`, `2u`, `3u`, …) and content inside the margin. Stack text
   blocks (`data.stack`, [data models §2.5](./data-models.md#25-node-the-editable-unit)) instead of
   computing their y, and check wrapping with `xds measure` before rendering: a wide display face

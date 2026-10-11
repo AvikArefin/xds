@@ -256,6 +256,7 @@ The API listens on `127.0.0.1:8765`. In development, the Vite UI runs on `:5173`
 | POST | `/api/models/import` | multipart upload; runs `xds model add` |
 | GET | `/api/library` · POST `/api/models/library` | the shipped models and logos, and adding a model by reference (`xds model add --library`) |
 | POST | `/api/fonts/fetch` | runs `xds fonts fetch` |
+| POST | `/api/reflow` | reflow a document `{ project, format }` to another format; returns `{ project, report }`, writes nothing |
 | GET · POST | `/api/snapshots` | list the snapshots (and migrate backups); take one `{ label? }` |
 | POST | `/api/snapshots/restore` | put one back `{ id }`, after snapshotting the current state |
 | DELETE | `/api/snapshots/{id}` | delete one (never a migrate backup) |
@@ -299,6 +300,7 @@ xds fonts vendor PROJECT [FAMILY]         # copy library fonts into the project
 xds grid PROJECT FILE [--step PCT]        # an image with a labeled % grid → cache/grid/
 xds formats
 xds schema --emit-types | --check        # xds development; --emit-types only inside the checkout
+xds reflow PROJECT (--format PRESET | --size WxH) [--dry-run]   # retarget: boxes relative to the margins, sizes to the bands
 xds snapshot PROJECT [--label TEXT]       # copy project.json, designs/, screens/ → .snapshots/
 xds snapshot PROJECT --list | --delete ID
 xds restore PROJECT ID                    # put a snapshot back (the current state is snapshotted first)

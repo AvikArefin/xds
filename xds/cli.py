@@ -413,6 +413,26 @@ def cmd_schema(a: argparse.Namespace, out: Out) -> int:
     return 0
 
 
+def cmd_reflow(a: argparse.Namespace, out: Out) -> int:
+    from . import reflow
+    from .models import Format
+
+    if bool(a.format) == bool(a.size):
+        raise XdsError("USAGE", "Give --format PRESET or --size WxH.", status=2)
+    if a.format:
+        p = formats.CATALOG[a.format]
+        target = Format(preset=p.key, width=p.width, height=p.height)
+    else:
+        try:
+            w, h = formats.parse_size(a.size)
+        except ValueError as e:
+            raise XdsError("USAGE", str(e), status=2) from e
+        target = Format(width=w, height=h)
+    r = reflow.reflow_project(proj.find_root(a.project), target, dry_run=a.dry_run)
+    out.emit(r, reflow.report_text(r))
+    return 0
+
+
 def cmd_snapshot(a: argparse.Namespace, out: Out) -> int:
     from . import snapshots
 
@@ -647,6 +667,13 @@ def build_parser() -> argparse.ArgumentParser:
     g = sp.add_mutually_exclusive_group(required=True)
     g.add_argument("--emit-types", action="store_true")
     g.add_argument("--check", action="store_true")
+
+    sp = add("reflow", cmd_reflow, "retarget the project to another format: boxes relative to the margins, "
+             "type sizes to the new bands")
+    sp.add_argument("project")
+    sp.add_argument("--format", choices=sorted(formats.CATALOG), help="a preset from `xds formats`")
+    sp.add_argument("--size", metavar="WxH", help="a custom size, e.g. 1440x1080")
+    sp.add_argument("--dry-run", action="store_true", help="report what would move without writing")
 
     sp = add("snapshot", cmd_snapshot, "save a snapshot of the project's sources into .snapshots/")
     sp.add_argument("project")
