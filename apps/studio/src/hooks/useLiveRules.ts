@@ -83,6 +83,7 @@ function collect(frame: HTMLElement, zoom: number): { nodes: LiveNode[]; slideId
       level: style.level,
       group: n.data.group ?? n.layout?.group ?? null,
       decorative: n.data.decorative ?? false,
+      fitted: !!n.data.fitWidth,
       align: n.data.align ?? "left",
       forcedLastLine: !!srcLast && texts.length > 0 && texts[texts.length - 1].trim() === srcLast,
     });

@@ -91,6 +91,19 @@ describe("collision", () => {
     expect(hit.edits).toEqual([{ nodeId: "b", path: "box.y", value: expect.any(Number) }]);
   });
 
+  it("interlocked expressive words of one group are neither overlap nor crowding; fitted sizes are not choices", () => {
+    const words = [
+      text("w1", 64, 100, 700, ["SHIFT"], { level: "expressive", group: "message", size: 272, fitted: true, lh: 230 }),
+      text("w2", 120, 300, 500, ["YOUR"], { level: "expressive", group: "message", size: 257, fitted: true, lh: 230 }),
+    ];
+    const f = ids(words);
+    expect(f).not.toContain("TEXT_OVERLAP");
+    expect(f).not.toContain("TEXT_CROWDED");
+    expect(f).not.toContain("SIZE_NEAR_MISS");
+    const loose = ids([words[0], { ...words[1], group: null }]);
+    expect(loose).toContain("TEXT_CROWDED");
+  });
+
   it("TEXT_CROWDED below max(u, half the smaller size)", () => {
     // gap 10 px between ink lines; need = max(8, 0.5 × 37) = 18.5
     const f = ids([text("a", 64, 100, 400, ["one"], { lh: 40 }), text("b", 64, 142, 400, ["two"])]);

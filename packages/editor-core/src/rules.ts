@@ -32,6 +32,8 @@ export interface LiveNode {
   level?: string;
   group?: string | null;
   decorative?: boolean;
+  /** An expressive block sized to its box width (`fitWidth`): its size is geometry, not a choice. */
+  fitted?: boolean;
   align?: "left" | "center" | "right";
   /** `"\n"` in the source text (a forced last line is not a widow). */
   forcedLastLine?: boolean;
@@ -353,7 +355,7 @@ class Live {
 
   sizes(): [number, LiveNode[]][] {
     const out: [number, LiveNode[]][] = [];
-    for (const n of [...this.reading].sort((a, b) => a.size! - b.size!)) {
+    for (const n of this.reading.filter((n) => !isFitted(n)).sort((a, b) => a.size! - b.size!)) {
       if (out.length && n.size! - out[out.length - 1][0] <= 0.5) out[out.length - 1][1].push(n);
       else out.push([n.size!, [n]]);
     }
@@ -362,6 +364,14 @@ class Live {
 }
 
 type Hit = Pick<Finding, "nodes" | "region" | "message" | "fix" | "edits"> & { severity?: Severity };
+
+/** Expressive words of one group: lettering set as one graphic, whose words may touch or
+ * interlock by design (design-rules §8). The audit's EXPRESSIVE_UNREADABLE guards the message. */
+export function isInterlocked(a: LiveNode, b: LiveNode): boolean {
+  return a.level === "expressive" && b.level === "expressive" && !!a.group && a.group === b.group;
+}
+
+const isFitted = (n: LiveNode) => n.level === "expressive" && !!n.fitted;
 type Rule = (s: Live) => Hit[];
 
 const names = (s: Live, ns: LiveNode[]) => ns.map((n) => `'${s.name(n.id)}'`).join(", ");
@@ -380,6 +390,7 @@ const RULES: Record<LiveRule, { severity: Severity; run: Rule }> = {
         for (let j = i + 1; j < s.text.length; j++) {
           const a = s.text[i];
           const b = s.text[j];
+          if (isInterlocked(a, b)) continue;
           const hits: Rect[] = [];
           for (const ra of a.lines!) for (const rb of b.lines!) {
             const h = intersect(ra, rb);
@@ -409,6 +420,7 @@ const RULES: Record<LiveRule, { severity: Severity; run: Rule }> = {
         for (let j = i + 1; j < s.text.length; j++) {
           const a = s.text[i];
           const b = s.text[j];
+          if (isInterlocked(a, b)) continue;
           let best: [number, Rect, Rect] | null = null;
           for (const ra of a.lines!) for (const rb of b.lines!) {
             const g = rectGap(ra, rb);
