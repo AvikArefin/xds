@@ -113,6 +113,8 @@ export interface StudioState {
   locked: Record<string, boolean>;
   /** Where the active slide's related nodes (pins, aligns, stacks, fit) landed, from the stage. Not saved, not in undo. */
   layout: Record<string, LayoutPlacement>;
+  /** The sizes `fitWidth` chose for the active slide's text blocks (px), from the stage. Not saved, not in undo. */
+  fitted: Record<string, number>;
   /** What Copy took: nodes of one layer, or a whole slide. Editor-only, cleared when another project opens. */
   clipboard: Clipboard | null;
 
@@ -170,6 +172,8 @@ export interface StudioActions {
   toggleLock(id: string): void;
   /** The stage resolved the layout relations: keep every decided box field in step (no undo step, not dirty). */
   syncLayout(placements: Map<string, LayoutPlacement>): void;
+  /** The stage fitted text blocks to their width: remember the sizes for the inspector. */
+  setFitted(sizes: Map<string, number>): void;
   /** Edit the selected nodes' `layout` (one undo step). `fn` returns the new layout, or undefined to clear it. */
   patchLayout(ids: string[], fn: (layout: Layout | undefined, node: Node) => Layout | undefined): void;
   /** Remove a relation and leave the box where the layout put it (one undo step). */
@@ -271,6 +275,7 @@ const initial: StudioState = {
   transformSpace: "world",
   locked: {},
   layout: {},
+  fitted: {},
   clipboard: null,
   zoom: "fit",
   fitZoom: 0.5,
@@ -605,6 +610,7 @@ export const useStudio = create<Studio>()(
           t.redo();
           fixSelectionAfterHistory();
         },
+        setFitted: (sizes) => set({ fitted: Object.fromEntries(sizes) }),
         syncLayout: (placements) => {
           const s = get();
           set({ layout: Object.fromEntries(placements) });

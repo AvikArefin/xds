@@ -5,17 +5,38 @@
  * Layout relations (stacks, aligns, pins, fit) are resolved by the stage (`SlideStage`): this
  * layer lays the text out at its placed rect, measures each block's ink relative to its box
  * (and its content height) once the fonts are in, and reports it with `onInk`. While the slide
- * has relations and the ink for the current layout has not been reported, "layout: relations"
- * is pending, so a render never captures a block in an unresolved place.
+ * has relations and the ink for the current layout has not been reported, "layout: text" is
+ * pending, so a render never captures a block in an unresolved place.
+ *
+ * Expressive treatments (data-models §2.5d) are drawn here, in the DOM, so the audit's layer
+ * alpha sees real ink: `skew` is a skewX on an inner box, `stroke`/`fill` a text stroke,
+ * `extrude` and `repeat` are absolutely positioned clones behind the text (`editor-core`
+ * `extrudeOffsets`/`repeatOffsets`), `plate` a rounded rect behind the measured ink, and
+ * `fitWidth` sets the size that makes the widest line fill the box (`fitWidthSize`), measured
+ * from canvas text metrics once the fonts are in. Ink is measured in the box's own space
+ * (rotation and skew off) and grown by the treatments (`treatedExtent`), so a stack gap under a
+ * plated or extruded block is measured from the plate or the extrusion.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Project, TypeNode } from "@xds/protocol";
-import { boxToPx, type LayoutPlacement } from "@xds/editor-core";
+import {
+  boxToPx,
+  extrudeOffsets,
+  fitWidthSize,
+  hasTreatment,
+  plateRect,
+  repeatOffsets,
+  strokePx,
+  treatedExtent,
+  type CloneOffset,
+  type LayoutPlacement,
+  type Rect,
+} from "@xds/editor-core";
 import { fileUrl } from "../api";
 import type { Guide } from "../types";
-import { inkExtent } from "./ink";
+import { inkExtent, widestLinePx, withoutTransforms } from "./ink";
 import { usePending } from "./readiness";
-import { cssFontFamily, effectiveTypeStyle, type EffectiveTypeStyle } from "./typeStyle";
+import { cssFontFamily, effectiveTypeStyle, tokenHex, type EffectiveTypeStyle } from "./typeStyle";
 
 export function fontFaceCss(project: Project): string {
   return (project.fonts ?? [])
@@ -69,13 +90,15 @@ function FontLoad({ req }: { req: FontReq }) {
 
 /** What the stage needs from a laid-out text block to resolve relations. */
 export interface TextInk {
-  /** Ink extent relative to the box, px. */
+  /** Ink extent relative to the box, px, grown by the block's treatments (plate, extrusion, repeats). */
   top: number;
   bottom: number;
   left: number;
   right: number;
   /** The laid-out text's height, px. */
   contentHeight: number;
+  /** The size `fitWidth` chose, px (absent when the block does not fit its width). */
+  fittedSize?: number;
 }
 
 export interface TypeLayerProps {
@@ -121,17 +144,55 @@ export function typeTextStyle(s: EffectiveTypeStyle, align: string | undefined):
 
 /** The key of a text layout: what changes the ink of a block relative to its box (width, text, style). */
 export function textLayoutKey(nodes: TypeNode[], styles: EffectiveTypeStyle[], widths: number[]): string {
-  return JSON.stringify(nodes.map((n, i) => [n.id, widths[i], n.data.text, n.data.align, n.data.valign, styles[i]]));
+  return JSON.stringify(
+    nodes.map((n, i) => [
+      n.id,
+      widths[i],
+      n.data.text,
+      n.data.align,
+      n.data.valign,
+      styles[i],
+      n.data.skew,
+      n.data.stroke,
+      n.data.fill,
+      n.data.extrude,
+      n.data.repeat,
+      n.data.plate,
+      n.data.fitWidth,
+    ]),
+  );
+}
+
+/** `#rrggbb` at an alpha. */
+function withAlpha(hex: string, alpha: number): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return hex;
+  return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
+}
+
+/** The stroke CSS for a text element (outline text, or a stroke around the fill). */
+function strokeStyle(node: TypeNode, style: EffectiveTypeStyle, project: Project, u: number, outlineOnly: boolean): CSSProperties {
+  const d = node.data;
+  const px = strokePx(d, u);
+  const color = tokenHex(project, d.stroke?.color) ?? style.color;
+  if (!px && !outlineOnly) return {};
+  const width = px || Math.max(1, u / 8);
+  return {
+    WebkitTextStroke: `${width}px ${color}`,
+    paintOrder: "stroke fill",
+    ...(d.fill === "none" || outlineOnly ? { WebkitTextFillColor: "transparent" } : {}),
+  } as CSSProperties;
 }
 
 export function TypeLayer({ project, nodes, background, guide, width, height, placements, needsInk, onInk }: TypeLayerProps) {
-  const styled = useMemo(
+  const u = stackUnit(project, guide);
+  const base = useMemo(
     () => nodes.map((n) => ({ node: n, style: effectiveTypeStyle(n.data, project, background, guide) })),
     [nodes, project, background, guide],
   );
   const fonts = useMemo(() => {
     const m = new Map<string, FontReq>();
-    for (const { node, style } of styled) {
+    for (const { node, style } of base) {
       if (!style.family) continue;
       const k = `${style.family}|${style.weight}|${style.italic}`;
       const prev = m.get(k);
@@ -140,9 +201,9 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
       else m.set(k, { family: style.family, weight: style.weight, italic: style.italic, sample: text.slice(0, 64) });
     }
     return [...m.values()];
-  }, [styled]);
+  }, [base]);
 
-  // --- placed rects and ink ---------------------------------------------------------------
+  // --- placed rects, fitted sizes and ink -------------------------------------------------
   const rects = useMemo(
     () =>
       nodes.map((n) => {
@@ -152,8 +213,16 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
       }),
     [nodes, placements, width, height],
   );
+  const [fitted, setFitted] = useState<Map<string, number>>(() => new Map());
+  const styled = useMemo(
+    () => base.map(({ node, style }) => ({ node, style: fitted.has(node.id) ? { ...style, size: fitted.get(node.id)! } : style })),
+    [base, fitted],
+  );
+  const [plates, setPlates] = useState<Map<string, Rect>>(() => new Map());
   const els = useRef(new Map<string, HTMLDivElement>());
-  const measure = !!needsInk;
+  // Fit-to-width and plates need the ink even when the slide has no relations.
+  const needsLocal = nodes.some((n) => n.data.fitWidth || n.data.plate);
+  const measure = !!needsInk || needsLocal;
   const layoutKey = useMemo(
     () => (measure ? textLayoutKey(nodes, styled.map((s) => s.style), rects.map((r) => r.w)) : ""),
     [measure, nodes, styled, rects],
@@ -161,7 +230,7 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
   const [fontTick, setFontTick] = useState(0);
   const [reported, setReported] = useState<string | null>(null);
   const key = `${layoutKey}|${fontTick}`;
-  usePending("layout:relations", "layout: relations", measure && reported !== key);
+  usePending("layout:text", "layout: text", measure && reported !== key);
 
   useEffect(() => {
     if (!measure) return;
@@ -182,22 +251,46 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
         alive = false;
       };
     }
+    // Fit-to-width first: the size that makes the widest line fill the box, from the base style.
+    const nextFit = new Map<string, number>();
+    base.forEach(({ node, style }, i) => {
+      if (!node.data.fitWidth) return;
+      const font = `${style.italic ? "italic " : ""}${style.weight} ${style.size}px ${cssFontFamily(style.family)}`;
+      const natural = widestLinePx(font, style.letterSpacing * style.size, node.data.text, style.uppercase);
+      nextFit.set(node.id, fitWidthSize(natural, style.size, rects[i].w));
+    });
+    let fitChanged = nextFit.size !== fitted.size;
+    for (const [id, size] of nextFit) if (fitted.get(id) !== size) fitChanged = true;
+    if (fitChanged) {
+      setFitted(nextFit);
+      return; // the re-render with the fitted sizes runs this effect again
+    }
     const ink = new Map<string, TextInk>();
+    const nextPlates = new Map<string, Rect>();
     for (const { node } of styled) {
       const el = els.current.get(node.id);
       if (!el) continue;
-      const scale = el.getBoundingClientRect().width / Math.max(1e-6, el.offsetWidth) || 1;
+      const scale = withoutTransforms(el, () => el.getBoundingClientRect().width / Math.max(1e-6, el.offsetWidth) || 1);
       const ext = inkExtent(el, scale);
       const textEl = (el.querySelector("[data-xds-text]") as HTMLElement) ?? el;
       const b = rects[nodes.indexOf(node)];
-      ink.set(node.id, {
-        top: ext?.top ?? 0,
-        bottom: ext?.bottom ?? b.h,
-        left: ext?.left ?? 0,
-        right: ext?.right ?? b.w,
-        contentHeight: textEl.offsetHeight,
-      });
+      const glyphs = { top: ext?.top ?? 0, bottom: ext?.bottom ?? b.h, left: ext?.left ?? 0, right: ext?.right ?? b.w };
+      const grown = hasTreatment(node.data) ? treatedExtent(node.data, glyphs, u) : glyphs;
+      const entry: TextInk = { ...grown, contentHeight: textEl.offsetHeight };
+      if (fitted.has(node.id)) entry.fittedSize = fitted.get(node.id);
+      ink.set(node.id, entry);
+      if (node.data.plate) {
+        const skewEl = el.querySelector<HTMLElement>("[data-xds-skew]");
+        const p = plateRect(node.data, glyphs, u);
+        nextPlates.set(node.id, { ...p, y: p.y - (skewEl?.offsetTop ?? 0) });
+      }
     }
+    let platesChanged = nextPlates.size !== plates.size;
+    for (const [id, r] of nextPlates) {
+      const q = plates.get(id);
+      if (!q || q.x !== r.x || q.y !== r.y || q.w !== r.w || q.h !== r.h) platesChanged = true;
+    }
+    if (platesChanged) setPlates(nextPlates);
     onInkRef.current?.(ink, key);
     setReported(key);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -209,7 +302,21 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
       ))}
       {styled.map(({ node, style }, i) => {
         const b = rects[i];
-        const v = node.data.valign ?? "top";
+        const d = node.data;
+        const v = d.valign ?? "top";
+        const text = typeTextStyle(style, d.align);
+        const stroke = strokeStyle(node, style, project, u, false);
+        const clones: (CloneOffset & { color: string; kind: "extrude" | "repeat" })[] = [];
+        if (d.extrude) {
+          const color = tokenHex(project, d.extrude.color) ?? withAlpha(style.color, 0.4);
+          for (const c of [...extrudeOffsets(d.extrude, u)].reverse()) clones.push({ ...c, color, kind: "extrude" });
+        }
+        if (d.repeat) {
+          for (const c of [...repeatOffsets(d.repeat, u)].reverse()) clones.push({ ...c, color: style.color, kind: "repeat" });
+        }
+        const plate = plates.get(node.id);
+        const plateFill = d.plate ? tokenHex(project, d.plate.fill) : null;
+        const plateStroke = d.plate?.stroke ? `${d.plate.stroke.width * u}px solid ${tokenHex(project, d.plate.stroke.color) ?? style.color}` : undefined;
         return (
           <div
             key={node.id}
@@ -219,6 +326,7 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
             }}
             data-node-id={node.id}
             data-layer="type"
+            data-treated={hasTreatment(d) || b.rotation ? "" : undefined}
             style={{
               position: "absolute",
               left: b.x,
@@ -232,8 +340,57 @@ export function TypeLayer({ project, nodes, background, guide, width, height, pl
               justifyContent: v === "middle" ? "center" : v === "bottom" ? "flex-end" : "flex-start",
             }}
           >
-            <div data-xds-text="" style={typeTextStyle(style, node.data.align)}>
-              {node.data.text}
+            <div
+              data-xds-skew=""
+              style={{
+                position: "relative",
+                width: "100%",
+                transform: d.skew ? `skewX(${d.skew}deg)` : undefined,
+                transformOrigin: "center",
+              }}
+            >
+              {plate && (
+                <div
+                  data-xds-plate=""
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: plate.x,
+                    top: plate.y,
+                    width: plate.w,
+                    height: plate.h,
+                    borderRadius: (d.plate?.radius ?? 0) * u,
+                    background: plateFill && plateFill !== "none" ? plateFill : d.plate?.fill === "none" || plateStroke ? "transparent" : withAlpha(style.color, 0.12),
+                    border: plateStroke,
+                    boxSizing: "border-box",
+                    zIndex: 0,
+                  }}
+                />
+              )}
+              {clones.map((c, k) => (
+                <div
+                  key={k}
+                  data-xds-clone={c.kind}
+                  aria-hidden
+                  style={{
+                    ...text,
+                    ...(c.outline ? strokeStyle(node, { ...style, color: c.color }, project, u, true) : stroke),
+                    ...(c.outline ? {} : { color: c.color }),
+                    position: "absolute",
+                    left: c.dx,
+                    top: c.dy,
+                    width: "100%",
+                    opacity: c.opacity,
+                    zIndex: 1,
+                    pointerEvents: "none",
+                  }}
+                >
+                  {d.text}
+                </div>
+              ))}
+              <div data-xds-text="" style={{ ...text, ...stroke, position: "relative", zIndex: 2 }}>
+                {d.text}
+              </div>
             </div>
           </div>
         );

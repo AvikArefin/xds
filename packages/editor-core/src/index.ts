@@ -9,3 +9,4 @@ export * from "./layout";
 export * from "./place";
 export * from "./typeSize";
 export * from "./edits";
+export * from "./treatments";

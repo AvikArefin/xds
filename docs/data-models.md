@@ -348,6 +348,13 @@ ShapeData = { shape: "star-4" | "star-8" | "sparkle" | "ring" | "rings" | "lens"
               stroke?: Stroke; fill?: string /* token or "none" */; params?: Record<string, number> };
 ```
 
+Angles are degrees clockwise from the right with y down (90 is down, 135 down-left). A plate
+sits behind the block's measured ink, not its box, and moves with the block; `fitWidth` sets the
+size from the widest line (a `\n` break counts) once the fonts are in, and the editor shows the
+fitted size in place of the Size field's placeholder. The ink a stack or align measures is the
+treated ink: the glyphs grown by the stroke, the clones and the plate. How each treatment is
+drawn is in [design rules §8.1](./design-rules.md#81-the-vocabulary).
+
 A shape is drawn by the renderer as inline SVG in the node's box (`apps/studio/src/stage/shapes.tsx`),
 so it is real ink for the audit and needs no file. The stroke is `stroke.width × u` px; its color
 defaults to the slide's default text color. A stroked shape has no fill unless `fill` names a
@@ -598,6 +605,8 @@ folder.
               letterSpacing: number; color: string; uppercase: boolean };
     overflow?: boolean;                           // text did not fit its box
     contentHeight?: number;                       // the laid-out text's height, px (box.h must hold it)
+    inkPolygon?: [number, number][];              // treated or rotated text: the ink's corners on the canvas
+    treated?: boolean;                            //   (after treatments, skew and rotation); masked by this ∩ alpha
   }[];
   subject: { bounds: Rect; coverage: number } | null;   // 3D silhouette, from the 3D layer's alpha
   layers: Record<Layer, string>;                  // per-layer alpha masks, PNG paths, for masking checks
@@ -676,7 +685,8 @@ Undo history covers `document.project` only. `dirty` is `project !== savedProjec
 decided box field, with the line, anchor edge or stack base that decided it), as the stage reports
 it; it is view state (never saved, not in undo). When it changes, the decided fields of those nodes'
 `box` are updated in `project` and `savedProject` alike (`syncLayout`), without an undo step and
-without making the document dirty. There is no
+without making the document dirty. `fitted` holds the sizes `fitWidth` chose for the active
+slide's text blocks, the same way (view state, for the inspector only). There is no
 per-path pending-edit ledger and no three-way rebase (see [dataflow §2](./dataflow.md#2-input-an-agent-editing-files)): the file on disk is the
 truth, and an outside change simply reloads.
 

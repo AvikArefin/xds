@@ -47,19 +47,30 @@ def text_overlap(s: MeasuredSlide, t: Thresholds) -> Iterator[Hit]:
     """Overlapping text can't be read.
 
     Compares the ink line rectangles of every pair of text nodes, not their boxes, so generous
-    boxes don't false-alarm.
+    boxes don't false-alarm. A treated or rotated block (design-rules §8) is compared by its ink
+    pixels (its polygon ∩ the type layer's alpha) instead, so a skewed word next to another is
+    judged on what was drawn.
     """
     for a, b in combinations(s.text_nodes, 2):
-        hits = [ra.intersect(rb) for ra in s.line_rects(a) for rb in s.line_rects(b)]
-        hits = [h for h in hits if h is not None and h.area >= 1]
-        if not hits:
-            continue
-        region = union_all(hits)
+        if (a.treated and a.ink_polygon) or (b.treated and b.ink_polygon):
+            both = s.text_ink_mask(a) & s.text_ink_mask(b)
+            area = int(both.sum())
+            if area < 1:
+                continue
+            ys, xs = np.nonzero(both)
+            region = R.from_edges(int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+        else:
+            hits = [ra.intersect(rb) for ra in s.line_rects(a) for rb in s.line_rects(b)]
+            hits = [h for h in hits if h is not None and h.area >= 1]
+            if not hits:
+                continue
+            region = union_all(hits)
+            area = round(sum(h.area for h in hits))
         ia, ib = s.ink(a), s.ink(b)
         yield Hit(
             nodes=[a.id, b.id], region=region,
-            message=f"'{s.name(a.id)}' and '{s.name(b.id)}' overlap by {sum(h.area for h in hits):.0f} px².",
-            measured={"overlapPx": round(sum(h.area for h in hits))},
+            message=f"'{s.name(a.id)}' and '{s.name(b.id)}' overlap by {area:.0f} px².",
+            measured={"overlapPx": area},
             expected={"overlapPx": 0, "gapPx": t.u},
             fix=_clear_of(s, b.id, ib, ia, t.u) + f" (clear of '{s.name(a.id)}' by {t.u}px)",
             edits=s.move_edits(b.id, dy=_clear_dy(ib, ia, t.u)),

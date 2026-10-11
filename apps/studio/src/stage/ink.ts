@@ -84,10 +84,29 @@ export function measureLines(textEl: HTMLElement, origin: { left: number; top: n
   return out;
 }
 
-/** A text block's ink extent relative to its box (the element carrying `data-node-id`), px. */
+/**
+ * Run `fn` with the node's rotation and skew switched off (the wrapper's `transform` and the
+ * `[data-xds-skew]` element's), so what it measures is in the box's own space. Synchronous, so
+ * nothing is painted in between.
+ */
+export function withoutTransforms<T>(el: HTMLElement, fn: () => T): T {
+  const skewEl = el.querySelector<HTMLElement>("[data-xds-skew]");
+  const saved = [el, skewEl].filter((e): e is HTMLElement => !!e).map((e) => [e, e.style.transform] as const);
+  for (const [e] of saved) e.style.transform = "none";
+  try {
+    return fn();
+  } finally {
+    for (const [e, t] of saved) e.style.transform = t;
+  }
+}
+
+/**
+ * A text block's ink extent relative to its box (the element carrying `data-node-id`), px, in the
+ * box's own space (rotation and skew off).
+ */
 export function inkExtent(el: HTMLElement, scale = 1): { top: number; bottom: number; left: number; right: number } | null {
   const textEl = (el.querySelector("[data-xds-text]") as HTMLElement) ?? el;
-  const lines = measureLines(textEl, el.getBoundingClientRect(), scale);
+  const lines = withoutTransforms(el, () => measureLines(textEl, el.getBoundingClientRect(), scale));
   if (!lines.length) return null;
   return {
     top: Math.min(...lines.map((l) => l.rect.y)),
@@ -95,4 +114,19 @@ export function inkExtent(el: HTMLElement, scale = 1): { top: number; bottom: nu
     left: Math.min(...lines.map((l) => l.rect.x)),
     right: Math.max(...lines.map((l) => l.rect.x + l.rect.w)),
   };
+}
+
+/**
+ * The natural (unwrapped) width of the widest line of `text` in `font` (a CSS font shorthand),
+ * px, from canvas text metrics: what fit-to-width scales against.
+ */
+export function widestLinePx(font: string, letterSpacingPx: number, text: string, uppercase: boolean): number {
+  let widest = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = textMetrics(font, letterSpacingPx, uppercase ? line.toUpperCase() : line);
+    widest = Math.max(widest, m.width);
+  }
+  return widest;
 }

@@ -737,6 +737,11 @@ class MeasuredNode(Model):
     align: Literal["left", "center", "right"] | None = None
     group: str | None = None
     decorative: bool | None = None
+    # Treated or rotated text (design-rules §8): the ink's corners on the canvas, px, after the
+    # treatments (stroke, extrusion, repeats, plate), skew and rotation. The audit masks such a
+    # block by this polygon ∩ the type layer's alpha instead of its axis-aligned line rects.
+    ink_polygon: list[tuple[float, float]] | None = None
+    treated: bool | None = None
 
 
 class MeasuredSubject(Model):

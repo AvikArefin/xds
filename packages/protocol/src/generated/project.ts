@@ -755,6 +755,8 @@ export interface MeasuredNode {
   align?: "left" | "center" | "right";
   group?: string;
   decorative?: boolean;
+  inkPolygon?: [number, number][];
+  treated?: boolean;
 }
 /**
  * This interface was referenced by `XdsSchema`'s JSON-Schema

@@ -115,8 +115,22 @@ class MeasuredSlide:
     def line_rects(node: MeasuredNode) -> list[R]:
         return [R.of(line.rect) for line in node.lines or []]
 
+    @staticmethod
+    def polygon_bounds(node: MeasuredNode) -> R | None:
+        """The bounds of a treated block's ink polygon (data-models §5.1), if it has one."""
+        pts = node.ink_polygon
+        if not pts:
+            return None
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        return R.from_edges(min(xs), min(ys), max(xs), max(ys))
+
     def ink(self, node: MeasuredNode) -> R:
-        """Text: the union of its ink line rects. Images: the bounds of its opaque pixels."""
+        """Text: the union of its ink line rects (a treated or rotated block: the bounds of its ink
+        polygon). Images: the bounds of its opaque pixels."""
+        poly = self.polygon_bounds(node) if node.treated else None
+        if poly is not None:
+            return poly
         if node.lines:
             return union_all(self.line_rects(node)) or R.of(node.box)
         if node.layer == "image":
@@ -217,9 +231,21 @@ class MeasuredSlide:
                 m[y0:y1, x0:x1] = True
         return m
 
+    def polygon_mask(self, pts: list[tuple[float, float]]) -> np.ndarray:
+        """A boolean mask of a polygon on the canvas."""
+        from PIL import ImageDraw
+
+        im = Image.new("1", (self.width, self.height), 0)
+        ImageDraw.Draw(im).polygon([(float(x), float(y)) for x, y in pts], fill=1)
+        return np.asarray(im, dtype=bool)
+
     def text_ink_mask(self, node: MeasuredNode) -> np.ndarray:
-        """The node's glyph pixels: its line rects ∩ the type layer's alpha (rects if no mask)."""
-        rects = self.rect_mask(self.line_rects(node))
+        """The node's glyph pixels: its line rects (a treated or rotated block: its ink polygon)
+        ∩ the type layer's alpha (the rects or polygon alone when there is no mask)."""
+        if node.treated and node.ink_polygon and len(node.ink_polygon) >= 3:
+            rects = self.polygon_mask(node.ink_polygon)
+        else:
+            rects = self.rect_mask(self.line_rects(node))
         alpha = self.mask("type")
         if alpha is not None:
             glyphs = rects & (alpha > 0.5)

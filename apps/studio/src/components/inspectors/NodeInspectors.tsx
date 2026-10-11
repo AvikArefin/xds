@@ -133,6 +133,7 @@ export function TypeInspector({ nodes }: { nodes: TypeNode[] }) {
   const guide = useStudio((s) => s.guide);
   const readOnly = useStudio((s) => s.readOnly);
   const patchData = useStudio((s) => s.patchData);
+  const fitted = useStudio((s) => s.fitted);
   const ids = nodes.map((n) => n.id);
   const roles = Object.entries(project.brand.typography ?? {});
   const styles = nodes.map((n) => typeStyle(project, n, guide));
@@ -189,12 +190,12 @@ export function TypeInspector({ nodes }: { nodes: TypeNode[] }) {
         <NumberField
           label="Size"
           value={d("size") as number | undefined | typeof MIXED}
-          placeholder={(eff("size") === MIXED ? "—" : (eff("size") as number)) ?? undefined}
+          placeholder={nodes.length === 1 && fitted[nodes[0].id] !== undefined ? `fit ${fitted[nodes[0].id]}` : (eff("size") === MIXED ? "—" : (eff("size") as number)) ?? undefined}
           range={b ? [b.min, b.max] : undefined}
           unit="px"
           min={1}
           disabled={readOnly}
-          title="Empty = Scale × the role's size (or the band default)"
+          title="Empty = Scale × the role's size (or the band default); with Fit width, the fitted size"
           onChange={(v) => (v === undefined ? set("size", undefined) : patchData(ids, { size: v }, ["scale"]))}
         />
         <NumberField

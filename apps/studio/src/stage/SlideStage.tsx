@@ -68,6 +68,8 @@ export interface SlideStageProps {
   mountLayers?: Layer[];
   /** The resolved layout relations (every 2D node a pin, align, stack or fit decided), whenever they change. */
   onLayout?: (placements: Map<string, LayoutPlacement>) => void;
+  /** The sizes `fitWidth` chose for text blocks (node id → px), whenever they change. */
+  onFit?: (sizes: Map<string, number>) => void;
   /** The slide's flat background fill (default true). */
   showBackground?: boolean;
   /** The contact/soft shadow in the 3D layer (default true). */
@@ -130,7 +132,19 @@ export function SlideStage(props: SlideStageProps) {
   const flat = useMemo(() => [...byLayer.ground, ...byLayer.image, ...byLayer.type], [byLayer]);
   const needsInk = useMemo(() => flat.some((n) => hasRelations(layoutSpecOf(n))), [flat]);
   const [ink, setInk] = useState<Map<string, TextInk>>(() => new Map());
-  const onInk = useCallback((m: Map<string, TextInk>) => setInk(m), []);
+  const onFitRef = useRef(props.onFit);
+  onFitRef.current = props.onFit;
+  const fittedRef = useRef("");
+  const onInk = useCallback((m: Map<string, TextInk>) => {
+    setInk(m);
+    const sizes = new Map<string, number>();
+    for (const [id, i] of m) if (i.fittedSize !== undefined) sizes.set(id, i.fittedSize);
+    const key = JSON.stringify([...sizes]);
+    if (key !== fittedRef.current) {
+      fittedRef.current = key;
+      onFitRef.current?.(sizes);
+    }
+  }, []);
   const lg = useMemo(() => layoutGuide(project, props.guide), [project, props.guide]);
   const placements = useMemo(() => {
     if (!needsInk) return new Map<string, LayoutPlacement>();

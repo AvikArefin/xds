@@ -32,7 +32,9 @@ import { toHex } from "../design/color";
 import { findPart, meshesUnder } from "../scene/objects";
 import type { SceneApi } from "../scene/SceneRoot";
 import { projectToPx } from "../scene/studio/subject";
-import { measureLines, rect } from "../stage/ink";
+import { boxToPx, hasTreatment, transformedCorners, treatedExtent, type Point } from "@xds/editor-core";
+import { inkExtent, measureLines, rect } from "../stage/ink";
+import { stackUnit } from "../stage/TypeLayer";
 import type { StageHandle } from "../stage/SlideStage";
 
 const ALPHA_THRESHOLD = 12; // of 255: ignore the faintest antialiasing fringe
@@ -229,6 +231,25 @@ function measureType(node: TypeNode, el: HTMLElement, origin: DOMRect, project: 
   };
   if (role?.level) out.level = role.level;
   if (node.data.group) out.group = node.data.group;
+  // Treated or rotated text: the ink's corners on the canvas (box space → skew → rotation), so the
+  // audit can mask it where axis-aligned line rects would be wrong (data-models §5.1).
+  const treated = hasTreatment(node.data) || !!node.box.rotation;
+  if (treated) {
+    const u = stackUnit(project);
+    const box = boxToPx(node.box, { width: canvas.w, height: canvas.h });
+    const b = el.getBoundingClientRect();
+    const r = { x: b.left - origin.left, y: b.top - origin.top, w: box.w, h: box.h };
+    // The DOM box is the rotated AABB; the unrotated box's top-left is where the wrapper would sit
+    // without its transform. The stage places it at the resolved rect, which the AABB is centered on.
+    const center = { x: r.x + b.width / 2, y: r.y + b.height / 2 };
+    const unrotated = { x: center.x - box.w / 2, y: center.y - box.h / 2, w: box.w, h: box.h };
+    const ext = inkExtent(el) ?? { top: 0, bottom: box.h, left: 0, right: box.w };
+    const grown = hasTreatment(node.data) ? treatedExtent(node.data, ext, u) : ext;
+    const local = { x: grown.left, y: grown.top, w: grown.right - grown.left, h: grown.bottom - grown.top };
+    const corners: Point[] = transformedCorners(local, unrotated, node.box.rotation ?? 0, node.data.skew ?? 0);
+    out.inkPolygon = corners.map(([x, y]) => [r2(x), r2(y)]);
+    out.treated = true;
+  }
   return out;
 }
 

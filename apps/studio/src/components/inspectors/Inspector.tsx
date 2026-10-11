@@ -6,6 +6,7 @@ import { BrandInspector } from "./BrandInspector";
 import { LayoutInspector } from "./LayoutInspector";
 import { GroundInspector, ImageInspector, ShapeInspector, TransformInspector, TypeInspector } from "./NodeInspectors";
 import { SceneInspector } from "./SceneInspector";
+import { TreatmentsInspector } from "./TreatmentsInspector";
 
 function NodeHeader({ id }: { id: string }) {
   const slide = useActiveSlide();
@@ -53,6 +54,7 @@ export function Inspector() {
           <TransformInspector nodes={boxNodes} />
           <LayoutInspector nodes={boxNodes} />
           {mode === "type" && <TypeInspector nodes={nodes as TypeNode[]} />}
+          {mode === "type" && <TreatmentsInspector nodes={nodes as TypeNode[]} />}
           {mode === "image" && <ImageInspector nodes={nodes as ImageNode[]} />}
           {mode === "image" && <ShapeInspector nodes={nodes as ImageNode[]} />}
           {mode === "ground" && <GroundInspector nodes={nodes as GroundNode[]} />}

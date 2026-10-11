@@ -30,7 +30,7 @@ editor.
 | **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings with a **Fix** link where the fix is one value, **Fix all on this slide**, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Snapshots, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos, the project's images, or **Shape…**: a drawn ornament). Text / 2D / Background: the layer's nodes and **+ New …** |
-| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (pins, align to, stack, fit to text) and its layer's fields (Text adds **Wrap**). |
+| **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box, its **Layout** (pins, align to, stack, fit to text) and its layer's fields (Text adds **Wrap** and **Treatments**). |
 
 **Layers** (Present): drag a row onto another to move that layer there (saved). The eye hides a
 layer on the canvas only, so you can work on what's under it; it is never saved, and exports
@@ -121,6 +121,14 @@ reloads from disk. Undo has one step per drag or field change.
   nudging or typing a coordinate of a related block edits its gap or offset instead (whole units
   while Snap is on); a side the layout sizes snaps back. **Free** drops a relation and leaves the
   box where it is.
+- **Expressive type**: give the role the `expressive` level (Present → Typography → Level) so its
+  size can run free, then the Text inspector's **Treatments**: **Skew** (degrees), **Fill**
+  Solid or None, **Stroke** (width in units, a color token), **Extrude** (depth, angle, steps,
+  color), **Repeat** (count, dX, dY, alternate outlines, fade), **Plate** (padding, radius,
+  stroke, fill) and **Fit width** (the widest line fills the box; the Size field shows the
+  fitted size). Rotation stays in Transform. Fields turn amber outside the brand's expression
+  system (Present → Brand), and the audit's `expression` rules say when a second angle, slant,
+  stroke or ornament family creeps in ([design rules §8](./design-rules.md#8-expression-and-coherence)).
 - **Background**: there is no page color. Each slide's back Background node covers the canvas, and
   new slides copy the previous slide's. To change it: `5`, select it, change its design or knobs.
   **+ New background…** adds a project design or a starter on top. The audit reports

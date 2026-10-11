@@ -405,6 +405,23 @@ lines, pluses, grids) with a stroke in `u` and a fill token. Rotation stays on t
 2D node. Imported art (a hand-drawn glyph, a texture) enters as an image and is checked only for
 what touches it.
 
+How the type layer draws each treatment (the one renderer, so the export, the audit and the
+editor agree):
+
+| Treatment | Drawn as |
+| --- | --- |
+| `skew` | a `skewX` of the block's inner box about its center, under the box rotation |
+| `stroke` (+ `fill: "none"`) | a text stroke of `width × u` px in the token (default the text color), painted under the fill; `fill: "none"` leaves only the outline |
+| `extrude` | `steps` copies (default one per 2 px) behind the text, each `depth × u / steps` further along `angle` (degrees clockwise from right, y down: 90 is down, 135 down-left), in the token or the text color at 40 % |
+| `repeat` | `count − 1` copies behind the text, each `(dx, dy) × u` further; `outline` alternates outlined copies, `fade` dims them to 20 % |
+| `plate` | a rounded rect behind the measured ink (not the box): `padding × u` around it, `radius × u` corners, the fill token (default the text color at 12 %), an optional stroke |
+| `fitWidth` | once the fonts are in, the size at which the widest line fills the box width, from text metrics; the audit measures that size |
+
+Clones and plates are real DOM ink, so the audit's layer alpha sees them. A treated or rotated
+block also reports its ink polygon (data-models §5.1), which the collision and expression rules
+mask by instead of its axis-aligned line rects. A stack under a plated or extruded block is
+measured from the plate or the extrusion, not the glyphs.
+
 ### 8.2 The expression system: `brand.expression`
 
 The project declares the few values its treatments draw from, the way it declares colors and
