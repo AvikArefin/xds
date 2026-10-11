@@ -5,13 +5,16 @@ import {
   addSlide,
   coversCanvas,
   slideBackground,
+  cloneNodes,
   deleteSlide,
   duplicateNodes,
+  duplicateSlide,
   findNode,
   freshId,
   moveSlide,
   nudgeNodes,
   nudgePose,
+  pasteNodes,
   placeInMargin,
   removeNodes,
   reorderInLayer,
@@ -185,5 +188,84 @@ describe("slides and removal", () => {
 
   it("removes nodes", () => {
     expect(ids(removeNodes(project(), "s1", ["title", "cta"]))).toEqual(["bg", "obj", "sub"]);
+  });
+});
+
+describe("copy and paste", () => {
+  const stacked = (): Project => {
+    const p = project();
+    p.slides[0].nodes!.push({
+      id: "note",
+      layer: "type",
+      box: { x: 10, y: 40, w: 50, h: 5 },
+      exceptions: [{ rule: "TYPE_SMALL", reason: "fine" }],
+      data: { text: "Note", role: "body", stack: { below: "sub", gap: 2 } },
+    } as TypeNode);
+    return p;
+  };
+
+  it("cloneNodes gives fresh ids, drops exceptions and remaps a copied anchor", () => {
+    const [sub, note] = cloneNodes(
+      [findNode(stacked(), "sub")!.node, findNode(stacked(), "note")!.node],
+      new Set(["sub", "note"]),
+    );
+    expect([sub.id, note.id]).toEqual(["sub-2", "note-2"]);
+    expect(note.exceptions).toBeUndefined();
+    expect((note as TypeNode).data.stack).toEqual({ below: "sub-2", gap: 2 });
+  });
+
+  it("cloneNodes keeps an anchor that is on the target slide and drops one that is not", () => {
+    const note = findNode(stacked(), "note")!.node;
+    expect((cloneNodes([note], new Set(["note"]), new Set(["sub"]))[0] as TypeNode).data.stack).toEqual({ below: "sub", gap: 2 });
+    expect((cloneNodes([note], new Set(["note"]))[0] as TypeNode).data.stack).toBeUndefined();
+  });
+
+  it("pastes onto another slide at the same box, appended", () => {
+    const p = stacked();
+    const r = pasteNodes(p, "s2", [findNode(p, "title")!.node, findNode(p, "note")!.node]);
+    expect(r.ids).toEqual(["title-2", "note-2"]);
+    expect(ids(r.project, 1)).toEqual(["title-2", "note-2"]);
+    const copy = findNode(r.project, "title-2")!.node as TypeNode;
+    expect(copy.box).toEqual({ x: 10, y: 10, w: 50, h: 10 });
+    expect((findNode(r.project, "note-2")!.node as TypeNode).data.stack).toBeUndefined(); // "sub" is not on s2
+    expect(ids(r.project, 0)).toEqual(["bg", "title", "obj", "sub", "cta", "note"]); // the source is untouched
+  });
+
+  it("pastes a render node sharing its object, and copies the object when it is already there", () => {
+    const p = project();
+    const obj = findNode(p, "obj")!.node;
+    const other = pasteNodes(p, "s2", [obj]);
+    expect((findNode(other.project, other.ids[0])!.node as RenderNode).data.object).toBe("bottle");
+    expect(other.project.objects!.length).toBe(1);
+    const same = pasteNodes(p, "s1", [obj]);
+    const n = findNode(same.project, same.ids[0])!.node as RenderNode;
+    expect(n.data.object).toBe("bottle-2");
+    expect(n.data.parts).toEqual({ Lid: { rotate: [-15, 0, 0] } });
+    expect(same.project.objects!.map((o) => o.id)).toEqual(["bottle", "bottle-2"]);
+  });
+
+  it("skips a render node whose object is gone", () => {
+    const p = project();
+    const r = pasteNodes({ ...p, objects: [] }, "s2", [findNode(p, "obj")!.node, findNode(p, "cta")!.node]);
+    expect(r.ids).toEqual(["cta-2"]);
+  });
+
+  it("duplicates a slide right after the original with fresh ids and the same layout", () => {
+    const p = stacked();
+    p.slides[0].name = "Cover";
+    p.slides[0].camera = { mode: "frame", yaw: 10 };
+    p.slides[0].exceptions = [{ rule: "UNCOVERED_CANVAS", reason: "x" }];
+    const r = duplicateSlide(p, p.slides[0], "s1");
+    expect(r.id).toBe("s3");
+    expect(r.project.slides.map((s) => s.id)).toEqual(["s1", "s3", "s2"]);
+    const copy = r.project.slides[1];
+    expect(copy.name).toBe("Cover copy");
+    expect(copy.camera).toEqual({ mode: "frame", yaw: 10 });
+    expect(copy.exceptions).toBeUndefined();
+    expect(ids(r.project, 1)).toEqual(["bg-2", "title-2", "obj-2", "sub-2", "cta-2", "note-2"]);
+    expect((findNode(r.project, "note-2")!.node as TypeNode).data.stack).toEqual({ below: "sub-2", gap: 2 });
+    expect((findNode(r.project, "obj-2")!.node as RenderNode).data.object).toBe("bottle");
+    expect((findNode(r.project, "title-2")!.node as TypeNode).box).toEqual({ x: 10, y: 10, w: 50, h: 10 });
+    expect(duplicateSlide(p, p.slides[1]).project.slides.map((s) => s.id)).toEqual(["s1", "s2", "s3"]);
   });
 });

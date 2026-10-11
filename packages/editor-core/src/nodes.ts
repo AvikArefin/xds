@@ -230,6 +230,93 @@ export function duplicateNodes(
   };
 }
 
+// --- copy and paste ------------------------------------------------------------------------
+
+/**
+ * Copies of `nodes` with fresh ids (project-unique, taken from `taken`), no audit exceptions, and
+ * stack anchors remapped: to the copy when the anchor was copied too, kept when `onSlide` has it,
+ * dropped otherwise (an anchor must be on the same slide).
+ */
+export function cloneNodes(nodes: Node[], taken: Set<string>, onSlide: Set<string> = new Set()): Node[] {
+  const map = new Map(nodes.map((n) => [n.id, freshId(n.id, taken)] as const));
+  return nodes.map((n) => {
+    const copy = structuredClone(n) as Node;
+    copy.id = map.get(n.id)!;
+    delete copy.exceptions;
+    if (copy.layer === "type" && copy.data.stack) {
+      const stack = { ...copy.data.stack };
+      for (const key of ["below", "above"] as const) {
+        const anchor = stack[key];
+        if (!anchor) continue;
+        if (map.has(anchor)) stack[key] = map.get(anchor);
+        else if (!onSlide.has(anchor)) delete copy.data.stack;
+      }
+      if (copy.data.stack) copy.data.stack = stack;
+    }
+    return copy;
+  });
+}
+
+/**
+ * Paste copies of `nodes` onto a slide, appended to its z-order, at the same boxes and poses.
+ * A render node whose object is already on that slide gets a copy of the object (fresh id),
+ * because one object appears at most once per slide; otherwise the object is shared.
+ * Nodes whose object no longer exists are skipped.
+ */
+export function pasteNodes(project: Project, slideId: string, nodes: Node[]): { project: Project; ids: string[] } {
+  const slide = project.slides.find((s) => s.id === slideId);
+  if (!slide) return { project, ids: [] };
+  const onSlide = new Set((slide.nodes ?? []).map((n) => n.id));
+  const objects = project.objects ?? [];
+  const objTaken = new Set(objects.map((o) => o.id));
+  const used = new Set((slide.nodes ?? []).flatMap((n) => (n.layer === "render" ? [n.data.object] : [])));
+  const newObjects: SceneObject[] = [];
+  const copies = cloneNodes(
+    nodes.filter((n) => n.layer !== "render" || objects.some((o) => o.id === n.data.object)),
+    allNodeIds(project),
+    onSlide,
+  );
+  for (const n of copies) {
+    if (n.layer !== "render") continue;
+    const obj = objects.find((o) => o.id === n.data.object)!;
+    if (!used.has(obj.id)) {
+      used.add(obj.id);
+      continue;
+    }
+    const objId = freshId(obj.id, objTaken);
+    newObjects.push({ ...structuredClone(obj), id: objId, name: `${obj.name} copy` });
+    n.data.object = objId;
+  }
+  const next = updateSlide(project, slideId, (s) => ({ ...s, nodes: [...(s.nodes ?? []), ...copies] as Slide["nodes"] }));
+  return {
+    project: newObjects.length ? { ...next, objects: [...objects, ...newObjects] } : next,
+    ids: copies.map((n) => n.id),
+  };
+}
+
+/**
+ * Insert a copy of `slide` right after the slide `afterId` (default: the end): fresh slide and
+ * node ids, "<name> copy", the same camera and lighting, no audit exceptions. Objects are shared
+ * (a render node references the same object on both slides).
+ */
+export function duplicateSlide(project: Project, slide: Slide, afterId?: string): { project: Project; id: string } {
+  const taken = new Set(project.slides.map((s) => s.id));
+  let n = project.slides.length + 1;
+  let id = `s${n}`;
+  while (taken.has(id)) id = `s${++n}`;
+  const copy: Slide = {
+    ...structuredClone(slide),
+    id,
+    name: `${slide.name || slide.id} copy`,
+    nodes: cloneNodes((slide.nodes ?? []) as Node[], allNodeIds(project)) as Slide["nodes"],
+  };
+  delete copy.exceptions;
+  const at = project.slides.findIndex((s) => s.id === afterId) + 1;
+  const slides = [...project.slides];
+  slides.splice(at <= 0 ? slides.length : at, 0, copy);
+  return { project: { ...project, slides: slides as Project["slides"] }, id };
+}
+
 // --- z-order within a layer ----------------------------------------------------------------
 
 export type ReorderTo = "forward" | "backward" | "front" | "back" | number;

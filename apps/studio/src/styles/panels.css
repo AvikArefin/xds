@@ -97,12 +97,15 @@
   display: flex;
   gap: 3px;
 }
-.slide-del {
-  width: 20px;
-  height: 20px;
+.slide-actions {
+  display: flex;
   opacity: 0;
 }
-.slide-item:hover .slide-del {
+.slide-actions .icon-btn {
+  width: 20px;
+  height: 20px;
+}
+.slide-item:hover .slide-actions {
   opacity: 1;
 }
 .thumb {

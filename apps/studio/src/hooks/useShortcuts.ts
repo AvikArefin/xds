@@ -64,7 +64,18 @@ export function useShortcuts() {
       }
       if (mod && key === "d") {
         e.preventDefault();
-        st.duplicateSelection();
+        if (st.selectedIds.length) st.duplicateSelection();
+        else st.duplicateSlide(st.activeSlideId);
+        return;
+      }
+      if (mod && key === "c") {
+        e.preventDefault();
+        st.copy();
+        return;
+      }
+      if (mod && key === "v") {
+        e.preventDefault();
+        st.paste();
         return;
       }
       if (mod || e.altKey) return;

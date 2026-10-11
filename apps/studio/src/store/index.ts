@@ -35,11 +35,13 @@ import {
   deleteSlide as deleteSlideCore,
   distributeRects,
   duplicateNodes,
+  duplicateSlide as duplicateSlideCore,
   freshId,
   gapForTop,
   moveSlide as moveSlideCore,
   nudgeNodes,
   nudgePose,
+  pasteNodes,
   pxRectToBox,
   removeNodes,
   reorderInLayer,
@@ -75,6 +77,8 @@ export interface PromptRequest {
   resolve: (v: string | null) => void;
 }
 
+export type Clipboard = { kind: "nodes"; layer: Layer; nodes: Node[] } | { kind: "slide"; slide: Slide };
+
 export interface StudioState {
   // --- document
   status: "loading" | "ready" | "error";
@@ -101,6 +105,8 @@ export interface StudioState {
   locked: Record<string, boolean>;
   /** Where the active slide's stacked text blocks landed (from the type layer). Not saved, not in undo. */
   stackLayout: Record<string, StackPlacement>;
+  /** What Copy took: nodes of one layer, or a whole slide. Editor-only, cleared when another project opens. */
+  clipboard: Clipboard | null;
 
   // --- view
   zoom: number | "fit";
@@ -176,6 +182,10 @@ export interface StudioActions {
   toggleHidden(id: string): void;
   deleteSelection(): void;
   duplicateSelection(): void;
+  /** The selection to the clipboard; with nothing selected, the active slide. */
+  copy(): void;
+  /** Nodes onto the active slide at the same place (switching to their layer); a slide after the active one. */
+  paste(): void;
   nudge(dx: number, dy: number, big: boolean): void;
   reorder(id: string, to: ReorderTo): void;
   align(how: AlignHow): void;
@@ -199,6 +209,7 @@ export interface StudioActions {
   setLayerOrder(order: Layer[]): void;
 
   addSlide(): void;
+  duplicateSlide(id: string): void;
   deleteSlide(id: string): void;
   moveSlide(id: string, to: number): void;
   renameSlide(id: string, name: string): void;
@@ -238,6 +249,7 @@ const initial: StudioState = {
   transformSpace: "world",
   locked: {},
   stackLayout: {},
+  clipboard: null,
   zoom: "fit",
   fitZoom: 0.5,
   snap: true,
@@ -437,6 +449,7 @@ export const useStudio = create<Studio>()(
           selectedIds: keepSession ? before.selectedIds.filter((id) => existing.has(id)) : [],
           mode: keepSession ? before.mode : "present",
           locked: keepSession ? before.locked : {},
+          clipboard: keepSession ? before.clipboard : null,
           report: keepSession ? before.report : null,
           exportBlocked: null,
         });
@@ -695,6 +708,33 @@ export const useStudio = create<Studio>()(
           const r = duplicateNodes(s.project!, s.activeSlideId, ok);
           commit(r.project, { selectedIds: r.ids });
         },
+        copy: () => {
+          const s = get();
+          const slide = slideOf();
+          if (!s.project || !slide) return;
+          if (!s.selectedIds.length || s.mode === "present") {
+            set({ clipboard: { kind: "slide", slide: structuredClone(slide) } });
+            return notify("info", `Copied slide “${slide.name || slide.id}”. Paste adds it after the active slide.`);
+          }
+          const nodes = nodesOf(slide).filter((n) => s.selectedIds.includes(n.id) && n.layer === s.mode);
+          if (!nodes.length) return;
+          set({ clipboard: { kind: "nodes", layer: s.mode, nodes: structuredClone(nodes) } });
+          notify("info", nodes.length === 1 ? "Copied 1 node." : `Copied ${nodes.length} nodes.`);
+        },
+        paste: () => {
+          const s = get();
+          const clip = s.clipboard;
+          if (!clip || !canEditDoc() || !s.project) return;
+          if (clip.kind === "slide") {
+            const r = duplicateSlideCore(s.project, clip.slide, s.activeSlideId);
+            commit(r.project, { activeSlideId: r.id, selectedIds: [] });
+            return;
+          }
+          const r = pasteNodes(s.project, s.activeSlideId, clip.nodes);
+          if (!r.ids.length) return notify("warning", "Nothing to paste: the copied objects are gone from this project.");
+          if (r.ids.length < clip.nodes.length) notify("warning", "Some copied objects are gone from this project and were skipped.");
+          commit(r.project, { selectedIds: r.ids, mode: clip.layer });
+        },
         nudge: (dx, dy, big) => {
           const s = get();
           const ok = guardIds(s.selectedIds, { quiet: true });
@@ -925,6 +965,13 @@ export const useStudio = create<Studio>()(
           const s = get();
           if (!canEditDoc() || !s.project) return;
           const r = addSlideCore(s.project, s.activeSlideId);
+          commit(r.project, { activeSlideId: r.id, selectedIds: [] });
+        },
+        duplicateSlide: (id) => {
+          const s = get();
+          const slide = getSlide(s.project, id);
+          if (!canEditDoc() || !s.project || !slide) return;
+          const r = duplicateSlideCore(s.project, slide, id);
           commit(r.project, { activeSlideId: r.id, selectedIds: [] });
         },
         deleteSlide: (id) => {

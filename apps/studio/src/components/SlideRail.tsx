@@ -13,7 +13,7 @@ function SlideList() {
   const hash = useStudio((s) => s.hash);
   const readOnly = useStudio((s) => s.readOnly);
   const dirty = useDirty();
-  const { setActiveSlide, addSlide, deleteSlide, moveSlide, renameSlide } = useStudio.getState();
+  const { setActiveSlide, addSlide, duplicateSlide, deleteSlide, moveSlide, renameSlide } = useStudio.getState();
   const [drag, setDrag] = useState<{ id: string; over: number | null } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   if (!project) return null;
@@ -90,17 +90,29 @@ function SlideList() {
                     {c?.e ? <span className="badge sev-error">{c.e}</span> : null}
                     {c?.w ? <span className="badge sev-warn">{c.w}</span> : null}
                   </span>
-                  {project.slides.length > 1 && !readOnly && (
-                    <IconButton
-                      icon="trash"
-                      title="Delete slide"
-                      className="slide-del"
-                      size={12}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSlide(slide.id);
-                      }}
-                    />
+                  {!readOnly && (
+                    <span className="slide-actions">
+                      <IconButton
+                        icon="copy"
+                        title="Duplicate slide (⌘D with nothing selected)"
+                        size={12}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          duplicateSlide(slide.id);
+                        }}
+                      />
+                      {project.slides.length > 1 && (
+                        <IconButton
+                          icon="trash"
+                          title="Delete slide"
+                          size={12}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSlide(slide.id);
+                          }}
+                        />
+                      )}
+                    </span>
                   )}
                 </div>
               </div>

@@ -27,7 +27,7 @@ editor.
 
 | Area | Contents |
 | --- | --- |
-| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Undo, Redo, Save |
+| **SlideRail** (left) | slides (click, drag to reorder, double-click the name to rename, `+`, duplicate, trash); **Audit** (counts, findings, an eye to hide or show them on the canvas, `Shift + A`); **Format** (preset or custom size); toolbar: Open, Search, Undo, Redo, Save |
 | **Stage** (center) | the mode switch (Present, then the layers front → back); in 3D: Move/Rotate/Scale and World/Local; in layer modes: Snap and Guides (`G`). The canvas is the export's own renderer. Zoom floats at its bottom-right (click the % to fit). After an audit, findings are outlined on the canvas. |
 | **Side panel** | Present: **Layers** and **Exports**. 3D: the slide's objects, **+ Add model…** (Library or From file), **+ Add shape…**. 2D: **+ New image…** (Library logos or the project's images). Text / 2D / Background: the layer's nodes and **+ New …** |
 | **Inspector** (right) | Present: the brand (colors, type roles, default lighting). 3D: the object's pose and **Place on canvas**, the slide's Camera and Lighting. Other layers: the selected node's box and its layer's fields (Text adds **Wrap** and **Stack**). |
@@ -64,7 +64,8 @@ Shortcuts are ignored while typing in a field.
 | `A` · `Shift + A` · `G` | run audit · toggle audit regions · toggle guides |
 | `Delete` / `Backspace` | delete the selection (respects locks) |
 | `Shift + click` · marquee · `Cmd/Ctrl + A` | add to the selection · select by area · select all in the layer |
-| `Cmd/Ctrl + D` | duplicate |
+| `Cmd/Ctrl + D` | duplicate the selection; with nothing selected, the slide |
+| `Cmd/Ctrl + C` · `V` | copy the selection (or, with nothing selected, the slide) · paste |
 | arrows | nudge: 2D 1 px (`Shift`: `u`); 3D 1 cm (`Shift`: 10 cm) |
 | `Escape` | close the palette or a list; clear the selection |
 
@@ -73,6 +74,15 @@ Shortcuts are ignored while typing in a field.
 the **gizmo** moves, rotates or scales the selected object on this slide. Clicking any part of a
 model selects the whole model: parts, animation and device screens are set in the file by an
 agent, and the editor keeps them as they are.
+
+**Copy and paste** is the editor's own clipboard (not the system one; it empties when another
+project opens). Pasted nodes land on the active slide **in the same place** as the originals, in
+front, selected, and the editor switches to their layer. A stacked text block keeps its anchor when
+the anchor was copied with it or is on that slide; otherwise it is released where it is. A 3D node
+pasted onto a slide that already shows its object gets a copy of the object (one object appears at
+most once per slide). A copied slide is pasted right after the active one, and **duplicate** (the
+rail's copy icon, or `Cmd/Ctrl + D` with nothing selected) inserts a copy right after the
+original. Copies never carry audit exceptions: audit them again.
 
 With several 2D nodes selected, the inspector shows their shared values (`—` where they differ)
 and the toolbar adds **Align** and **Distribute**. Selection survives edits, undo, save and
