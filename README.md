@@ -1,7 +1,7 @@
 <h1 align="center">XDS</h1>
 
 <p align="center">
-  <b>A local design editor for social-media graphics that people and AI agents both drive.</b><br>
+  <b>A local agent driven and human audited design editor for social-media graphics for products.</b><br>
   Live 3D product scenes, typography that fits itself, and design rules that check your work while you edit.
 </p>
 
@@ -28,10 +28,18 @@ Most graphic tools make you place everything by hand, one format at a time. XDS 
 
 Everything runs on your machine. No account, no cloud.
 
+**Who it's for:** people who make product graphics and like working with a coding agent (Claude
+Code, Codex) or a CLI next to a visual editor. If you want a pure drag-and-drop tool, this isn't it.
+
+**Status:** early. XDS is a personal project, developed and tested on macOS; Linux should work,
+Windows is experimental. Issues and pull requests are welcome, but there are no promises on
+support or timelines.
+
 ## Showcase
 
 Carousels made with XDS for cortextech projects. Every slide is a live
-3D scene plus type, exported straight from the CLI.
+3D scene plus type, exported straight from the CLI. The phones and laptops are the optional
+device models (see Setup); a fresh install renders without them.
 
 | | |
 | --- | --- |
@@ -59,45 +67,67 @@ view over those files. See [docs/](./docs/README.md) for the architecture, data 
 
 ## Setup
 
-Requirements: [uv](https://docs.astral.sh/uv/), Node.js ≥ 20 with npm, macOS or Linux.
+One line installs everything: uv (which brings Python), a private copy of Node.js if you don't
+have one, the editor and its renderer. It installs into `~/xds` (set `XDS_DIR` to change that)
+and is safe to run again to update.
+
+**macOS / Linux**, in Terminal:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/AvikArefin/xds/main/install.sh | sh
+```
+
+**Windows** (experimental), in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/AvikArefin/xds/main/install.ps1 | iex
+```
+
+Then open a new terminal and run `xds init` and `xds open` (see Quickstart). Read
+[install.sh](./install.sh) or [install.ps1](./install.ps1) first if you prefer.
+
+Optional: the iPhone and MacBook device models are third-party and not in the repo, so your
+renders won't use them until you set them up locally as described in
+[xds/library/models/AGENTS.md](./xds/library/models/AGENTS.md) (or ask your coding agent to).
+
+<details>
+<summary>Manual setup</summary>
+
+Requirements: [uv](https://docs.astral.sh/uv/), Node.js ≥ 20 with npm.
+
+```bash
+git clone https://github.com/AvikArefin/xds && cd xds
 uv sync                                  # Python 3.12 + the xds package
 npm install                              # the studio and the screen toolkit
 uv run playwright install chromium       # the renderer
 npm run build                            # the studio, served by `xds` for headless renders
+uv tool install --editable . --force     # `xds` on your PATH, running this checkout
 ```
 
-Optional: the iPhone and MacBook device models are third-party and not in the repo. To use
-them, set them up locally as described in [xds/library/models/AGENTS.md](./xds/library/models/AGENTS.md)
-(or ask your coding agent to).
+`xds` on your PATH matters: a project's `AGENTS.md` tells agents to run plain `xds` inside the
+project folder and never leave it.
 
-Then put `xds` on your PATH, so it works from inside a project folder. The project's `AGENTS.md`
-tells agents to run plain `xds` there and never leave the project:
-
-```bash
-uv tool install --editable . --force     # `xds` everywhere, running this checkout
-```
+</details>
 
 ## Quickstart
 
 ```bash
-uv run xds init ~/xd-projects/launch --name "Launch" --format instagram-portrait
-uv run xds open ~/xd-projects/launch     # the editor (API :8765, Vite :5173)
+xds init ~/xd-projects/launch --name "Launch" --format instagram-portrait
+xds open ~/xd-projects/launch     # the editor (API :8765, Vite :5173)
 ```
 
 Or work like an agent, through files and the CLI (the project's `AGENTS.md` explains the loop):
 
 ```bash
-uv run xds guide ~/xd-projects/launch    # margins, spacing unit, type sizes for this format
-uv run xds layout apply ~/xd-projects/launch hero-left --mode new   # a slide from a layout (relations, no coordinates)
+xds guide ~/xd-projects/launch    # margins, spacing unit, type sizes for this format
+xds layout apply ~/xd-projects/launch hero-left --mode new   # a slide from a layout (relations, no coordinates)
 # edit project.json, designs/, screens/
-uv run xds check ~/xd-projects/launch    # schema + references, no browser
-uv run xds measure ~/xd-projects/launch  # where the text lands (lines, heights, stacks), no 3D
-uv run xds audit ~/xd-projects/launch    # render + measure + design rules
-uv run xds fix ~/xd-projects/launch      # apply the findings' structured fixes
-uv run xds export ~/xd-projects/launch   # audit gate → export/<stamp>/*.png (--pdf: one PDF)
-uv run xds export ~/xd-projects/launch --format linkedin-landscape   # the same deck in another format
+xds check ~/xd-projects/launch    # schema + references, no browser
+xds measure ~/xd-projects/launch  # where the text lands (lines, heights, stacks), no 3D
+xds audit ~/xd-projects/launch    # render + measure + design rules
+xds fix ~/xd-projects/launch      # apply the findings' structured fixes
+xds export ~/xd-projects/launch   # audit gate → export/<stamp>/*.png (--pdf: one PDF)
+xds export ~/xd-projects/launch --format linkedin-landscape   # the same deck in another format
 ```
 
 ## CLI reference

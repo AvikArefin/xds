@@ -19,3 +19,4 @@ xds/library/fonts/
 
 # Third-party device models: set up locally (xds/library/models/AGENTS.md), not redistributed
 xds/library/models/*/model.glb
+.tools/
