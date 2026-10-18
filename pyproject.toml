@@ -3,6 +3,7 @@ name = "xds"
 version = "2.0.0"
 description = "Local design editor for social-media graphics that agents can drive"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.9",

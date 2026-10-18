@@ -1,18 +1,62 @@
-# XDS
+<h1 align="center">XDS</h1>
 
-A local design editor for social-media graphics that people and LLM agents both drive. Each slide
-stacks a 2D **background**, a live **3D** product scene with automatic studio lighting, 2D
-**images** and drawn **ornaments**, and **type**. A layout is said in relations rather than
-coordinates (a block pinned to the margin, stacked a gap under another, in a column that flows),
-so one source renders in every format; the design rules run live while you edit and again in the
-audit, and a finding's fix is a field write you can apply with one click or `xds fix`.
-Expressive type (skew, outline, extrusion, repeats, plates) is declared as treatments, drawn by
-the renderer and checked for coherence. Slides start from a library of layouts, and every big
-save leaves a snapshot to restore.
+<p align="center">
+  <b>A local design editor for social-media graphics that people and AI agents both drive.</b><br>
+  Live 3D product scenes, typography that fits itself, and design rules that check your work while you edit.
+</p>
 
-Everything runs on your machine. A project is an ordinary folder (`project.json` plus designs,
-assets and fonts), and the editor is a view over those files. See [docs/](./docs/README.md) for
-the architecture, data models and rules.
+<p align="center">
+  <img src="docs/showcase/armxcell.jpg" width="49%" alt="ArmXCell: a robot arm controlled from a phone">
+  <img src="docs/showcase/gateman.jpg" width="49%" alt="GateMan: a smart doorbell and lock">
+</p>
+
+## What it is
+
+Most graphic tools make you place everything by hand, one format at a time. XDS works differently:
+
+- **Say where things go, not their coordinates.** "Pinned to the left margin", "a gap under the headline".
+  One source renders correctly in Instagram, LinkedIn or any custom size.
+- **Real 3D, lit for you.** Drop in a product model (a phone, a laptop, a robot) and it gets studio
+  lighting automatically. Put your own app screens on the device's display.
+- **A design reviewer built in.** Rules for spacing, contrast, type sizes and alignment run live.
+  Each problem comes with a fix you apply in one click, or with `xds fix`.
+- **Built for AI agents too.** A project is a plain folder of JSON, SVG and assets. An agent like
+  Claude Code or Codex can build a whole carousel through the CLI, and you can open it in the
+  editor and keep going.
+- **Expressive type.** Skew, outlines, extrusion, repeats and plates, drawn by the renderer and
+  checked for coherence.
+- **Safe to experiment.** Start from a library of layouts; every big save leaves a snapshot to restore.
+
+Everything runs on your machine. No account, no cloud.
+
+## Showcase
+
+Carousels made with XDS for cortextech projects. Every slide is a live
+3D scene plus type, exported straight from the CLI.
+
+| | |
+| --- | --- |
+| ![ArmXCell: the math](docs/showcase/armxcell-math.jpg) | ![Drake drone project](docs/showcase/drake.jpg) |
+| **ArmXCell**: a robot arm driven from an iPhone | **Drake**: drone autonomy research |
+| ![Drake: stereo vision](docs/showcase/drake-stereo.jpg) | ![DarkBotX: six axes, one soft hand](docs/showcase/darkbotx.jpg) |
+| Particles and depth in the same scene | **DarkBotX**: a robot hand that grips by touch |
+| ![DarkBotX: mesh reconstruction](docs/showcase/darkbotx-mesh.jpg) | ![GateMan: the lock](docs/showcase/gateman-lock.jpg) |
+| Wireframe geometry as a design element | **GateMan**: device plus app screen on one slide |
+| ![Vector research arm](docs/showcase/vector.jpg) | ![Vector: depth from disparity](docs/showcase/vector-depth.jpg) |
+| **Vector**: a research arm, light theme | Diagrams and figures beside the 3D |
+
+<p align="center"><img src="docs/showcase/topic-cover.jpg" width="80%" alt="A flat blog cover in a wide format"><br>
+<sub>Not everything needs 3D: a flat blog cover in a 1200×627 format.</sub></p>
+
+## How it works
+
+A slide is a stack of layers: a 2D **background** (SVG), a **3D** scene, 2D **images** and drawn
+**ornaments**, and **type**. You write a layout as relations (a block pinned to the margin, stacked
+under another, in a column that flows), so the same slide reflows to every format. The design rules
+run live in the editor and again in `xds audit`; a finding's fix is just a field write.
+
+A project is an ordinary folder (`project.json` plus designs, assets and fonts), and the editor is a
+view over those files. See [docs/](./docs/README.md) for the architecture, data models and rules.
 
 ## Setup
 
@@ -24,6 +68,10 @@ npm install                              # the studio and the screen toolkit
 uv run playwright install chromium       # the renderer
 npm run build                            # the studio, served by `xds` for headless renders
 ```
+
+Optional: the iPhone and MacBook device models are third-party and not in the repo. To use
+them, set them up locally as described in [xds/library/models/AGENTS.md](./xds/library/models/AGENTS.md)
+(or ask your coding agent to).
 
 Then put `xds` on your PATH, so it works from inside a project folder. The project's `AGENTS.md`
 tells agents to run plain `xds` there and never leave the project:
@@ -55,6 +103,10 @@ uv run xds export ~/xd-projects/launch --format linkedin-landscape   # the same 
 
 ## CLI reference
 
+<details>
+<summary>All commands</summary>
+
+
 Every command accepts `--json` (one JSON document on stdout; progress goes to stderr). Exit
 status is 0 on success, 1 on failure or open audit errors.
 
@@ -79,7 +131,7 @@ status is 0 on success, 1 on failure or open audit errors.
 | `xds migrate [PROJECT \| --all] [--dry-run] [--conform]` | upgrade project files to the current schema, and the project's `AGENTS.md` to this version's guide |
 | `xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace] [--height M \| --scale F] [--front DIR] [--ground]` | check, convert (`.gltf`, `.dae`) and register a model; `--height`/`--front` bring it to real size, facing +Z, standing on its bottom center |
 | `xds model inspect FILE` | parts, clips, screen meshes, convention warnings |
-| `xds model library` | the device models that ship with xds (iPhone 17 Pro, MacBook Pro 14″) |
+| `xds model library` | the device models set up locally (iPhone 17 Pro, MacBook Pro 14″; see `xds/library/models/AGENTS.md`) |
 | `xds model add PROJECT --library ID [--slide ID] [--screen ID]` | use a library model by reference (not copied) |
 | `xds model vendor PROJECT ASSET_ID` | copy a library model into the project so it travels without xds |
 | `xds logo library` · `xds logo add PROJECT LOGO` | the cortextech logos that ship with xds · register one as an asset by reference |
@@ -92,6 +144,8 @@ status is 0 on success, 1 on failure or open audit errors.
 | `xds formats` | the format catalog, with each preset's aspect and orientation class |
 | `xds schema --emit-types \| --check` | regenerate or check `packages/protocol/src/generated/project.ts` (development; `--emit-types` runs only inside this checkout) |
 | `xds clean PROJECT` | delete `cache/` |
+
+</details>
 
 The projects directory (for the editor's project browser and `migrate --all`) is
 `~/xd-projects/`, or `$XDS_PROJECTS_DIR`.
@@ -109,3 +163,9 @@ Repository layout: `xds/` is the Python package (schema, gate, API, CLI, rendere
 `apps/studio/` the React editor and render page, `packages/protocol/` the generated TypeScript
 types, and `packages/editor-core/` pure editing math. Details are in
 [docs/architecture.md](./docs/architecture.md).
+
+
+## License
+
+The code is licensed under the [Apache License 2.0](./LICENSE). Logos, the showcase images and the
+device models are not covered; see [NOTICE](./NOTICE).

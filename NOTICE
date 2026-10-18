@@ -1,0 +1,28 @@
+XDS
+Copyright 2026 Avik Arefin
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party material and trademarks
+===================================
+
+The Apache License covers the XDS source code and documentation. It does not cover:
+
+- cortextech logos (xds/library/brands/cortextech/) and the showcase images in
+  docs/showcase/ (renders of cortextech projects: ArmXCell, DarkBotX, Drake,
+  GateMan, Vector). These are trademarks and works of cortextech, included to
+  demonstrate the tool. All rights reserved; do not reuse them in your own
+  work.
+
+- Device models. The iPhone 17 Pro and MacBook Pro 14″ models are third-party
+  and are not distributed in this repository; each user sets them up locally
+  (see xds/library/models/AGENTS.md). Renders of them appear in the showcase.
+  iPhone and MacBook are trademarks of Apple Inc. XDS is not affiliated with
+  or endorsed by Apple.
+
+- Fonts. XDS does not ship fonts. `xds fonts fetch` downloads families from
+  Fontshare (Indian Type Foundry) into a local, git-ignored library under the
+  Fontshare license; they are not redistributed here.
+
+- Hiwonder, Raspberry Pi, Bluetooth and other product names shown in the
+  showcase belong to their respective owners.
