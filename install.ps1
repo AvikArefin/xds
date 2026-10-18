@@ -91,7 +91,4 @@ XDS is installed in $Dir.
 Open a new PowerShell, then:
   xds init ~\xd-projects\first --name "First" --format instagram-portrait
   xds open ~\xd-projects\first
-
-Optional: the iPhone and MacBook models are not included; see
-$Dir\xds\library\models\AGENTS.md to set them up.
 "@

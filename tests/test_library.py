@@ -10,11 +10,6 @@ from .conftest import edit
 
 IDS = {"iphone-17-pro", "macbook-pro-14"}
 
-# The device models are third-party and not in the repository (xds/library/models/AGENTS.md)
-pytestmark = pytest.mark.skipif(
-    not all((library.DIR / "models" / i / "model.glb").is_file() for i in IDS),
-    reason="library device models not set up (see xds/library/models/AGENTS.md)")
-
 
 def test_models_follow_the_conventions():
     items = {m["id"]: m for m in library.models()}

@@ -14,11 +14,21 @@ The Apache License covers the XDS source code and documentation. It does not cov
   demonstrate the tool. All rights reserved; do not reuse them in your own
   work.
 
-- Device models. The iPhone 17 Pro and MacBook Pro 14″ models are third-party
-  and are not distributed in this repository; each user sets them up locally
-  (see xds/library/models/AGENTS.md). Renders of them appear in the showcase.
-  iPhone and MacBook are trademarks of Apple Inc. XDS is not affiliated with
-  or endorsed by Apple.
+- Device models (xds/library/models/), licensed under Creative Commons
+  Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/) by their
+  authors, not under the Apache License:
+
+  - iphone-17-pro: "iPhone 17 Pro" by Ranguel
+    https://sketchfab.com/3d-models/iphone-17-pro-4541aa8a28324b33a2baaf81d263aaec
+  - macbook-pro-14: "MacBook Air M4" by ValentinoMyHero
+    https://sketchfab.com/3d-models/macbook-air-m4-6a33f3de64aa45af9a8781736ca16eb7
+
+  Changes: re-oriented, grounded and centered; a separate Screen mesh with
+  0-1 UVs; the MacBook lid pivoted on its hinge; textures re-encoded as WebP
+  and geometry Draco-compressed (scripts/build_library_models.py).
+
+  iPhone, MacBook and Apple are trademarks of Apple Inc. XDS is not
+  affiliated with or endorsed by Apple.
 
 - Fonts. XDS does not ship fonts. `xds fonts fetch` downloads families from
   Fontshare (Indian Type Foundry) into a local, git-ignored library under the

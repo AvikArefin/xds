@@ -77,9 +77,6 @@ XDS is installed in $DIR.
 Open a new terminal, then:
   xds init ~/xd-projects/first --name "First" --format instagram-portrait
   xds open ~/xd-projects/first
-
-Optional: the iPhone and MacBook models are not included; see
-$DIR/xds/library/models/AGENTS.md to set them up.
 EOF
 if [ "$(uname -s)" = Linux ]; then
   echo "On Linux, if rendering fails with missing libraries, run once:"

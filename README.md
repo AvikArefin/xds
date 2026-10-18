@@ -38,8 +38,7 @@ support or timelines.
 ## Showcase
 
 Carousels made with XDS for cortextech projects. Every slide is a live
-3D scene plus type, exported straight from the CLI. The phones and laptops are the optional
-device models (see Setup); a fresh install renders without them.
+3D scene plus type, exported straight from the CLI.
 
 | | |
 | --- | --- |
@@ -85,10 +84,6 @@ irm https://raw.githubusercontent.com/AvikArefin/xds/main/install.ps1 | iex
 
 Then open a new terminal and run `xds init` and `xds open` (see Quickstart). Read
 [install.sh](./install.sh) or [install.ps1](./install.ps1) first if you prefer.
-
-Optional: the iPhone and MacBook device models are third-party and not in the repo, so your
-renders won't use them until you set them up locally as described in
-[xds/library/models/AGENTS.md](./xds/library/models/AGENTS.md) (or ask your coding agent to).
 
 <details>
 <summary>Manual setup</summary>
@@ -160,7 +155,7 @@ status is 0 on success, 1 on failure or open audit errors.
 | `xds migrate [PROJECT \| --all] [--dry-run] [--conform]` | upgrade project files to the current schema, and the project's `AGENTS.md` to this version's guide |
 | `xds model add PROJECT FILE --id ID [--name NAME] [--slide ID] [--replace] [--height M \| --scale F] [--front DIR] [--ground]` | check, convert (`.gltf`, `.dae`) and register a model; `--height`/`--front` bring it to real size, facing +Z, standing on its bottom center |
 | `xds model inspect FILE` | parts, clips, screen meshes, convention warnings |
-| `xds model library` | the device models set up locally (iPhone 17 Pro, MacBook Pro 14″; see `xds/library/models/AGENTS.md`) |
+| `xds model library` | the device models that ship with xds (iPhone 17 Pro, MacBook Pro 14″) |
 | `xds model add PROJECT --library ID [--slide ID] [--screen ID]` | use a library model by reference (not copied) |
 | `xds model vendor PROJECT ASSET_ID` | copy a library model into the project so it travels without xds |
 | `xds logo library` · `xds logo add PROJECT LOGO` | the cortextech logos that ship with xds · register one as an asset by reference |
@@ -196,5 +191,5 @@ types, and `packages/editor-core/` pure editing math. Details are in
 
 ## License
 
-The code is licensed under the [Apache License 2.0](./LICENSE). Logos, the showcase images and the
-device models are not covered; see [NOTICE](./NOTICE).
+The code is licensed under the [Apache License 2.0](./LICENSE). Logos and the showcase images are
+not covered, and the device models are CC BY 4.0 by their authors; see [NOTICE](./NOTICE).
