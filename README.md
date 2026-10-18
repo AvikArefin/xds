@@ -6,8 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/showcase/armxcell.jpg" width="44%" alt="ArmXCell: a robot arm controlled from a phone">
-  <img src="docs/showcase/editor.jpg" width="53%" alt="The XDS editor: slides, audit findings, the canvas, layers and brand panels">
+  <img src="docs/showcase/editor.jpg" width="90%" alt="The XDS editor: slides, audit findings, the canvas, layers and brand panels">
 </p>
 
 ## What it is
